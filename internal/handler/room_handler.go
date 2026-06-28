@@ -15,12 +15,18 @@ type CreateRoomRequest struct {
 	Code string `json:"code"`
 }
 
+// AddUserToRoomRequest represents the request to add a user to a room
+type AddUserToRoomRequest struct {
+	Code string `json:"code"`
+}
+
 // RoomResponse represents a room in the response
 type RoomResponse struct {
 	ID        string `json:"id"`
 	Name      string `json:"name"`
 	Code      string `json:"code"`
 	CreatedBy string `json:"created_by"`
+	Members   []string `json:"members,omitempty"`
 	CreatedAt string `json:"created_at"`
 	UpdatedAt string `json:"updated_at"`
 }
@@ -84,6 +90,65 @@ func (h *RoomHandler) CreateRoom(c *fiber.Ctx) error {
 		"data":    response,
 		"message": "room created successfully",
 		"status":  fiber.StatusCreated,
+	})
+}
+
+// AddUserToRoom adds a user to an existing room by code
+func (h *RoomHandler) AddUserToRoom(c *fiber.Ctx) error {
+	// Extract user ID from context
+	userID, ok := c.Locals("user_id").(string)
+	if !ok || userID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(map[string]interface{}{
+			"error":  "unauthorized",
+			"status": fiber.StatusUnauthorized,
+		})
+	}
+
+	// Convert user ID from string to ObjectID
+	userObjID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
+			"error":  "invalid user id",
+			"status": fiber.StatusBadRequest,
+		})
+	}
+
+	// Parse request body
+	var req AddUserToRoomRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
+			"error":  "invalid input",
+			"status": fiber.StatusBadRequest,
+		})
+	}
+
+	// Add user to room via service
+	room, err := h.svc.AddUserToRoom(c.Context(), req.Code, userObjID)
+	if err != nil {
+		return h.handleError(c, err)
+	}
+
+	// Convert members to string slice for response
+	members := make([]string, len(room.Members))
+	for i, m := range room.Members {
+		members[i] = m.Hex()
+	}
+
+	// Convert domain Room to RoomResponse
+	response := &RoomResponse{
+		ID:        room.ID.Hex(),
+		Name:      room.Name,
+		Code:      room.Code,
+		CreatedBy: room.CreatedBy.Hex(),
+		Members:   members,
+		CreatedAt: room.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		UpdatedAt: room.UpdatedAt.Format("2006-01-02T15:04:05Z"),
+	}
+
+	return c.Status(fiber.StatusOK).JSON(map[string]interface{}{
+		"data":    response,
+		"message": "user added to room successfully",
+		"status":  fiber.StatusOK,
 	})
 }
 

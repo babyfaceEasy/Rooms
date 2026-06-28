@@ -12,4 +12,5 @@ type RoomRepository interface {
 	Create(ctx context.Context, room *domain.Room) error
 	GetByID(ctx context.Context, id primitive.ObjectID) (*domain.Room, error)
 	GetByCode(ctx context.Context, code string) (*domain.Room, error)
+	AddUserToRoom(ctx context.Context, roomID, userID primitive.ObjectID) error
 }
