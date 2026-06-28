@@ -1,0 +1,416 @@
+# Posts Module API Documentation
+
+This document provides comprehensive API documentation for the Posts module, including all endpoints, request/response formats, and examples.
+
+## Base URL
+
+```
+http://localhost:3000/api/v1
+```
+
+## Authentication
+
+All endpoints in this module require JWT authentication via the `Authorization` header:
+
+```
+Authorization: Bearer <access_token>
+```
+
+The JWT token is obtained from the login endpoint (`POST /api/v1/auth/login`).
+
+---
+
+## Overview
+
+The Posts module allows users to create, retrieve, and delete posts. Posts support optional image and video attachments that are stored in S3-compatible object storage (MinIO for development, AWS S3 for production).
+
+### Supported File Types
+
+**Images:** jpg, jpeg, png, gif, webp
+
+**Videos:** mp4, webm, mov, avi
+
+---
+
+## Endpoints
+
+### 1. Create Post
+
+Creates a new post with optional image/video attachments.
+
+**Endpoint:** `POST /api/v1/posts`
+
+**Authentication:** Required
+
+**Request Format:** `multipart/form-data`
+
+**Form Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| text | string | Yes | Post text content (1-5000 characters) |
+| image | file | No | Image file (max size limited by S3 bucket config) |
+| video | file | No | Video file (max size limited by S3 bucket config) |
+
+**Example Request (using curl):**
+
+```bash
+# Create post with text only
+curl -X POST http://localhost:3000/api/v1/posts \
+  -H "Authorization: Bearer <access_token>" \
+  -F "text=This is my first post!"
+
+# Create post with image
+curl -X POST http://localhost:3000/api/v1/posts \
+  -H "Authorization: Bearer <access_token>" \
+  -F "text=Check out this photo!" \
+  -F "image=@/path/to/image.jpg"
+
+# Create post with video
+curl -X POST http://localhost:3000/api/v1/posts \
+  -H "Authorization: Bearer <access_token>" \
+  -F "text=Watch this video!" \
+  -F "video=@/path/to/video.mp4"
+
+# Create post with both image and video
+curl -X POST http://localhost:3000/api/v1/posts \
+  -H "Authorization: Bearer <access_token>" \
+  -F "text=Media gallery" \
+  -F "image=@/path/to/image.png" \
+  -F "video=@/path/to/video.webm"
+```
+
+**Success Response (201 Created):**
+
+```json
+{
+  "data": {
+    "id": "507f1f77bcf86cd799439013",
+    "user_id": "507f1f77bcf86cd799439012",
+    "text": "This is my first post!",
+    "image": null,
+    "video": null,
+    "created_at": "2024-06-28T21:30:00Z",
+    "updated_at": "2024-06-28T21:30:00Z"
+  },
+  "message": "post created successfully",
+  "status": 201
+}
+```
+
+**Success Response with Image (201 Created):**
+
+```json
+{
+  "data": {
+    "id": "507f1f77bcf86cd799439014",
+    "user_id": "507f1f77bcf86cd799439012",
+    "text": "Check out this photo!",
+    "image": "posts/images/507f1f77bcf86cd799439012/sunset.jpg",
+    "video": null,
+    "created_at": "2024-06-28T21:32:00Z",
+    "updated_at": "2024-06-28T21:32:00Z"
+  },
+  "message": "post created successfully",
+  "status": 201
+}
+```
+
+**Error Responses:**
+
+| Status | Error | Description |
+|--------|-------|-------------|
+| 400 | invalid input | Missing text field or invalid request format |
+| 400 | invalid image type | Image file has unsupported extension |
+| 400 | invalid video type | Video file has unsupported extension |
+| 400 | text is required | Text field is empty |
+| 400 | text must be at least 1 character | Text too short |
+| 400 | text must not exceed 5000 characters | Text too long |
+| 401 | unauthorized | Missing or invalid JWT token |
+| 500 | failed to upload image | S3 upload error for image |
+| 500 | failed to upload video | S3 upload error for video |
+
+**Example Error Response (400 - Invalid Image Type):**
+
+```json
+{
+  "error": "invalid image type",
+  "status": 400
+}
+```
+
+**Example Error Response (400 - Text Validation):**
+
+```json
+{
+  "error": "text must be at least 1 character",
+  "status": 400
+}
+```
+
+---
+
+### 2. Get Post
+
+Retrieves a post by ID.
+
+**Endpoint:** `GET /api/v1/posts/:id`
+
+**Authentication:** Required
+
+**URL Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| id | string | Yes | Post ID (MongoDB ObjectID) |
+
+**Example Request:**
+
+```bash
+curl -X GET http://localhost:3000/api/v1/posts/507f1f77bcf86cd799439013 \
+  -H "Authorization: Bearer <access_token>"
+```
+
+**Success Response (200 OK):**
+
+```json
+{
+  "data": {
+    "id": "507f1f77bcf86cd799439013",
+    "user_id": "507f1f77bcf86cd799439012",
+    "text": "This is my first post!",
+    "image": null,
+    "video": null,
+    "created_at": "2024-06-28T21:30:00Z",
+    "updated_at": "2024-06-28T21:30:00Z"
+  },
+  "message": "post retrieved successfully",
+  "status": 200
+}
+```
+
+**Error Responses:**
+
+| Status | Error | Description |
+|--------|-------|-------------|
+| 400 | invalid post id | Invalid MongoDB ObjectID format |
+| 401 | unauthorized | Missing or invalid JWT token |
+| 404 | post not found | Post does not exist or is soft-deleted |
+| 500 | internal server error | Server error |
+
+**Example Error Response (404):**
+
+```json
+{
+  "error": "post not found",
+  "status": 404
+}
+```
+
+---
+
+### 3. Delete Post
+
+Deletes a post (soft delete). Only the post creator can delete their posts.
+
+**Endpoint:** `DELETE /api/v1/posts/:id`
+
+**Authentication:** Required
+
+**URL Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| id | string | Yes | Post ID (MongoDB ObjectID) |
+
+**Example Request:**
+
+```bash
+curl -X DELETE http://localhost:3000/api/v1/posts/507f1f77bcf86cd799439013 \
+  -H "Authorization: Bearer <access_token>"
+```
+
+**Success Response (200 OK):**
+
+```json
+{
+  "message": "post deleted successfully",
+  "status": 200
+}
+```
+
+**Error Responses:**
+
+| Status | Error | Description |
+|--------|-------|-------------|
+| 400 | invalid post id | Invalid MongoDB ObjectID format |
+| 401 | unauthorized | Missing or invalid JWT token |
+| 403 | forbidden | User is not the post creator |
+| 404 | post not found | Post does not exist |
+| 500 | internal server error | Server error |
+
+**Example Error Response (403 - Unauthorized Delete):**
+
+```json
+{
+  "error": "forbidden",
+  "status": 403
+}
+```
+
+---
+
+## Data Model
+
+### Post
+
+```json
+{
+  "id": "string (MongoDB ObjectID)",
+  "user_id": "string (MongoDB ObjectID of creator)",
+  "text": "string (1-5000 characters)",
+  "image": "string or null (S3 object key)",
+  "video": "string or null (S3 object key)",
+  "created_at": "string (ISO 8601 timestamp)",
+  "updated_at": "string (ISO 8601 timestamp)",
+  "deleted_at": "string (ISO 8601 timestamp) or null"
+}
+```
+
+### Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| id | string | Unique post identifier |
+| user_id | string | Creator's user ID |
+| text | string | Post content |
+| image | string\|null | S3 path to image (nullable) |
+| video | string\|null | S3 path to video (nullable) |
+| created_at | string | Creation timestamp |
+| updated_at | string | Last update timestamp |
+| deleted_at | string\|null | Soft delete timestamp (null if active) |
+
+---
+
+## Common Use Cases
+
+### 1. Create a Simple Text Post
+
+```bash
+curl -X POST http://localhost:3000/api/v1/posts \
+  -H "Authorization: Bearer eyJhbGc..." \
+  -F "text=Hello world!"
+```
+
+### 2. Create a Post with Image
+
+```bash
+curl -X POST http://localhost:3000/api/v1/posts \
+  -H "Authorization: Bearer eyJhbGc..." \
+  -F "text=Beautiful sunset" \
+  -F "image=@sunset.jpg"
+```
+
+### 3. Create a Post with Video
+
+```bash
+curl -X POST http://localhost:3000/api/v1/posts \
+  -H "Authorization: Bearer eyJhbGc..." \
+  -F "text=Check this out" \
+  -F "video=@tutorial.mp4"
+```
+
+### 4. View Your Own Post
+
+```bash
+curl -X GET http://localhost:3000/api/v1/posts/507f1f77bcf86cd799439013 \
+  -H "Authorization: Bearer eyJhbGc..."
+```
+
+### 5. Delete a Post
+
+```bash
+curl -X DELETE http://localhost:3000/api/v1/posts/507f1f77bcf86cd799439013 \
+  -H "Authorization: Bearer eyJhbGc..."
+```
+
+---
+
+## S3 File Storage
+
+Files are stored in S3 with the following path structure:
+
+```
+posts/images/{user_id}/{filename}
+posts/videos/{user_id}/{filename}
+```
+
+**Example Paths:**
+- `posts/images/507f1f77bcf86cd799439012/vacation-photo.jpg`
+- `posts/videos/507f1f77bcf86cd799439012/birthday-video.mp4`
+
+### Local Development (MinIO)
+
+For local development, MinIO is used as an S3-compatible object store. Files can be accessed via the MinIO console at:
+
+```
+http://localhost:9001
+```
+
+### Production (AWS S3)
+
+In production, files are stored in AWS S3 and accessible via CloudFront or direct S3 URLs.
+
+---
+
+## Notes
+
+- **Soft Delete:** Posts are never permanently deleted from the database. Instead, they are marked with a `deleted_at` timestamp and excluded from queries.
+- **File Ownership:** Image and video files are namespaced by user ID to ensure isolation and prevent accidental overwrites.
+- **Single Upload:** The API accepts one image and one video per request. If multiple files of the same type are provided, only the first one is used.
+- **File Validation:** File type is validated by file extension before upload. Ensure files have correct extensions.
+- **File Size:** Maximum file size is determined by S3 bucket configuration. Consult deployment documentation for limits.
+
+---
+
+## Integration with Other Modules
+
+### User Authentication
+
+All post endpoints require valid JWT tokens from the authentication module. Tokens are issued via:
+
+- `POST /api/v1/auth/register` — Register new user
+- `POST /api/v1/auth/login` — Login and get access token
+- `POST /api/v1/auth/refresh` — Refresh access token
+
+### Room Integration (Future)
+
+Posts can be extended to be associated with rooms. Future endpoints may include:
+
+- `POST /api/v1/rooms/:code/posts` — Post to a room
+- `GET /api/v1/rooms/:code/posts` — List room posts
+
+---
+
+## Testing
+
+For testing the Posts API, see [TESTING.md](TESTING.md) for instructions on setting up the test environment and running tests.
+
+### Unit Tests
+
+- Domain validation tests: `internal/domain/post_test.go`
+- Service layer tests: `internal/service/post_service_test.go`
+- Handler layer tests: `internal/handler/post_handler_test.go`
+
+### Running Tests
+
+```bash
+# Run all tests
+go test ./...
+
+# Run only post tests
+go test ./internal/domain ./internal/service ./internal/handler -v -k Post
+
+# Run tests with coverage
+go test ./internal/service -cover
+```
