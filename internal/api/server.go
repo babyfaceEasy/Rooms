@@ -12,6 +12,7 @@ import (
 	"temp_backend/config"
 	"temp_backend/internal/handler"
 	"temp_backend/internal/middleware"
+	"temp_backend/internal/service"
 )
 
 // Server wraps the Fiber application and its dependencies.
@@ -22,7 +23,7 @@ type Server struct {
 }
 
 // NewServer builds a configured Fiber server and wires all routes.
-func NewServer(cfg config.Config, logger *slog.Logger, itemHandler *handler.ItemHandler) *Server {
+func NewServer(cfg config.Config, logger *slog.Logger, itemHandler *handler.ItemHandler, userHandler *handler.UserHandler, authHandler *handler.AuthHandler, authService service.AuthService) *Server {
 	app := fiber.New(fiber.Config{
 		AppName:      cfg.App.Name,
 		ErrorHandler: middleware.NewErrorHandler(logger),
@@ -43,7 +44,7 @@ func NewServer(cfg config.Config, logger *slog.Logger, itemHandler *handler.Item
 		cfg:    cfg,
 		logger: logger,
 	}
-	s.registerRoutes(itemHandler)
+	s.registerRoutes(itemHandler, userHandler, authHandler, authService)
 	return s
 }
 
@@ -55,4 +56,9 @@ func (s *Server) Start() error {
 // Shutdown gracefully stops the server using the supplied timeout.
 func (s *Server) Shutdown(ctx context.Context) error {
 	return s.app.ShutdownWithTimeout(15 * time.Second)
+}
+
+// GetApp returns the underlying Fiber application for testing purposes.
+func (s *Server) GetApp() *fiber.App {
+	return s.app
 }
