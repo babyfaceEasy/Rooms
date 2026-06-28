@@ -19,4 +19,6 @@ var (
 	ErrTokenExpired            = errors.New("token has expired")
 	ErrTokenInvalid            = errors.New("invalid token")
 	ErrTokenNotFound           = errors.New("token not found")
+	ErrCodeAlreadyExists       = errors.New("room code already exists")
+	ErrRoomNotFound            = errors.New("room not found")
 )
