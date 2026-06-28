@@ -1,0 +1,89 @@
+version: "3.8"
+
+services:
+  mongodb:
+    image: mongo:7
+    container_name: temp_backend_mongo
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: secret
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  minio:
+    image: minio/minio:latest
+    container_name: temp_backend_minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  createbuckets:
+    image: minio/mc:latest
+    container_name: temp_backend_createbuckets
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    entrypoint: >
+      /bin/sh -c "
+      /usr/bin/mc alias set local http://minio:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD};
+      /usr/bin/mc mb local/temp-bucket || true;
+      /usr/bin/mc policy set download local/temp-bucket || true;
+      exit 0;
+      "
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: temp_backend_api
+    restart: unless-stopped
+    environment:
+      APP_NAME: temp_backend
+      PORT: "8080"
+      LOG_LEVEL: info
+      MONGO_URI: mongodb://admin:secret@mongodb:27017/temp_backend?authSource=admin
+      MONGO_DATABASE: temp_backend
+      MONGO_CONNECT_TIMEOUT: 10s
+      S3_ENDPOINT_URL: http://minio:9000
+      S3_REGION: us-east-1
+      S3_BUCKET: temp-bucket
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadmin
+      S3_USE_SSL: "false"
+      S3_PRESIGNED_EXPIRY: 15m
+    ports:
+      - "8080:8080"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      createbuckets:
+        condition: service_completed_successfully
+
+volumes:
+  mongo_data:
+  minio_data:

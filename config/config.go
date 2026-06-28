@@ -1,0 +1,92 @@
+package config
+
+import (
+	"fmt"
+	"os"
+	"strconv"
+	"time"
+)
+
+// Config aggregates all application configuration values.
+type Config struct {
+	App struct {
+		Name     string
+		Port     string
+		Env      string
+		LogLevel string
+	}
+	Mongo struct {
+		URI            string
+		Database       string
+		ConnectTimeout time.Duration
+	}
+	S3 struct {
+		EndpointURL     string
+		Region          string
+		Bucket          string
+		AccessKey       string
+		SecretKey       string
+		UseSSL          bool
+		PresignedExpiry time.Duration
+	}
+}
+
+// Load reads configuration from environment variables and applies sensible defaults.
+func Load() (Config, error) {
+	cfg := Config{}
+
+	cfg.App.Name = getEnv("APP_NAME", "temp_backend")
+	cfg.App.Port = getEnv("PORT", "8080")
+	cfg.App.Env = getEnv("APP_ENV", "development")
+	cfg.App.LogLevel = getEnv("LOG_LEVEL", "info")
+
+	cfg.Mongo.URI = getEnv("MONGO_URI", "mongodb://localhost:27017/temp_backend")
+	cfg.Mongo.Database = getEnv("MONGO_DATABASE", "temp_backend")
+	cfg.Mongo.ConnectTimeout = parseDuration(getEnv("MONGO_CONNECT_TIMEOUT", "10s"))
+
+	cfg.S3.EndpointURL = getEnv("S3_ENDPOINT_URL", "http://localhost:9000")
+	cfg.S3.Region = getEnv("S3_REGION", "us-east-1")
+	cfg.S3.Bucket = getEnv("S3_BUCKET", "temp-bucket")
+	cfg.S3.AccessKey = getEnv("S3_ACCESS_KEY", "minioadmin")
+	cfg.S3.SecretKey = getEnv("S3_SECRET_KEY", "minioadmin")
+	cfg.S3.UseSSL = parseBool(getEnv("S3_USE_SSL", "false"))
+	cfg.S3.PresignedExpiry = parseDuration(getEnv("S3_PRESIGNED_EXPIRY", "15m"))
+
+	if cfg.Mongo.URI == "" {
+		return cfg, fmt.Errorf("MONGO_URI is required")
+	}
+	if cfg.S3.EndpointURL == "" {
+		return cfg, fmt.Errorf("S3_ENDPOINT_URL is required")
+	}
+	if cfg.S3.Bucket == "" {
+		return cfg, fmt.Errorf("S3_BUCKET is required")
+	}
+
+	return cfg, nil
+}
+
+func getEnv(key, fallback string) string {
+	if value, ok := os.LookupEnv(key); ok && value != "" {
+		return value
+	}
+	return fallback
+}
+
+func parseBool(value string) bool {
+	ok, err := strconv.ParseBool(value)
+	if err != nil {
+		return false
+	}
+	return ok
+}
+
+func parseDuration(value string) time.Duration {
+	if value == "" {
+		return 0
+	}
+	d, err := time.ParseDuration(value)
+	if err != nil {
+		return 0
+	}
+	return d
+}
