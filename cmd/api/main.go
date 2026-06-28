@@ -65,13 +65,34 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Item repositories and service
 	itemRepo := repository.NewMongoItemRepository(mongoClient.Database(cfg.Mongo.Database))
 	storageRepo := repository.NewS3Repository(s3Client, cfg.S3.Bucket)
-
 	itemService := service.NewItemService(itemRepo, storageRepo)
 	itemHandler := handler.NewItemHandler(itemService)
 
-	server := api.NewServer(cfg, logger, itemHandler)
+	// User repository and service
+	userRepo, err := repository.NewMongoUserRepository(mongoClient.Database(cfg.Mongo.Database))
+	if err != nil {
+		logger.Error("user repository initialization failed", slog.Any("error", err))
+		os.Exit(1)
+	}
+
+	// Auth repositories
+	refreshTokenRepo, err := repository.NewMongoRefreshTokenRepository(mongoClient.Database(cfg.Mongo.Database))
+	if err != nil {
+		logger.Error("refresh token repository initialization failed", slog.Any("error", err))
+		os.Exit(1)
+	}
+
+	userService := service.NewUserService(userRepo, refreshTokenRepo)
+	userHandler := handler.NewUserHandler(userService)
+
+	// Auth services
+	authService := service.NewAuthService(userRepo, refreshTokenRepo, cfg)
+	authHandler := handler.NewAuthHandler(authService)
+
+	server := api.NewServer(cfg, logger, itemHandler, userHandler, authHandler, authService)
 
 	go func() {
 		if err := server.Start(); err != nil && !errors.Is(err, http.ErrServerClosed) {

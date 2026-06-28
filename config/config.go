@@ -29,6 +29,11 @@ type Config struct {
 		UseSSL          bool
 		PresignedExpiry time.Duration
 	}
+	JWT struct {
+		Secret          string
+		AccessTokenTTL  time.Duration
+		RefreshTokenTTL time.Duration
+	}
 }
 
 // Load reads configuration from environment variables and applies sensible defaults.
@@ -52,6 +57,10 @@ func Load() (Config, error) {
 	cfg.S3.UseSSL = parseBool(getEnv("S3_USE_SSL", "false"))
 	cfg.S3.PresignedExpiry = parseDuration(getEnv("S3_PRESIGNED_EXPIRY", "15m"))
 
+	cfg.JWT.Secret = getEnv("JWT_SECRET", "")
+	cfg.JWT.AccessTokenTTL = parseDuration(getEnv("ACCESS_TOKEN_TTL", "1h"))
+	cfg.JWT.RefreshTokenTTL = parseDuration(getEnv("REFRESH_TOKEN_TTL", "168h"))
+
 	if cfg.Mongo.URI == "" {
 		return cfg, fmt.Errorf("MONGO_URI is required")
 	}
@@ -60,6 +69,12 @@ func Load() (Config, error) {
 	}
 	if cfg.S3.Bucket == "" {
 		return cfg, fmt.Errorf("S3_BUCKET is required")
+	}
+	if cfg.JWT.Secret == "" {
+		return cfg, fmt.Errorf("JWT_SECRET is required")
+	}
+	if len(cfg.JWT.Secret) < 32 {
+		return cfg, fmt.Errorf("JWT_SECRET must be at least 32 characters long")
 	}
 
 	return cfg, nil
