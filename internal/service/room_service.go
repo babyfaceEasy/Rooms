@@ -15,6 +15,8 @@ type RoomService interface {
 	AddUserToRoom(ctx context.Context, code string, userID primitive.ObjectID) (*domain.Room, error)
 	GetRoom(ctx context.Context, code string) (*domain.Room, error)
 	LeaveRoom(ctx context.Context, code string, userID primitive.ObjectID) error
+	DeleteRoom(ctx context.Context, code string, userID primitive.ObjectID) error
+	ListUserRooms(ctx context.Context, userID primitive.ObjectID) ([]*domain.Room, error)
 }
 
 type roomService struct {
@@ -120,3 +122,35 @@ func (s *roomService) LeaveRoom(ctx context.Context, code string, userID primiti
 
 	return nil
 }
+
+// DeleteRoom soft-deletes a room (only owner can delete)
+func (s *roomService) DeleteRoom(ctx context.Context, code string, userID primitive.ObjectID) error {
+	// Get room by code
+	room, err := s.repo.GetByCode(ctx, code)
+	if err != nil {
+		return err
+	}
+
+	// Check if user is the owner
+	if room.CreatedBy != userID {
+		return domain.ErrInvalidInput
+	}
+
+	// Soft delete the room
+	if err := s.repo.DeleteRoom(ctx, room.ID); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// ListUserRooms retrieves all rooms where the user is the creator or a member
+func (s *roomService) ListUserRooms(ctx context.Context, userID primitive.ObjectID) ([]*domain.Room, error) {
+	rooms, err := s.repo.ListUserRooms(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	return rooms, nil
+}
+
