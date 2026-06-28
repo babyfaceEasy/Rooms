@@ -7,7 +7,7 @@ import (
 	"temp_backend/internal/service"
 )
 
-func (s *Server) registerRoutes(itemHandler *handler.ItemHandler, userHandler *handler.UserHandler, authHandler *handler.AuthHandler, roomHandler *handler.RoomHandler, authService service.AuthService) {
+func (s *Server) registerRoutes(itemHandler *handler.ItemHandler, userHandler *handler.UserHandler, authHandler *handler.AuthHandler, roomHandler *handler.RoomHandler, postHandler *handler.PostHandler, authService service.AuthService) {
 	s.app.Get("/health", func(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusOK).JSON(fiber.Map{
 			"status": "ok",
@@ -41,6 +41,11 @@ func (s *Server) registerRoutes(itemHandler *handler.ItemHandler, userHandler *h
 	apiProtected.Get("/rooms/:code", roomHandler.GetRoom)
 	apiProtected.Get("/rooms/:code/members", roomHandler.GetRoomMembers)
 	apiProtected.Delete("/rooms/:code", roomHandler.HandleRoomDelete)
+
+	// Post routes (protected)
+	apiProtected.Post("/posts", postHandler.CreatePost)
+	apiProtected.Get("/posts/:id", postHandler.GetPost)
+	apiProtected.Delete("/posts/:id", postHandler.DeletePost)
 
 	// Item routes (protected)
 	apiProtected.Post("/items", itemHandler.CreateItem)
