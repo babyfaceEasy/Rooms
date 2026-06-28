@@ -97,7 +97,12 @@ func main() {
 	roomService := service.NewRoomService(roomRepo)
 	roomHandler := handler.NewRoomHandler(roomService)
 
-	server := api.NewServer(cfg, logger, itemHandler, userHandler, authHandler, roomHandler, authService)
+	// Post repositories and service
+	postRepo := repository.NewMongoPostRepository(mongoClient.Database(cfg.Mongo.Database))
+	postService := service.NewPostService(postRepo)
+	postHandler := handler.NewPostHandler(postService, storageRepo)
+
+	server := api.NewServer(cfg, logger, itemHandler, userHandler, authHandler, roomHandler, postHandler, authService)
 
 	go func() {
 		if err := server.Start(); err != nil && !errors.Is(err, http.ErrServerClosed) {
