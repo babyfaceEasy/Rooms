@@ -31,6 +31,16 @@ type RoomResponse struct {
 	UpdatedAt string `json:"updated_at"`
 }
 
+// RoomMembersResponse represents the members of a room
+type RoomMembersResponse struct {
+	RoomID   string   `json:"room_id"`
+	RoomCode string   `json:"room_code"`
+	RoomName string   `json:"room_name"`
+	Owner    string   `json:"owner"`
+	Members  []string `json:"members"`
+	Count    int      `json:"count"`
+}
+
 // RoomHandler handles room-related endpoints
 type RoomHandler struct {
 	svc service.RoomService
@@ -224,6 +234,81 @@ func (h *RoomHandler) GetRoom(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(map[string]interface{}{
 		"data":    response,
 		"message": "room details retrieved successfully",
+		"status":  fiber.StatusOK,
+	})
+}
+
+// GetRoomMembers retrieves members of a room - only owner and members can access
+func (h *RoomHandler) GetRoomMembers(c *fiber.Ctx) error {
+	// Extract user ID from context
+	userID, ok := c.Locals("user_id").(string)
+	if !ok || userID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(map[string]interface{}{
+			"error":  "unauthorized",
+			"status": fiber.StatusUnauthorized,
+		})
+	}
+
+	// Convert user ID from string to ObjectID
+	userObjID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
+			"error":  "invalid user id",
+			"status": fiber.StatusBadRequest,
+		})
+	}
+
+	// Get room code from URL parameter
+	roomCode := c.Params("code")
+	if roomCode == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
+			"error":  "room code is required",
+			"status": fiber.StatusBadRequest,
+		})
+	}
+
+	// Get room via service
+	room, err := h.svc.GetRoom(c.Context(), roomCode)
+	if err != nil {
+		return h.handleError(c, err)
+	}
+
+	// Check authorization: user must be owner or member
+	isOwner := room.CreatedBy == userObjID
+	isMember := false
+	for _, m := range room.Members {
+		if m == userObjID {
+			isMember = true
+			break
+		}
+	}
+
+	if !isOwner && !isMember {
+		return c.Status(fiber.StatusForbidden).JSON(map[string]interface{}{
+			"error":  "you do not have permission to access this room",
+			"status": fiber.StatusForbidden,
+		})
+	}
+
+	// Convert members to string slice for response
+	members := make([]string, len(room.Members))
+	for i, m := range room.Members {
+		members[i] = m.Hex()
+	}
+
+	// Create response
+	response := &RoomMembersResponse{
+		RoomID:   room.ID.Hex(),
+		RoomCode: room.Code,
+		RoomName: room.Name,
+		Owner:    room.CreatedBy.Hex(),
+		Members:  members,
+		Count:    len(room.Members),
+	}
+
+	return c.Status(fiber.StatusOK).JSON(map[string]interface{}{
+		"data":    response,
+		"message": "room members retrieved successfully",
 		"status":  fiber.StatusOK,
 	})
 }
