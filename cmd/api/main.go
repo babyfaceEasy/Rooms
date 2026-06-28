@@ -92,7 +92,12 @@ func main() {
 	authService := service.NewAuthService(userRepo, refreshTokenRepo, cfg)
 	authHandler := handler.NewAuthHandler(authService)
 
-	server := api.NewServer(cfg, logger, itemHandler, userHandler, authHandler, authService)
+	// Room repositories and service
+	roomRepo := repository.NewMongoRoomRepository(mongoClient.Database(cfg.Mongo.Database))
+	roomService := service.NewRoomService(roomRepo)
+	roomHandler := handler.NewRoomHandler(roomService)
+
+	server := api.NewServer(cfg, logger, itemHandler, userHandler, authHandler, roomHandler, authService)
 
 	go func() {
 		if err := server.Start(); err != nil && !errors.Is(err, http.ErrServerClosed) {
