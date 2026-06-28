@@ -16,6 +16,7 @@ type MockRoomService struct {
 	createRoomFunc    func(ctx context.Context, name, code string, userID primitive.ObjectID) (*domain.Room, error)
 	addUserToRoomFunc func(ctx context.Context, code string, userID primitive.ObjectID) (*domain.Room, error)
 	getRoom           func(ctx context.Context, code string) (*domain.Room, error)
+	leaveRoom         func(ctx context.Context, code string, userID primitive.ObjectID) error
 }
 
 func (m *MockRoomService) CreateRoom(ctx context.Context, name, code string, userID primitive.ObjectID) (*domain.Room, error) {
@@ -37,6 +38,13 @@ func (m *MockRoomService) GetRoom(ctx context.Context, code string) (*domain.Roo
 		return m.getRoom(ctx, code)
 	}
 	return nil, nil
+}
+
+func (m *MockRoomService) LeaveRoom(ctx context.Context, code string, userID primitive.ObjectID) error {
+	if m.leaveRoom != nil {
+		return m.leaveRoom(ctx, code, userID)
+	}
+	return nil
 }
 
 func TestCreateRoomRequest_Structure(t *testing.T) {
@@ -432,4 +440,42 @@ func TestRoomMembersResponse_Structure(t *testing.T) {
 	assert.Equal(t, "Conference Room A", resp.RoomName)
 	assert.Equal(t, 2, resp.Count)
 	assert.Len(t, resp.Members, 2)
+}
+
+func TestLeaveRoom_Success(t *testing.T) {
+	roomCode := "CONF_A_001"
+
+	mockService := &MockRoomService{
+		leaveRoom: func(ctx context.Context, code string, uID primitive.ObjectID) error {
+			if code == roomCode {
+				return nil
+			}
+			return domain.ErrRoomNotFound
+		},
+	}
+
+	handler := NewRoomHandler(mockService)
+	assert.NotNil(t, handler.LeaveRoom)
+}
+
+func TestLeaveRoom_NotFound(t *testing.T) {
+	mockService := &MockRoomService{
+		leaveRoom: func(ctx context.Context, code string, uID primitive.ObjectID) error {
+			return domain.ErrRoomNotFound
+		},
+	}
+
+	handler := NewRoomHandler(mockService)
+	assert.NotNil(t, handler.LeaveRoom)
+}
+
+func TestLeaveRoom_NotMember(t *testing.T) {
+	mockService := &MockRoomService{
+		leaveRoom: func(ctx context.Context, code string, uID primitive.ObjectID) error {
+			return domain.ErrInvalidInput
+		},
+	}
+
+	handler := NewRoomHandler(mockService)
+	assert.NotNil(t, handler.LeaveRoom)
 }

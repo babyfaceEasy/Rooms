@@ -95,3 +95,25 @@ func (m *MongoRoomRepository) AddUserToRoom(ctx context.Context, roomID, userID 
 
 	return nil
 }
+
+// RemoveUserFromRoom removes a user from the room's members list
+func (m *MongoRoomRepository) RemoveUserFromRoom(ctx context.Context, roomID, userID primitive.ObjectID) error {
+	result, err := m.collection.UpdateOne(
+		ctx,
+		bson.M{"_id": roomID},
+		bson.M{
+			"$pull": bson.M{"members": userID},
+			"$set":  bson.M{"updated_at": time.Now()},
+		},
+	)
+
+	if err != nil {
+		return err
+	}
+
+	if result.MatchedCount == 0 {
+		return domain.ErrRoomNotFound
+	}
+
+	return nil
+}
