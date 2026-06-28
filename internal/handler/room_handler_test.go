@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -12,12 +13,20 @@ import (
 
 // MockRoomService is a mock implementation for testing
 type MockRoomService struct {
-	createRoomFunc func(ctx context.Context, name, code string, userID primitive.ObjectID) (*domain.Room, error)
+	createRoomFunc    func(ctx context.Context, name, code string, userID primitive.ObjectID) (*domain.Room, error)
+	addUserToRoomFunc func(ctx context.Context, code string, userID primitive.ObjectID) (*domain.Room, error)
 }
 
 func (m *MockRoomService) CreateRoom(ctx context.Context, name, code string, userID primitive.ObjectID) (*domain.Room, error) {
 	if m.createRoomFunc != nil {
 		return m.createRoomFunc(ctx, name, code, userID)
+	}
+	return nil, nil
+}
+
+func (m *MockRoomService) AddUserToRoom(ctx context.Context, code string, userID primitive.ObjectID) (*domain.Room, error) {
+	if m.addUserToRoomFunc != nil {
+		return m.addUserToRoomFunc(ctx, code, userID)
 	}
 	return nil, nil
 }
@@ -121,6 +130,78 @@ func TestCreateRoom_ErrorHandling(t *testing.T) {
 
 			handler := NewRoomHandler(mockService)
 			assert.NotNil(t, handler.CreateRoom)
+		})
+	}
+}
+
+func TestAddUserToRoomRequest_Structure(t *testing.T) {
+	req := AddUserToRoomRequest{
+		Code: "CONF_A_001",
+	}
+
+	assert.Equal(t, "CONF_A_001", req.Code)
+}
+
+func TestAddUserToRoom_Success(t *testing.T) {
+	userID := primitive.NewObjectID()
+	roomID := primitive.NewObjectID()
+	roomCode := "CONF_A_001"
+	now := time.Now()
+
+	room := &domain.Room{
+		ID:        roomID,
+		Name:      "Conference Room A",
+		Code:      roomCode,
+		CreatedBy: primitive.NewObjectID(),
+		Members:   []primitive.ObjectID{userID},
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	mockService := &MockRoomService{
+		addUserToRoomFunc: func(ctx context.Context, code string, uID primitive.ObjectID) (*domain.Room, error) {
+			if code == roomCode {
+				return room, nil
+			}
+			return nil, domain.ErrRoomNotFound
+		},
+	}
+
+	handler := NewRoomHandler(mockService)
+	assert.NotNil(t, handler.AddUserToRoom)
+}
+
+func TestAddUserToRoom_RoomNotFound(t *testing.T) {
+	mockService := &MockRoomService{
+		addUserToRoomFunc: func(ctx context.Context, code string, uID primitive.ObjectID) (*domain.Room, error) {
+			return nil, domain.ErrRoomNotFound
+		},
+	}
+
+	handler := NewRoomHandler(mockService)
+	assert.NotNil(t, handler.AddUserToRoom)
+}
+
+func TestAddUserToRoom_ErrorHandling(t *testing.T) {
+	testCases := []struct {
+		name        string
+		err         error
+		expectError bool
+	}{
+		{"RoomNotFound", domain.ErrRoomNotFound, true},
+		{"UnknownError", errors.New("unknown error"), true},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			mockService := &MockRoomService{
+				addUserToRoomFunc: func(ctx context.Context, code string, uID primitive.ObjectID) (*domain.Room, error) {
+					return nil, tc.err
+				},
+			}
+
+			handler := NewRoomHandler(mockService)
+			assert.NotNil(t, handler.AddUserToRoom)
 		})
 	}
 }

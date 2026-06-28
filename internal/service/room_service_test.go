@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -12,9 +13,10 @@ import (
 
 // MockRoomRepository is a mock implementation for testing
 type MockRoomRepository struct {
-	createFunc   func(ctx context.Context, room *domain.Room) error
-	getByIDFunc  func(ctx context.Context, id primitive.ObjectID) (*domain.Room, error)
-	getByCodeFunc func(ctx context.Context, code string) (*domain.Room, error)
+	createFunc        func(ctx context.Context, room *domain.Room) error
+	getByIDFunc       func(ctx context.Context, id primitive.ObjectID) (*domain.Room, error)
+	getByCodeFunc     func(ctx context.Context, code string) (*domain.Room, error)
+	addUserToRoomFunc func(ctx context.Context, roomID, userID primitive.ObjectID) error
 }
 
 func (m *MockRoomRepository) Create(ctx context.Context, room *domain.Room) error {
@@ -36,6 +38,13 @@ func (m *MockRoomRepository) GetByCode(ctx context.Context, code string) (*domai
 		return m.getByCodeFunc(ctx, code)
 	}
 	return nil, domain.ErrRoomNotFound
+}
+
+func (m *MockRoomRepository) AddUserToRoom(ctx context.Context, roomID, userID primitive.ObjectID) error {
+	if m.addUserToRoomFunc != nil {
+		return m.addUserToRoomFunc(ctx, roomID, userID)
+	}
+	return nil
 }
 
 func TestCreateRoom_Success(t *testing.T) {
@@ -194,4 +203,98 @@ func TestCreateRoom_ValidateCodeFormatWithValidInputs(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestAddUserToRoom_Success(t *testing.T) {
+	userID := primitive.NewObjectID()
+	roomID := primitive.NewObjectID()
+	roomCode := "CONF_A_001"
+	now := time.Now()
+
+	room := &domain.Room{
+		ID:        roomID,
+		Name:      "Conference Room A",
+		Code:      roomCode,
+		CreatedBy: primitive.NewObjectID(),
+		Members:   []primitive.ObjectID{},
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	repoMock := &MockRoomRepository{
+		getByCodeFunc: func(ctx context.Context, code string) (*domain.Room, error) {
+			if code == roomCode {
+				return room, nil
+			}
+			return nil, domain.ErrRoomNotFound
+		},
+		addUserToRoomFunc: func(ctx context.Context, rID, uID primitive.ObjectID) error {
+			room.Members = append(room.Members, uID)
+			return nil
+		},
+		getByIDFunc: func(ctx context.Context, id primitive.ObjectID) (*domain.Room, error) {
+			if id == roomID {
+				return room, nil
+			}
+			return nil, domain.ErrRoomNotFound
+		},
+	}
+
+	svc := NewRoomService(repoMock)
+	updatedRoom, err := svc.AddUserToRoom(context.Background(), roomCode, userID)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, updatedRoom)
+	assert.Equal(t, roomID, updatedRoom.ID)
+	assert.Contains(t, updatedRoom.Members, userID)
+}
+
+func TestAddUserToRoom_RoomNotFound(t *testing.T) {
+	userID := primitive.NewObjectID()
+	roomCode := "NONEXISTENT"
+
+	repoMock := &MockRoomRepository{
+		getByCodeFunc: func(ctx context.Context, code string) (*domain.Room, error) {
+			return nil, domain.ErrRoomNotFound
+		},
+	}
+
+	svc := NewRoomService(repoMock)
+	room, err := svc.AddUserToRoom(context.Background(), roomCode, userID)
+
+	assert.Error(t, err)
+	assert.Nil(t, room)
+	assert.True(t, errors.Is(err, domain.ErrRoomNotFound))
+}
+
+func TestAddUserToRoom_RepositoryAddError(t *testing.T) {
+	userID := primitive.NewObjectID()
+	roomID := primitive.NewObjectID()
+	roomCode := "CONF_A_001"
+
+	room := &domain.Room{
+		ID:        roomID,
+		Name:      "Conference Room A",
+		Code:      roomCode,
+		CreatedBy: primitive.NewObjectID(),
+		Members:   []primitive.ObjectID{},
+	}
+
+	repoMock := &MockRoomRepository{
+		getByCodeFunc: func(ctx context.Context, code string) (*domain.Room, error) {
+			if code == roomCode {
+				return room, nil
+			}
+			return nil, domain.ErrRoomNotFound
+		},
+		addUserToRoomFunc: func(ctx context.Context, rID, uID primitive.ObjectID) error {
+			return errors.New("database error")
+		},
+	}
+
+	svc := NewRoomService(repoMock)
+	updatedRoom, err := svc.AddUserToRoom(context.Background(), roomCode, userID)
+
+	assert.Error(t, err)
+	assert.Nil(t, updatedRoom)
 }

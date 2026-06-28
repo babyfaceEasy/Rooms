@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -71,4 +72,26 @@ func (m *MongoRoomRepository) GetByCode(ctx context.Context, code string) (*doma
 		return nil, err
 	}
 	return &room, nil
+}
+
+// AddUserToRoom adds a user to the room's members list
+func (m *MongoRoomRepository) AddUserToRoom(ctx context.Context, roomID, userID primitive.ObjectID) error {
+	result, err := m.collection.UpdateOne(
+		ctx,
+		bson.M{"_id": roomID},
+		bson.M{
+			"$addToSet": bson.M{"members": userID},
+			"$set":      bson.M{"updated_at": time.Now()},
+		},
+	)
+
+	if err != nil {
+		return err
+	}
+
+	if result.MatchedCount == 0 {
+		return domain.ErrRoomNotFound
+	}
+
+	return nil
 }

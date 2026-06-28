@@ -12,6 +12,7 @@ import (
 // RoomService defines the interface for room business logic
 type RoomService interface {
 	CreateRoom(ctx context.Context, name, code string, userID primitive.ObjectID) (*domain.Room, error)
+	AddUserToRoom(ctx context.Context, code string, userID primitive.ObjectID) (*domain.Room, error)
 }
 
 type roomService struct {
@@ -55,4 +56,26 @@ func (s *roomService) CreateRoom(ctx context.Context, name, code string, userID 
 	}
 
 	return room, nil
+}
+
+// AddUserToRoom adds a user to a room by room code
+func (s *roomService) AddUserToRoom(ctx context.Context, code string, userID primitive.ObjectID) (*domain.Room, error) {
+	// Get room by code
+	room, err := s.repo.GetByCode(ctx, code)
+	if err != nil {
+		return nil, err
+	}
+
+	// Add user to room members
+	if err := s.repo.AddUserToRoom(ctx, room.ID, userID); err != nil {
+		return nil, err
+	}
+
+	// Fetch updated room
+	updatedRoom, err := s.repo.GetByID(ctx, room.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	return updatedRoom, nil
 }
