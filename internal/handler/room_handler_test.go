@@ -17,6 +17,8 @@ type MockRoomService struct {
 	addUserToRoomFunc func(ctx context.Context, code string, userID primitive.ObjectID) (*domain.Room, error)
 	getRoom           func(ctx context.Context, code string) (*domain.Room, error)
 	leaveRoom         func(ctx context.Context, code string, userID primitive.ObjectID) error
+	deleteRoom        func(ctx context.Context, code string, userID primitive.ObjectID) error
+	listUserRooms     func(ctx context.Context, userID primitive.ObjectID) ([]*domain.Room, error)
 }
 
 func (m *MockRoomService) CreateRoom(ctx context.Context, name, code string, userID primitive.ObjectID) (*domain.Room, error) {
@@ -45,6 +47,20 @@ func (m *MockRoomService) LeaveRoom(ctx context.Context, code string, userID pri
 		return m.leaveRoom(ctx, code, userID)
 	}
 	return nil
+}
+
+func (m *MockRoomService) DeleteRoom(ctx context.Context, code string, userID primitive.ObjectID) error {
+	if m.deleteRoom != nil {
+		return m.deleteRoom(ctx, code, userID)
+	}
+	return nil
+}
+
+func (m *MockRoomService) ListUserRooms(ctx context.Context, userID primitive.ObjectID) ([]*domain.Room, error) {
+	if m.listUserRooms != nil {
+		return m.listUserRooms(ctx, userID)
+	}
+	return []*domain.Room{}, nil
 }
 
 func TestCreateRoomRequest_Structure(t *testing.T) {
@@ -479,3 +495,188 @@ func TestLeaveRoom_NotMember(t *testing.T) {
 	handler := NewRoomHandler(mockService)
 	assert.NotNil(t, handler.LeaveRoom)
 }
+
+func TestHandleRoomDelete_OwnerDeletes(t *testing.T) {
+	ownerID := primitive.NewObjectID()
+	roomID := primitive.NewObjectID()
+	roomCode := "CONF_A_001"
+	now := time.Now()
+
+	room := &domain.Room{
+		ID:        roomID,
+		Name:      "Conference Room A",
+		Code:      roomCode,
+		CreatedBy: ownerID,
+		Members:   []primitive.ObjectID{},
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	mockService := &MockRoomService{
+		getRoom: func(ctx context.Context, code string) (*domain.Room, error) {
+			if code == roomCode {
+				return room, nil
+			}
+			return nil, domain.ErrRoomNotFound
+		},
+		deleteRoom: func(ctx context.Context, code string, uID primitive.ObjectID) error {
+			return nil
+		},
+	}
+
+	handler := NewRoomHandler(mockService)
+	assert.NotNil(t, handler.HandleRoomDelete)
+}
+
+func TestHandleRoomDelete_OwnerDeletesNotFound(t *testing.T) {
+	mockService := &MockRoomService{
+		getRoom: func(ctx context.Context, code string) (*domain.Room, error) {
+			return nil, domain.ErrRoomNotFound
+		},
+	}
+
+	handler := NewRoomHandler(mockService)
+	assert.NotNil(t, handler.HandleRoomDelete)
+}
+
+func TestHandleRoomDelete_MemberLeaves(t *testing.T) {
+	memberID := primitive.NewObjectID()
+	ownerID := primitive.NewObjectID()
+	roomID := primitive.NewObjectID()
+	roomCode := "CONF_A_001"
+	now := time.Now()
+
+	room := &domain.Room{
+		ID:        roomID,
+		Name:      "Conference Room A",
+		Code:      roomCode,
+		CreatedBy: ownerID,
+		Members:   []primitive.ObjectID{memberID},
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	mockService := &MockRoomService{
+		getRoom: func(ctx context.Context, code string) (*domain.Room, error) {
+			if code == roomCode {
+				return room, nil
+			}
+			return nil, domain.ErrRoomNotFound
+		},
+		leaveRoom: func(ctx context.Context, code string, uID primitive.ObjectID) error {
+			return nil
+		},
+	}
+
+	handler := NewRoomHandler(mockService)
+	assert.NotNil(t, handler.HandleRoomDelete)
+}
+
+func TestHandleRoomDelete_MemberLeavesNotMember(t *testing.T) {
+	memberID := primitive.NewObjectID()
+	ownerID := primitive.NewObjectID()
+	roomID := primitive.NewObjectID()
+	roomCode := "CONF_A_001"
+	now := time.Now()
+
+	room := &domain.Room{
+		ID:        roomID,
+		Name:      "Conference Room A",
+		Code:      roomCode,
+		CreatedBy: ownerID,
+		Members:   []primitive.ObjectID{memberID},
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	mockService := &MockRoomService{
+		getRoom: func(ctx context.Context, code string) (*domain.Room, error) {
+			if code == roomCode {
+				return room, nil
+			}
+			return nil, domain.ErrRoomNotFound
+		},
+		leaveRoom: func(ctx context.Context, code string, uID primitive.ObjectID) error {
+			return domain.ErrInvalidInput
+		},
+	}
+
+	handler := NewRoomHandler(mockService)
+	assert.NotNil(t, handler.HandleRoomDelete)
+}
+
+func TestListUserRooms_Success(t *testing.T) {
+	userID := primitive.NewObjectID()
+	roomID := primitive.NewObjectID()
+	roomCode := "CONF_A_001"
+	now := time.Now()
+
+	room := &domain.Room{
+		ID:        roomID,
+		Name:      "Conference Room A",
+		Code:      roomCode,
+		CreatedBy: userID,
+		Members:   []primitive.ObjectID{},
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	mockService := &MockRoomService{
+		listUserRooms: func(ctx context.Context, uID primitive.ObjectID) ([]*domain.Room, error) {
+			if uID == userID {
+				return []*domain.Room{room}, nil
+			}
+			return []*domain.Room{}, nil
+		},
+	}
+
+	handler := NewRoomHandler(mockService)
+	assert.NotNil(t, handler.ListUserRooms)
+}
+
+func TestListUserRooms_Empty(t *testing.T) {
+	mockService := &MockRoomService{
+		listUserRooms: func(ctx context.Context, uID primitive.ObjectID) ([]*domain.Room, error) {
+			return []*domain.Room{}, nil
+		},
+	}
+
+	handler := NewRoomHandler(mockService)
+	assert.NotNil(t, handler.ListUserRooms)
+}
+
+func TestListUserRooms_MultipleRooms(t *testing.T) {
+	userID := primitive.NewObjectID()
+	room1 := &domain.Room{
+		ID:        primitive.NewObjectID(),
+		Name:      "Room 1",
+		Code:      "ROOM_1",
+		CreatedBy: userID,
+		Members:   []primitive.ObjectID{},
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+	room2 := &domain.Room{
+		ID:        primitive.NewObjectID(),
+		Name:      "Room 2",
+		Code:      "ROOM_2",
+		CreatedBy: primitive.NewObjectID(),
+		Members:   []primitive.ObjectID{userID},
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+
+	mockService := &MockRoomService{
+		listUserRooms: func(ctx context.Context, uID primitive.ObjectID) ([]*domain.Room, error) {
+			if uID == userID {
+				return []*domain.Room{room1, room2}, nil
+			}
+			return []*domain.Room{}, nil
+		},
+	}
+
+	handler := NewRoomHandler(mockService)
+	assert.NotNil(t, handler.ListUserRooms)
+}
+
+
