@@ -15,6 +15,7 @@ import (
 type MockRoomService struct {
 	createRoomFunc    func(ctx context.Context, name, code string, userID primitive.ObjectID) (*domain.Room, error)
 	addUserToRoomFunc func(ctx context.Context, code string, userID primitive.ObjectID) (*domain.Room, error)
+	getRoom           func(ctx context.Context, code string) (*domain.Room, error)
 }
 
 func (m *MockRoomService) CreateRoom(ctx context.Context, name, code string, userID primitive.ObjectID) (*domain.Room, error) {
@@ -27,6 +28,13 @@ func (m *MockRoomService) CreateRoom(ctx context.Context, name, code string, use
 func (m *MockRoomService) AddUserToRoom(ctx context.Context, code string, userID primitive.ObjectID) (*domain.Room, error) {
 	if m.addUserToRoomFunc != nil {
 		return m.addUserToRoomFunc(ctx, code, userID)
+	}
+	return nil, nil
+}
+
+func (m *MockRoomService) GetRoom(ctx context.Context, code string) (*domain.Room, error) {
+	if m.getRoom != nil {
+		return m.getRoom(ctx, code)
 	}
 	return nil, nil
 }
@@ -204,4 +212,104 @@ func TestAddUserToRoom_ErrorHandling(t *testing.T) {
 			assert.NotNil(t, handler.AddUserToRoom)
 		})
 	}
+}
+
+func TestGetRoom_OwnerAccess(t *testing.T) {
+	ownerID := primitive.NewObjectID()
+	roomID := primitive.NewObjectID()
+	roomCode := "CONF_A_001"
+	now := time.Now()
+
+	room := &domain.Room{
+		ID:        roomID,
+		Name:      "Conference Room A",
+		Code:      roomCode,
+		CreatedBy: ownerID,
+		Members:   []primitive.ObjectID{},
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	mockService := &MockRoomService{
+		getRoom: func(ctx context.Context, code string) (*domain.Room, error) {
+			if code == roomCode {
+				return room, nil
+			}
+			return nil, domain.ErrRoomNotFound
+		},
+	}
+
+	handler := NewRoomHandler(mockService)
+	assert.NotNil(t, handler.GetRoom)
+}
+
+func TestGetRoom_MemberAccess(t *testing.T) {
+	memberID := primitive.NewObjectID()
+	ownerID := primitive.NewObjectID()
+	roomID := primitive.NewObjectID()
+	roomCode := "CONF_A_001"
+	now := time.Now()
+
+	room := &domain.Room{
+		ID:        roomID,
+		Name:      "Conference Room A",
+		Code:      roomCode,
+		CreatedBy: ownerID,
+		Members:   []primitive.ObjectID{memberID},
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	mockService := &MockRoomService{
+		getRoom: func(ctx context.Context, code string) (*domain.Room, error) {
+			if code == roomCode {
+				return room, nil
+			}
+			return nil, domain.ErrRoomNotFound
+		},
+	}
+
+	handler := NewRoomHandler(mockService)
+	assert.NotNil(t, handler.GetRoom)
+}
+
+func TestGetRoom_UnauthorizedAccess(t *testing.T) {
+	ownerID := primitive.NewObjectID()
+	memberID := primitive.NewObjectID()
+	roomID := primitive.NewObjectID()
+	roomCode := "CONF_A_001"
+	now := time.Now()
+
+	room := &domain.Room{
+		ID:        roomID,
+		Name:      "Conference Room A",
+		Code:      roomCode,
+		CreatedBy: ownerID,
+		Members:   []primitive.ObjectID{memberID},
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	mockService := &MockRoomService{
+		getRoom: func(ctx context.Context, code string) (*domain.Room, error) {
+			if code == roomCode {
+				return room, nil
+			}
+			return nil, domain.ErrRoomNotFound
+		},
+	}
+
+	handler := NewRoomHandler(mockService)
+	assert.NotNil(t, handler.GetRoom)
+}
+
+func TestGetRoom_NotFound(t *testing.T) {
+	mockService := &MockRoomService{
+		getRoom: func(ctx context.Context, code string) (*domain.Room, error) {
+			return nil, domain.ErrRoomNotFound
+		},
+	}
+
+	handler := NewRoomHandler(mockService)
+	assert.NotNil(t, handler.GetRoom)
 }
