@@ -313,6 +313,47 @@ func (h *RoomHandler) GetRoomMembers(c *fiber.Ctx) error {
 	})
 }
 
+// LeaveRoom removes the authenticated user from a room
+func (h *RoomHandler) LeaveRoom(c *fiber.Ctx) error {
+	// Extract user ID from context
+	userID, ok := c.Locals("user_id").(string)
+	if !ok || userID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(map[string]interface{}{
+			"error":  "unauthorized",
+			"status": fiber.StatusUnauthorized,
+		})
+	}
+
+	// Convert user ID from string to ObjectID
+	userObjID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
+			"error":  "invalid user id",
+			"status": fiber.StatusBadRequest,
+		})
+	}
+
+	// Get room code from URL parameter
+	roomCode := c.Params("code")
+	if roomCode == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
+			"error":  "room code is required",
+			"status": fiber.StatusBadRequest,
+		})
+	}
+
+	// Leave room via service
+	if err := h.svc.LeaveRoom(c.Context(), roomCode, userObjID); err != nil {
+		return h.handleError(c, err)
+	}
+
+	return c.Status(fiber.StatusOK).JSON(map[string]interface{}{
+		"data":    nil,
+		"message": "you have left the room successfully",
+		"status":  fiber.StatusOK,
+	})
+}
+
 // handleError maps service errors to HTTP responses
 func (h *RoomHandler) handleError(c *fiber.Ctx, err error) error {
 	switch {

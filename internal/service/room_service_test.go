@@ -13,10 +13,11 @@ import (
 
 // MockRoomRepository is a mock implementation for testing
 type MockRoomRepository struct {
-	createFunc        func(ctx context.Context, room *domain.Room) error
-	getByIDFunc       func(ctx context.Context, id primitive.ObjectID) (*domain.Room, error)
-	getByCodeFunc     func(ctx context.Context, code string) (*domain.Room, error)
-	addUserToRoomFunc func(ctx context.Context, roomID, userID primitive.ObjectID) error
+	createFunc           func(ctx context.Context, room *domain.Room) error
+	getByIDFunc          func(ctx context.Context, id primitive.ObjectID) (*domain.Room, error)
+	getByCodeFunc        func(ctx context.Context, code string) (*domain.Room, error)
+	addUserToRoomFunc    func(ctx context.Context, roomID, userID primitive.ObjectID) error
+	removeUserFromRoomFunc func(ctx context.Context, roomID, userID primitive.ObjectID) error
 }
 
 func (m *MockRoomRepository) Create(ctx context.Context, room *domain.Room) error {
@@ -43,6 +44,13 @@ func (m *MockRoomRepository) GetByCode(ctx context.Context, code string) (*domai
 func (m *MockRoomRepository) AddUserToRoom(ctx context.Context, roomID, userID primitive.ObjectID) error {
 	if m.addUserToRoomFunc != nil {
 		return m.addUserToRoomFunc(ctx, roomID, userID)
+	}
+	return nil
+}
+
+func (m *MockRoomRepository) RemoveUserFromRoom(ctx context.Context, roomID, userID primitive.ObjectID) error {
+	if m.removeUserFromRoomFunc != nil {
+		return m.removeUserFromRoomFunc(ctx, roomID, userID)
 	}
 	return nil
 }
@@ -346,4 +354,122 @@ func TestGetRoom_NotFound(t *testing.T) {
 	assert.Error(t, err)
 	assert.Nil(t, room)
 	assert.True(t, errors.Is(err, domain.ErrRoomNotFound))
+}
+
+func TestLeaveRoom_Success(t *testing.T) {
+	userID := primitive.NewObjectID()
+	roomID := primitive.NewObjectID()
+	roomCode := "CONF_A_001"
+	now := time.Now()
+
+	room := &domain.Room{
+		ID:        roomID,
+		Name:      "Conference Room A",
+		Code:      roomCode,
+		CreatedBy: primitive.NewObjectID(),
+		Members:   []primitive.ObjectID{userID},
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	repoMock := &MockRoomRepository{
+		getByCodeFunc: func(ctx context.Context, code string) (*domain.Room, error) {
+			if code == roomCode {
+				return room, nil
+			}
+			return nil, domain.ErrRoomNotFound
+		},
+		removeUserFromRoomFunc: func(ctx context.Context, rID, uID primitive.ObjectID) error {
+			return nil
+		},
+	}
+
+	svc := NewRoomService(repoMock)
+	err := svc.LeaveRoom(context.Background(), roomCode, userID)
+
+	assert.NoError(t, err)
+}
+
+func TestLeaveRoom_NotFound(t *testing.T) {
+	userID := primitive.NewObjectID()
+	roomCode := "NONEXISTENT"
+
+	repoMock := &MockRoomRepository{
+		getByCodeFunc: func(ctx context.Context, code string) (*domain.Room, error) {
+			return nil, domain.ErrRoomNotFound
+		},
+	}
+
+	svc := NewRoomService(repoMock)
+	err := svc.LeaveRoom(context.Background(), roomCode, userID)
+
+	assert.Error(t, err)
+	assert.True(t, errors.Is(err, domain.ErrRoomNotFound))
+}
+
+func TestLeaveRoom_UserNotMember(t *testing.T) {
+	userID := primitive.NewObjectID()
+	otherUserID := primitive.NewObjectID()
+	roomID := primitive.NewObjectID()
+	roomCode := "CONF_A_001"
+	now := time.Now()
+
+	room := &domain.Room{
+		ID:        roomID,
+		Name:      "Conference Room A",
+		Code:      roomCode,
+		CreatedBy: primitive.NewObjectID(),
+		Members:   []primitive.ObjectID{otherUserID},
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	repoMock := &MockRoomRepository{
+		getByCodeFunc: func(ctx context.Context, code string) (*domain.Room, error) {
+			if code == roomCode {
+				return room, nil
+			}
+			return nil, domain.ErrRoomNotFound
+		},
+	}
+
+	svc := NewRoomService(repoMock)
+	err := svc.LeaveRoom(context.Background(), roomCode, userID)
+
+	assert.Error(t, err)
+	assert.True(t, errors.Is(err, domain.ErrInvalidInput))
+}
+
+func TestLeaveRoom_RepositoryError(t *testing.T) {
+	userID := primitive.NewObjectID()
+	roomID := primitive.NewObjectID()
+	roomCode := "CONF_A_001"
+	now := time.Now()
+
+	room := &domain.Room{
+		ID:        roomID,
+		Name:      "Conference Room A",
+		Code:      roomCode,
+		CreatedBy: primitive.NewObjectID(),
+		Members:   []primitive.ObjectID{userID},
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	repoMock := &MockRoomRepository{
+		getByCodeFunc: func(ctx context.Context, code string) (*domain.Room, error) {
+			if code == roomCode {
+				return room, nil
+			}
+			return nil, domain.ErrRoomNotFound
+		},
+		removeUserFromRoomFunc: func(ctx context.Context, rID, uID primitive.ObjectID) error {
+			return errors.New("database error")
+		},
+	}
+
+	svc := NewRoomService(repoMock)
+	err := svc.LeaveRoom(context.Background(), roomCode, userID)
+
+	assert.Error(t, err)
 }
