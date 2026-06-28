@@ -298,3 +298,52 @@ func TestAddUserToRoom_RepositoryAddError(t *testing.T) {
 	assert.Error(t, err)
 	assert.Nil(t, updatedRoom)
 }
+
+func TestGetRoom_Success(t *testing.T) {
+	roomID := primitive.NewObjectID()
+	roomCode := "CONF_A_001"
+	now := time.Now()
+
+	room := &domain.Room{
+		ID:        roomID,
+		Name:      "Conference Room A",
+		Code:      roomCode,
+		CreatedBy: primitive.NewObjectID(),
+		Members:   []primitive.ObjectID{primitive.NewObjectID()},
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	repoMock := &MockRoomRepository{
+		getByCodeFunc: func(ctx context.Context, code string) (*domain.Room, error) {
+			if code == roomCode {
+				return room, nil
+			}
+			return nil, domain.ErrRoomNotFound
+		},
+	}
+
+	svc := NewRoomService(repoMock)
+	retrievedRoom, err := svc.GetRoom(context.Background(), roomCode)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, retrievedRoom)
+	assert.Equal(t, roomCode, retrievedRoom.Code)
+}
+
+func TestGetRoom_NotFound(t *testing.T) {
+	roomCode := "NONEXISTENT"
+
+	repoMock := &MockRoomRepository{
+		getByCodeFunc: func(ctx context.Context, code string) (*domain.Room, error) {
+			return nil, domain.ErrRoomNotFound
+		},
+	}
+
+	svc := NewRoomService(repoMock)
+	room, err := svc.GetRoom(context.Background(), roomCode)
+
+	assert.Error(t, err)
+	assert.Nil(t, room)
+	assert.True(t, errors.Is(err, domain.ErrRoomNotFound))
+}

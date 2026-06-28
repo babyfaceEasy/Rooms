@@ -152,6 +152,82 @@ func (h *RoomHandler) AddUserToRoom(c *fiber.Ctx) error {
 	})
 }
 
+// GetRoom retrieves room details - only owner and members can access
+func (h *RoomHandler) GetRoom(c *fiber.Ctx) error {
+	// Extract user ID from context
+	userID, ok := c.Locals("user_id").(string)
+	if !ok || userID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(map[string]interface{}{
+			"error":  "unauthorized",
+			"status": fiber.StatusUnauthorized,
+		})
+	}
+
+	// Convert user ID from string to ObjectID
+	userObjID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
+			"error":  "invalid user id",
+			"status": fiber.StatusBadRequest,
+		})
+	}
+
+	// Get room code from URL parameter
+	roomCode := c.Params("code")
+	if roomCode == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
+			"error":  "room code is required",
+			"status": fiber.StatusBadRequest,
+		})
+	}
+
+	// Get room via service
+	room, err := h.svc.GetRoom(c.Context(), roomCode)
+	if err != nil {
+		return h.handleError(c, err)
+	}
+
+	// Check authorization: user must be owner or member
+	isOwner := room.CreatedBy == userObjID
+	isMember := false
+	for _, m := range room.Members {
+		if m == userObjID {
+			isMember = true
+			break
+		}
+	}
+
+	if !isOwner && !isMember {
+		return c.Status(fiber.StatusForbidden).JSON(map[string]interface{}{
+			"error":  "you do not have permission to access this room",
+			"status": fiber.StatusForbidden,
+		})
+	}
+
+	// Convert members to string slice for response
+	members := make([]string, len(room.Members))
+	for i, m := range room.Members {
+		members[i] = m.Hex()
+	}
+
+	// Convert domain Room to RoomResponse
+	response := &RoomResponse{
+		ID:        room.ID.Hex(),
+		Name:      room.Name,
+		Code:      room.Code,
+		CreatedBy: room.CreatedBy.Hex(),
+		Members:   members,
+		CreatedAt: room.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		UpdatedAt: room.UpdatedAt.Format("2006-01-02T15:04:05Z"),
+	}
+
+	return c.Status(fiber.StatusOK).JSON(map[string]interface{}{
+		"data":    response,
+		"message": "room details retrieved successfully",
+		"status":  fiber.StatusOK,
+	})
+}
+
 // handleError maps service errors to HTTP responses
 func (h *RoomHandler) handleError(c *fiber.Ctx, err error) error {
 	switch {

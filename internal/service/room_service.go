@@ -13,6 +13,7 @@ import (
 type RoomService interface {
 	CreateRoom(ctx context.Context, name, code string, userID primitive.ObjectID) (*domain.Room, error)
 	AddUserToRoom(ctx context.Context, code string, userID primitive.ObjectID) (*domain.Room, error)
+	GetRoom(ctx context.Context, code string) (*domain.Room, error)
 }
 
 type roomService struct {
@@ -78,4 +79,14 @@ func (s *roomService) AddUserToRoom(ctx context.Context, code string, userID pri
 	}
 
 	return updatedRoom, nil
+}
+
+// GetRoom retrieves a room by code
+func (s *roomService) GetRoom(ctx context.Context, code string) (*domain.Room, error) {
+	room, err := s.repo.GetByCode(ctx, code)
+	if err != nil {
+		return nil, err
+	}
+
+	return room, nil
 }
