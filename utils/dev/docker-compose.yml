@@ -1,0 +1,19 @@
+version: "3"
+
+services:
+  room-dev:
+    image: 068709857936.dkr.ecr.us-east-1.amazonaws.com/bouk-room-dev:latest
+    ports:
+      - "8000:8000"
+    # environment:
+    #   - ENVIRONMENT=STAGING
+    env_file:
+      - ./.env
+  nginx-dev:
+    build: ./nginx
+    ports:
+      - 80:80
+      - 443:443
+
+    volumes:
+      - /etc/letsencrypt:/etc/letsencrypt

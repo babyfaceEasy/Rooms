@@ -1,0 +1,21 @@
+version: "3"
+
+services:
+  room-prod:
+    image: 068709857936.dkr.ecr.us-east-1.amazonaws.com/bouk-room-prod:latest
+    ports:
+      - "8000:8000"
+    # environment:
+    #   - ENVIRONMENT=PRODUCTION
+
+    env_file:
+      - ./.env
+
+  nginx-prod:
+    build: ./nginx
+    ports:
+      - 80:80
+      - 443:443
+
+    volumes:
+      - /etc/letsencrypt:/etc/letsencrypt
