@@ -9,11 +9,11 @@ services:
     #   - ENVIRONMENT=STAGING
     env_file:
       - ./.env
-  nginx-dev:
-    build: ./nginx
-    ports:
-      - 80:80
-      - 443:443
+  # nginx-dev:
+  #   build: ./nginx
+  #   ports:
+  #     - 80:80
+  #     - 443:443
 
-    volumes:
-      - /etc/letsencrypt:/etc/letsencrypt
+  #   volumes:
+  #     - /etc/letsencrypt:/etc/letsencrypt

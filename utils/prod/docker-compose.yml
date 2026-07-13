@@ -11,11 +11,11 @@ services:
     env_file:
       - ./.env
 
-  nginx-prod:
-    build: ./nginx
-    ports:
-      - 80:80
-      - 443:443
+  # nginx-prod:
+  #   build: ./nginx
+  #   ports:
+  #     - 80:80
+  #     - 443:443
 
-    volumes:
-      - /etc/letsencrypt:/etc/letsencrypt
+  #   volumes:
+  #     - /etc/letsencrypt:/etc/letsencrypt
