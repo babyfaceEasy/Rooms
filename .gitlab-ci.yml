@@ -120,7 +120,7 @@ Deploy To DEV:
     - echo "Updating Docker container on virtual machine"
     - chmod 400 $VIRTUAL_MACHINE_SSH_KEY_DEV
     ##mna - sh utils/update_application_variable.sh $MONGO_URL_CRED_DEV $MONGO_DB_DEV $STRIPE_API_KEY_DEV $SENDGRID_API_KEY_DEV
-    - sh utils/update_application_variable.sh $APP_NAME $PORT $APP_ENV $LOG_LEVEL $MONGO_URI $MONGO_DATABASE $MONGO_CONNECT_TIMEOUT $S3_ENDPOINT $S3_REGION $S3_BUCKET $S3_ACCESS_KEY $S3_SECRET_KEY $S3_USE_SSL $S3_PRESIGNED_EXPIRY
+    - sh utils/update_application_variable.sh $APP_NAME $PORT development $LOG_LEVEL $MONGO_URI $MONGO_DATABASE $MONGO_CONNECT_TIMEOUT $S3_ENDPOINT $S3_REGION $S3_BUCKET $S3_ACCESS_KEY $S3_SECRET_KEY $S3_USE_SSL $S3_PRESIGNED_EXPIRY
     - pwd && ls && ls -la
     - cat .env
   script:
@@ -184,7 +184,7 @@ publish_prod:
   before_script:
     - $(aws ecr get-login --no-include-email --region $AWS_REGION | tr -d '\r')
     - chmod 0755  utils/update_application_variable.sh
-    - sh utils/update_application_variable.sh $APP_NAME $PORT $APP_ENV $LOG_LEVEL $MONGO_URI $MONGO_DATABASE $MONGO_CONNECT_TIMEOUT $S3_ENDPOINT $S3_REGION $S3_BUCKET $S3_ACCESS_KEY $S3_SECRET_KEY $S3_USE_SSL $S3_PRESIGNED_EXPIRY
+    - sh utils/update_application_variable.sh $APP_NAME $PORT production $LOG_LEVEL $MONGO_URI $MONGO_DATABASE $MONGO_CONNECT_TIMEOUT $S3_ENDPOINT $S3_REGION $S3_BUCKET $S3_ACCESS_KEY $S3_SECRET_KEY $S3_USE_SSL $S3_PRESIGNED_EXPIRY
     - ls -la
     - cat .env
 
@@ -210,7 +210,7 @@ Deploy To Prod:
     - chmod 400 $VIRTUAL_MACHINE_SSH_KEY_DEV
     # - sh utils/update_application_variable.sh $DATABASE_NAME_DEV $DATABASE_PASSWORD_DEV $DATABASE_HOST_DEV $DATABASE_DB_DEV  $STRIPE_API_KEY_DEV $SENDGRID_API_KEY_DEV
     # - sh utils/update_application_variable.sh $MONGO_URL_CRED_DEV $MONGO_DB_DEV $STRIPE_API_KEY_DEV $SENDGRID_API_KEY_DEV # using dev variables for now
-    - sh utils/update_application_variable.sh $APP_NAME $PORT $APP_ENV $LOG_LEVEL $MONGO_URI $MONGO_DATABASE $MONGO_CONNECT_TIMEOUT $S3_ENDPOINT $S3_REGION $S3_BUCKET $S3_ACCESS_KEY $S3_SECRET_KEY $S3_USE_SSL $S3_PRESIGNED_EXPIRY
+    - sh utils/update_application_variable.sh $APP_NAME $PORT production $LOG_LEVEL $MONGO_URI $MONGO_DATABASE $MONGO_CONNECT_TIMEOUT $S3_ENDPOINT $S3_REGION $S3_BUCKET $S3_ACCESS_KEY $S3_SECRET_KEY $S3_USE_SSL $S3_PRESIGNED_EXPIRY
     - pwd && ls && ls -la
     - cat .env
 
