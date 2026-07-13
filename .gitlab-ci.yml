@@ -52,7 +52,7 @@ services:
 default:
   tags:
     # - do-application-runner-01 ##
-    - bouk-admin-backend
+    - bouk-admin-prod-runner
 
 stages:
   - build
