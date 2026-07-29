@@ -4,7 +4,7 @@ services:
   room:
     image: 068709857936.dkr.ecr.us-east-1.amazonaws.com/bouk-room-dev:latest
     ports:
-      - "8000:8000"
+      - "8080:8080"
     env_file:
       - ./.env
 
