@@ -5,10 +5,11 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"temp_backend/internal/domain"
 	"temp_backend/internal/service"
+
+	"github.com/stretchr/testify/assert"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // MockUserService is a mock implementation of UserService for testing.
@@ -63,11 +64,32 @@ func (m *MockUserService) DeleteAccount(ctx context.Context, id string) error {
 	return nil
 }
 
+// MockEmailService is a mock implementation of EmailService for testing.
+type MockEmailService struct {
+	sendVerificationEmailFunc  func(ctx context.Context, userID primitive.ObjectID, recipientEmail string, dynamicData map[string]string) error
+	sendPasswordResetEmailFunc func(ctx context.Context, userID primitive.ObjectID, recipientEmail string, dynamicData map[string]string) error
+}
+
+func (m *MockEmailService) SendVerificationEmail(ctx context.Context, userID primitive.ObjectID, recipientEmail string, dynamicData map[string]string) error {
+	if m.sendVerificationEmailFunc != nil {
+		return m.sendVerificationEmailFunc(ctx, userID, recipientEmail, dynamicData)
+	}
+	return nil
+}
+
+func (m *MockEmailService) SendPasswordResetEmail(ctx context.Context, userID primitive.ObjectID, recipientEmail string, dynamicData map[string]string) error {
+	if m.sendPasswordResetEmailFunc != nil {
+		return m.sendPasswordResetEmailFunc(ctx, userID, recipientEmail, dynamicData)
+	}
+	return nil
+}
+
 func TestNewUserHandler(t *testing.T) {
 	mock := &MockUserService{}
 	var svc service.UserService = mock
+	emailSvc := &MockEmailService{}
 
-	handler := NewUserHandler(svc)
+	handler := NewUserHandler(svc, emailSvc)
 
 	assert.NotNil(t, handler)
 	assert.Equal(t, handler.svc, svc)
@@ -89,8 +111,9 @@ func TestViewProfile_Success(t *testing.T) {
 			return nil, domain.ErrUserNotFound
 		},
 	}
+	emailSvc := &MockEmailService{}
 
-	handler := NewUserHandler(mock)
+	handler := NewUserHandler(mock, emailSvc)
 
 	// We can't easily test Fiber handlers without the full HTTP stack
 	// Just verify the handler exists and is callable
@@ -103,8 +126,9 @@ func TestViewProfile_UserNotFound(t *testing.T) {
 			return nil, domain.ErrUserNotFound
 		},
 	}
+	emailSvc := &MockEmailService{}
 
-	handler := NewUserHandler(mock)
+	handler := NewUserHandler(mock, emailSvc)
 
 	// Verify the handler exists
 	assert.NotNil(t, handler.ViewProfile)
@@ -124,7 +148,8 @@ func TestUserHandler_CreatesWithValidService(t *testing.T) {
 	}
 
 	var svc service.UserService = mock
-	handler := NewUserHandler(svc)
+	emailSvc := &MockEmailService{}
+	handler := NewUserHandler(svc, emailSvc)
 
 	assert.NotNil(t, handler)
 }
@@ -147,7 +172,8 @@ func TestUserHandler_HandlesGetUserByID(t *testing.T) {
 	}
 
 	var svc service.UserService = mock
-	handler := NewUserHandler(svc)
+	emailSvc := &MockEmailService{}
+	handler := NewUserHandler(svc, emailSvc)
 
 	// Test successful retrieval
 	user, err := handler.svc.GetUserByID(context.Background(), userID.Hex())
@@ -173,7 +199,8 @@ func TestUserHandler_HandlesDeleteUser(t *testing.T) {
 	}
 
 	var svc service.UserService = mock
-	handler := NewUserHandler(svc)
+	emailSvc := &MockEmailService{}
+	handler := NewUserHandler(svc, emailSvc)
 
 	// Test successful deletion
 	err := handler.svc.DeleteUser(context.Background(), userID.Hex())
@@ -249,7 +276,8 @@ func TestUpdateProfile_Success(t *testing.T) {
 		},
 	}
 
-	handler := NewUserHandler(mock)
+	emailSvc := &MockEmailService{}
+	handler := NewUserHandler(mock, emailSvc)
 
 	// Verify the handler exists and is callable
 	assert.NotNil(t, handler.UpdateProfile)
@@ -267,7 +295,8 @@ func TestUpdateProfile_InvalidName(t *testing.T) {
 		},
 	}
 
-	handler := NewUserHandler(mock)
+	emailSvc := &MockEmailService{}
+	handler := NewUserHandler(mock, emailSvc)
 
 	// Test with invalid name
 	_, err := handler.svc.UpdateProfile(context.Background(), userID.Hex(), "")
@@ -282,7 +311,8 @@ func TestUpdateProfile_UserNotFound(t *testing.T) {
 		},
 	}
 
-	handler := NewUserHandler(mock)
+	emailSvc := &MockEmailService{}
+	handler := NewUserHandler(mock, emailSvc)
 
 	// Test with non-existent user
 	_, err := handler.svc.UpdateProfile(context.Background(), primitive.NewObjectID().Hex(), "New Name")
@@ -310,7 +340,8 @@ func TestChangePassword_Success(t *testing.T) {
 		},
 	}
 
-	handler := NewUserHandler(mock)
+	emailSvc := &MockEmailService{}
+	handler := NewUserHandler(mock, emailSvc)
 
 	// Verify the handler exists and is callable
 	assert.NotNil(t, handler.ChangePassword)
@@ -328,7 +359,8 @@ func TestChangePassword_InvalidCurrentPassword(t *testing.T) {
 		},
 	}
 
-	handler := NewUserHandler(mock)
+	emailSvc := &MockEmailService{}
+	handler := NewUserHandler(mock, emailSvc)
 
 	// Test with wrong current password
 	err := handler.svc.ChangePassword(context.Background(), userID.Hex(), "WrongPass123!", "NewPass456!")
@@ -343,7 +375,8 @@ func TestChangePassword_UserNotFound(t *testing.T) {
 		},
 	}
 
-	handler := NewUserHandler(mock)
+	emailSvc := &MockEmailService{}
+	handler := NewUserHandler(mock, emailSvc)
 
 	// Test with non-existent user
 	err := handler.svc.ChangePassword(context.Background(), primitive.NewObjectID().Hex(), "OldPass123!", "NewPass456!")
@@ -381,7 +414,8 @@ func TestDeleteAccount_Success(t *testing.T) {
 		},
 	}
 
-	handler := NewUserHandler(mock)
+	emailSvc := &MockEmailService{}
+	handler := NewUserHandler(mock, emailSvc)
 
 	// Verify the handler exists and is callable
 	assert.NotNil(t, handler.DeleteAccount)
@@ -394,7 +428,8 @@ func TestDeleteAccount_UserNotFound(t *testing.T) {
 		},
 	}
 
-	handler := NewUserHandler(mock)
+	emailSvc := &MockEmailService{}
+	handler := NewUserHandler(mock, emailSvc)
 
 	// Test with non-existent user
 	err := handler.svc.DeleteAccount(context.Background(), primitive.NewObjectID().Hex())
@@ -409,7 +444,8 @@ func TestDeleteAccount_InvalidID(t *testing.T) {
 		},
 	}
 
-	handler := NewUserHandler(mock)
+	emailSvc := &MockEmailService{}
+	handler := NewUserHandler(mock, emailSvc)
 
 	// Test with invalid ID
 	err := handler.svc.DeleteAccount(context.Background(), "invalid")
