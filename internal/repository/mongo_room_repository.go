@@ -4,11 +4,12 @@ import (
 	"context"
 	"time"
 
+	"temp_backend/internal/domain"
+
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"temp_backend/internal/domain"
 )
 
 // MongoRoomRepository implements RoomRepository for MongoDB
@@ -22,7 +23,7 @@ func NewMongoRoomRepository(db *mongo.Database) *MongoRoomRepository {
 
 	// Create unique index on code
 	indexModel := mongo.IndexModel{
-		Keys: bson.D{{Key: "code", Value: 1}},
+		Keys:    bson.D{{Key: "code", Value: 1}},
 		Options: options.Index().SetUnique(true),
 	}
 	collection.Indexes().CreateOne(context.Background(), indexModel)
@@ -90,7 +91,6 @@ func (m *MongoRoomRepository) AddUserToRoom(ctx context.Context, roomID, userID 
 			"$set":      bson.M{"updated_at": time.Now()},
 		},
 	)
-
 	if err != nil {
 		return err
 	}
@@ -112,7 +112,6 @@ func (m *MongoRoomRepository) RemoveUserFromRoom(ctx context.Context, roomID, us
 			"$set":  bson.M{"updated_at": time.Now()},
 		},
 	)
-
 	if err != nil {
 		return err
 	}
@@ -137,7 +136,6 @@ func (m *MongoRoomRepository) DeleteRoom(ctx context.Context, roomID primitive.O
 			},
 		},
 	)
-
 	if err != nil {
 		return err
 	}
@@ -176,3 +174,20 @@ func (m *MongoRoomRepository) ListUserRooms(ctx context.Context, userID primitiv
 	return rooms, nil
 }
 
+// IsUserMember checks if a user is a member of a room
+func (m *MongoRoomRepository) IsUserMember(ctx context.Context, roomID, userID primitive.ObjectID) (bool, error) {
+	result := m.collection.FindOne(ctx, bson.M{
+		"_id":        roomID,
+		"members":    bson.M{"$in": []primitive.ObjectID{userID}},
+		"deleted_at": nil,
+	})
+
+	if err := result.Err(); err != nil {
+		if err == mongo.ErrNoDocuments {
+			return false, nil
+		}
+		return false, err
+	}
+
+	return true, nil
+}

@@ -100,7 +100,7 @@ func main() {
 	// Post repositories and service
 	postRepo := repository.NewMongoPostRepository(mongoClient.Database(cfg.Mongo.Database))
 	postService := service.NewPostService(postRepo)
-	postHandler := handler.NewPostHandler(postService, storageRepo)
+	postHandler := handler.NewPostHandler(postService, storageRepo, roomRepo)
 
 	server := api.NewServer(cfg, logger, itemHandler, userHandler, authHandler, roomHandler, postHandler, authService)
 

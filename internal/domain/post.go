@@ -13,11 +13,13 @@ var (
 	ErrPostTextTooShort = errors.New("post text must be at least 1 character")
 	ErrPostNotFound     = errors.New("post not found")
 	ErrUnauthorizedPost = errors.New("you are not authorized to perform this action on this post")
+	ErrNotRoomMember    = errors.New("not a member of this room")
 )
 
 // Post represents a social media post
 type Post struct {
 	ID        primitive.ObjectID `bson:"_id,omitempty"`
+	RoomID    primitive.ObjectID `bson:"room_id"`
 	UserID    primitive.ObjectID `bson:"user_id"`
 	Text      string             `bson:"text"`
 	Image     *string            `bson:"image,omitempty"` // S3 URL
@@ -30,6 +32,10 @@ type Post struct {
 
 // ValidatePost validates the Post entity
 func (p *Post) Validate() error {
+	if p.RoomID.IsZero() {
+		return ErrInvalidInput
+	}
+
 	if p.Text == "" {
 		return ErrPostTextRequired
 	}

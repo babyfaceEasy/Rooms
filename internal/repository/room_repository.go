@@ -3,8 +3,9 @@ package repository
 import (
 	"context"
 
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"temp_backend/internal/domain"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // RoomRepository defines the interface for room persistence
@@ -16,4 +17,5 @@ type RoomRepository interface {
 	RemoveUserFromRoom(ctx context.Context, roomID, userID primitive.ObjectID) error
 	DeleteRoom(ctx context.Context, roomID primitive.ObjectID) error
 	ListUserRooms(ctx context.Context, userID primitive.ObjectID) ([]*domain.Room, error)
+	IsUserMember(ctx context.Context, roomID, userID primitive.ObjectID) (bool, error)
 }

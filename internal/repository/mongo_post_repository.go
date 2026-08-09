@@ -4,10 +4,12 @@ import (
 	"context"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"temp_backend/internal/domain"
+
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // MongoPostRepository implements PostRepository for MongoDB
@@ -64,7 +66,6 @@ func (m *MongoPostRepository) DeletePost(ctx context.Context, id primitive.Objec
 			},
 		},
 	)
-
 	if err != nil {
 		return err
 	}
@@ -74,4 +75,28 @@ func (m *MongoPostRepository) DeletePost(ctx context.Context, id primitive.Objec
 	}
 
 	return nil
+}
+
+// GetByRoomID retrieves all posts for a room (excluding soft-deleted)
+func (m *MongoPostRepository) GetByRoomID(ctx context.Context, roomID primitive.ObjectID) ([]*domain.Post, error) {
+	cursor, err := m.collection.Find(ctx, bson.M{
+		"room_id":    roomID,
+		"deleted_at": nil,
+	}, options.Find().SetSort(bson.M{"created_at": -1}))
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var posts []*domain.Post
+	if err = cursor.All(ctx, &posts); err != nil {
+		return nil, err
+	}
+
+	// If no posts found, return empty slice instead of nil
+	if posts == nil {
+		posts = []*domain.Post{}
+	}
+
+	return posts, nil
 }

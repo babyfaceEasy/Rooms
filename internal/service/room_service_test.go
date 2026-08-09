@@ -6,20 +6,21 @@ import (
 	"testing"
 	"time"
 
+	"temp_backend/internal/domain"
+
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"temp_backend/internal/domain"
 )
 
 // MockRoomRepository is a mock implementation for testing
 type MockRoomRepository struct {
-	createFunc           func(ctx context.Context, room *domain.Room) error
-	getByIDFunc          func(ctx context.Context, id primitive.ObjectID) (*domain.Room, error)
-	getByCodeFunc        func(ctx context.Context, code string) (*domain.Room, error)
-	addUserToRoomFunc    func(ctx context.Context, roomID, userID primitive.ObjectID) error
+	createFunc             func(ctx context.Context, room *domain.Room) error
+	getByIDFunc            func(ctx context.Context, id primitive.ObjectID) (*domain.Room, error)
+	getByCodeFunc          func(ctx context.Context, code string) (*domain.Room, error)
+	addUserToRoomFunc      func(ctx context.Context, roomID, userID primitive.ObjectID) error
 	removeUserFromRoomFunc func(ctx context.Context, roomID, userID primitive.ObjectID) error
-	deleteRoomFunc       func(ctx context.Context, roomID primitive.ObjectID) error
-	listUserRoomsFunc    func(ctx context.Context, userID primitive.ObjectID) ([]*domain.Room, error)
+	deleteRoomFunc         func(ctx context.Context, roomID primitive.ObjectID) error
+	listUserRoomsFunc      func(ctx context.Context, userID primitive.ObjectID) ([]*domain.Room, error)
 }
 
 func (m *MockRoomRepository) Create(ctx context.Context, room *domain.Room) error {
@@ -68,6 +69,14 @@ func (m *MockRoomRepository) ListUserRooms(ctx context.Context, userID primitive
 	if m.listUserRoomsFunc != nil {
 		return m.listUserRoomsFunc(ctx, userID)
 	}
+	return []*domain.Room{}, nil
+}
+
+func (m *MockRoomRepository) IsUserMember(ctx context.Context, roomID, userID primitive.ObjectID) (bool, error) {
+	return true, nil
+}
+
+func (m *MockRoomRepository) GetByRoomID(ctx context.Context, roomID primitive.ObjectID) ([]*domain.Room, error) {
 	return []*domain.Room{}, nil
 }
 
@@ -187,10 +196,10 @@ func TestCreateRoom_RepositoryError(t *testing.T) {
 
 func TestCreateRoom_ValidateCodeFormatWithValidInputs(t *testing.T) {
 	userID := primitive.NewObjectID()
-	
+
 	testCases := []struct {
-		name    string
-		code    string
+		name       string
+		code       string
 		shouldFail bool
 	}{
 		{"Alphanumeric", "ABC123", false},
