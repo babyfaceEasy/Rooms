@@ -5,11 +5,12 @@ import (
 	"mime/multipart"
 	"path/filepath"
 
-	"github.com/gofiber/fiber/v2"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"temp_backend/internal/domain"
 	"temp_backend/internal/repository"
 	"temp_backend/internal/service"
+
+	"github.com/gofiber/fiber/v2"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // CreatePostRequest represents the request to create a post
@@ -19,13 +20,14 @@ type CreatePostRequest struct {
 
 // PostResponse represents a post in the response
 type PostResponse struct {
-	ID        string `json:"id"`
-	UserID    string `json:"user_id"`
-	Text      string `json:"text"`
+	ID        string  `json:"id"`
+	UserID    string  `json:"user_id"`
+	Text      string  `json:"text"`
 	Image     *string `json:"image,omitempty"`
 	Video     *string `json:"video,omitempty"`
-	CreatedAt string `json:"created_at"`
-	UpdatedAt string `json:"updated_at"`
+	Audio     *string `json:"audio,omitempty"`
+	CreatedAt string  `json:"created_at"`
+	UpdatedAt string  `json:"updated_at"`
 }
 
 // PostHandler handles post-related endpoints
@@ -71,7 +73,7 @@ func (h *PostHandler) CreatePost(c *fiber.Ctx) error {
 		})
 	}
 
-	var imageURL, videoURL *string
+	var imageURL, videoURL, audioURL *string
 
 	// Handle file uploads
 	form, err := c.MultipartForm()
@@ -139,10 +141,41 @@ func (h *PostHandler) CreatePost(c *fiber.Ctx) error {
 			}
 			videoURL = &url
 		}
+
+		// Try to upload audio
+		if audios := form.File["audio"]; len(audios) > 0 {
+			audio := audios[0]
+			file, err := audio.Open()
+			if err != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
+					"error":  "failed to process audio",
+					"status": fiber.StatusBadRequest,
+				})
+			}
+			defer file.Close()
+
+			// Validate audio type
+			if !isValidAudioType(audio.Filename) {
+				return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
+					"error":  "invalid audio type",
+					"status": fiber.StatusBadRequest,
+				})
+			}
+
+			// Upload to S3
+			url, err := h.storage.PutObject(c.Context(), "posts/audio/"+userID+"/"+audio.Filename, file, audio.Size, audio.Header.Get("Content-Type"))
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(map[string]interface{}{
+					"error":  "failed to upload audio",
+					"status": fiber.StatusInternalServerError,
+				})
+			}
+			audioURL = &url
+		}
 	}
 
 	// Create post via service
-	post, err := h.svc.CreatePost(c.Context(), text, userObjID, imageURL, videoURL)
+	post, err := h.svc.CreatePost(c.Context(), text, userObjID, imageURL, videoURL, audioURL)
 	if err != nil {
 		return h.handleError(c, err)
 	}
@@ -154,6 +187,7 @@ func (h *PostHandler) CreatePost(c *fiber.Ctx) error {
 		Text:      post.Text,
 		Image:     post.Image,
 		Video:     post.Video,
+		Audio:     post.Audio,
 		CreatedAt: post.CreatedAt.Format("2006-01-02T15:04:05Z"),
 		UpdatedAt: post.UpdatedAt.Format("2006-01-02T15:04:05Z"),
 	}
@@ -197,6 +231,7 @@ func (h *PostHandler) GetPost(c *fiber.Ctx) error {
 		Text:      post.Text,
 		Image:     post.Image,
 		Video:     post.Video,
+		Audio:     post.Audio,
 		CreatedAt: post.CreatedAt.Format("2006-01-02T15:04:05Z"),
 		UpdatedAt: post.UpdatedAt.Format("2006-01-02T15:04:05Z"),
 	}
@@ -308,6 +343,20 @@ func isValidVideoType(filename string) bool {
 		".webm": true,
 		".mov":  true,
 		".avi":  true,
+	}
+	return validTypes[ext]
+}
+
+// isValidAudioType checks if the file is a valid audio type
+func isValidAudioType(filename string) bool {
+	ext := filepath.Ext(filename)
+	validTypes := map[string]bool{
+		".mp3":  true,
+		".wav":  true,
+		".m4a":  true,
+		".aac":  true,
+		".flac": true,
+		".ogg":  true,
 	}
 	return validTypes[ext]
 }

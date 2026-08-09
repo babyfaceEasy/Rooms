@@ -1,6 +1,9 @@
 package api
 
 import (
+	"os"
+	"strings"
+
 	"github.com/gofiber/fiber/v2"
 	"temp_backend/internal/handler"
 	"temp_backend/internal/middleware"
@@ -11,6 +14,21 @@ func (s *Server) registerRoutes(itemHandler *handler.ItemHandler, userHandler *h
 	s.app.Get("/health", func(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusOK).JSON(fiber.Map{
 			"status": "ok",
+		})
+	})
+
+	// DEBUG: returns all environment variables visible to the process.
+	// This endpoint is intended for local testing only and must not be deployed to production.
+	s.app.Get("/debug/env", func(c *fiber.Ctx) error {
+		envVars := make(map[string]string)
+		for _, env := range os.Environ() {
+			parts := strings.SplitN(env, "=", 2)
+			if len(parts) == 2 {
+				envVars[parts[0]] = parts[1]
+			}
+		}
+		return c.JSON(fiber.Map{
+			"env": envVars,
 		})
 	})
 
