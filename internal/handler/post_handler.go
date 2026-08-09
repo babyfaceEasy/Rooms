@@ -21,6 +21,9 @@ type CreatePostRequest struct {
 // PostResponse represents a post in the response
 type PostResponse struct {
 	ID        string  `json:"id"`
+	RoomID    string  `json:"room_id"`
+	RoomCode  string  `json:"room_code"`
+	RoomName  string  `json:"room_name"`
 	UserID    string  `json:"user_id"`
 	Text      string  `json:"text"`
 	Image     *string `json:"image,omitempty"`
@@ -32,15 +35,17 @@ type PostResponse struct {
 
 // PostHandler handles post-related endpoints
 type PostHandler struct {
-	svc     service.PostService
-	storage repository.ObjectStorage
+	svc      service.PostService
+	storage  repository.ObjectStorage
+	roomRepo repository.RoomRepository
 }
 
 // NewPostHandler creates a new post handler
-func NewPostHandler(svc service.PostService, storage repository.ObjectStorage) *PostHandler {
+func NewPostHandler(svc service.PostService, storage repository.ObjectStorage, roomRepo repository.RoomRepository) *PostHandler {
 	return &PostHandler{
-		svc:     svc,
-		storage: storage,
+		svc:      svc,
+		storage:  storage,
+		roomRepo: roomRepo,
 	}
 }
 
@@ -70,6 +75,36 @@ func (h *PostHandler) CreatePost(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
 			"error":  "text is required",
 			"status": fiber.StatusBadRequest,
+		})
+	}
+
+	// Parse room_code from form data
+	roomCode := c.FormValue("room_code")
+	if roomCode == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
+			"error":  "room_code is required",
+			"status": fiber.StatusBadRequest,
+		})
+	}
+
+	// Get room by code
+	room, err := h.roomRepo.GetByCode(c.Context(), roomCode)
+	if err != nil {
+		return h.handleError(c, err)
+	}
+
+	// Verify user is room member
+	isMember, err := h.roomRepo.IsUserMember(c.Context(), room.ID, userObjID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(map[string]interface{}{
+			"error":  "internal server error",
+			"status": fiber.StatusInternalServerError,
+		})
+	}
+	if !isMember {
+		return c.Status(fiber.StatusForbidden).JSON(map[string]interface{}{
+			"error":  "not a member of this room",
+			"status": fiber.StatusForbidden,
 		})
 	}
 
@@ -174,23 +209,14 @@ func (h *PostHandler) CreatePost(c *fiber.Ctx) error {
 		}
 	}
 
-	// Create post via service
-	post, err := h.svc.CreatePost(c.Context(), text, userObjID, imageURL, videoURL, audioURL)
+	// Create post via service with roomID
+	post, err := h.svc.CreatePost(c.Context(), text, userObjID, room.ID, imageURL, videoURL, audioURL)
 	if err != nil {
 		return h.handleError(c, err)
 	}
 
-	// Convert domain Post to PostResponse
-	response := &PostResponse{
-		ID:        post.ID.Hex(),
-		UserID:    post.UserID.Hex(),
-		Text:      post.Text,
-		Image:     post.Image,
-		Video:     post.Video,
-		Audio:     post.Audio,
-		CreatedAt: post.CreatedAt.Format("2006-01-02T15:04:05Z"),
-		UpdatedAt: post.UpdatedAt.Format("2006-01-02T15:04:05Z"),
-	}
+	// Convert domain Post to PostResponse using helper
+	response := h.toPostResponse(post, room)
 
 	return c.Status(fiber.StatusCreated).JSON(map[string]interface{}{
 		"data":    response,
@@ -201,6 +227,24 @@ func (h *PostHandler) CreatePost(c *fiber.Ctx) error {
 
 // GetPost retrieves a post by ID
 func (h *PostHandler) GetPost(c *fiber.Ctx) error {
+	// Extract user ID from context
+	userID, ok := c.Locals("user_id").(string)
+	if !ok || userID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(map[string]interface{}{
+			"error":  "unauthorized",
+			"status": fiber.StatusUnauthorized,
+		})
+	}
+
+	// Convert user ID from string to ObjectID
+	userObjID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
+			"error":  "invalid user id",
+			"status": fiber.StatusBadRequest,
+		})
+	}
+
 	postID := c.Params("id")
 	if postID == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
@@ -224,17 +268,29 @@ func (h *PostHandler) GetPost(c *fiber.Ctx) error {
 		return h.handleError(c, err)
 	}
 
-	// Convert domain Post to PostResponse
-	response := &PostResponse{
-		ID:        post.ID.Hex(),
-		UserID:    post.UserID.Hex(),
-		Text:      post.Text,
-		Image:     post.Image,
-		Video:     post.Video,
-		Audio:     post.Audio,
-		CreatedAt: post.CreatedAt.Format("2006-01-02T15:04:05Z"),
-		UpdatedAt: post.UpdatedAt.Format("2006-01-02T15:04:05Z"),
+	// Verify user is member of the room
+	isMember, err := h.roomRepo.IsUserMember(c.Context(), post.RoomID, userObjID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(map[string]interface{}{
+			"error":  "internal server error",
+			"status": fiber.StatusInternalServerError,
+		})
 	}
+	if !isMember {
+		return c.Status(fiber.StatusForbidden).JSON(map[string]interface{}{
+			"error":  "not a member of this room",
+			"status": fiber.StatusForbidden,
+		})
+	}
+
+	// Get room to enrich response
+	room, err := h.roomRepo.GetByID(c.Context(), post.RoomID)
+	if err != nil {
+		return h.handleError(c, err)
+	}
+
+	// Convert domain Post to PostResponse using helper
+	response := h.toPostResponse(post, room)
 
 	return c.Status(fiber.StatusOK).JSON(map[string]interface{}{
 		"data":   response,
@@ -279,6 +335,27 @@ func (h *PostHandler) DeletePost(c *fiber.Ctx) error {
 		})
 	}
 
+	// Get post to verify room membership
+	post, err := h.svc.GetPost(c.Context(), postObjID)
+	if err != nil {
+		return h.handleError(c, err)
+	}
+
+	// Verify user is member of the room (final check)
+	isMember, err := h.roomRepo.IsUserMember(c.Context(), post.RoomID, userObjID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(map[string]interface{}{
+			"error":  "internal server error",
+			"status": fiber.StatusInternalServerError,
+		})
+	}
+	if !isMember {
+		return c.Status(fiber.StatusForbidden).JSON(map[string]interface{}{
+			"error":  "not a member of this room",
+			"status": fiber.StatusForbidden,
+		})
+	}
+
 	// Delete post via service
 	if err := h.svc.DeletePost(c.Context(), postObjID, userObjID); err != nil {
 		return h.handleError(c, err)
@@ -299,6 +376,11 @@ func (h *PostHandler) handleError(c *fiber.Ctx, err error) error {
 			"error":  "post not found",
 			"status": fiber.StatusNotFound,
 		})
+	case errors.Is(err, domain.ErrRoomNotFound):
+		return c.Status(fiber.StatusNotFound).JSON(map[string]interface{}{
+			"error":  "room not found",
+			"status": fiber.StatusNotFound,
+		})
 	case errors.Is(err, domain.ErrPostTextRequired):
 		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
 			"error":  "post text is required",
@@ -308,6 +390,11 @@ func (h *PostHandler) handleError(c *fiber.Ctx, err error) error {
 		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
 			"error":  "post text exceeds maximum length (5000 characters)",
 			"status": fiber.StatusBadRequest,
+		})
+	case errors.Is(err, domain.ErrNotRoomMember):
+		return c.Status(fiber.StatusForbidden).JSON(map[string]interface{}{
+			"error":  "not a member of this room",
+			"status": fiber.StatusForbidden,
 		})
 	case errors.Is(err, domain.ErrUnauthorizedPost):
 		return c.Status(fiber.StatusForbidden).JSON(map[string]interface{}{
@@ -319,6 +406,23 @@ func (h *PostHandler) handleError(c *fiber.Ctx, err error) error {
 			"error":  "internal server error",
 			"status": fiber.StatusInternalServerError,
 		})
+	}
+}
+
+// toPostResponse converts a domain Post and Room to a PostResponse
+func (h *PostHandler) toPostResponse(post *domain.Post, room *domain.Room) *PostResponse {
+	return &PostResponse{
+		ID:        post.ID.Hex(),
+		RoomID:    post.RoomID.Hex(),
+		RoomCode:  room.Code,
+		RoomName:  room.Name,
+		UserID:    post.UserID.Hex(),
+		Text:      post.Text,
+		Image:     post.Image,
+		Video:     post.Video,
+		Audio:     post.Audio,
+		CreatedAt: post.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		UpdatedAt: post.UpdatedAt.Format("2006-01-02T15:04:05Z"),
 	}
 }
 

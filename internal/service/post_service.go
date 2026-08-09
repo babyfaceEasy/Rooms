@@ -12,7 +12,7 @@ import (
 
 // PostService defines the interface for post business logic
 type PostService interface {
-	CreatePost(ctx context.Context, text string, userID primitive.ObjectID, imageURL, videoURL, audioURL *string) (*domain.Post, error)
+	CreatePost(ctx context.Context, text string, userID, roomID primitive.ObjectID, imageURL, videoURL, audioURL *string) (*domain.Post, error)
 	GetPost(ctx context.Context, id primitive.ObjectID) (*domain.Post, error)
 	DeletePost(ctx context.Context, id, userID primitive.ObjectID) error
 }
@@ -27,10 +27,11 @@ func NewPostService(repo repository.PostRepository) PostService {
 }
 
 // CreatePost creates a new post with validation
-func (s *postService) CreatePost(ctx context.Context, text string, userID primitive.ObjectID, imageURL, videoURL, audioURL *string) (*domain.Post, error) {
+func (s *postService) CreatePost(ctx context.Context, text string, userID, roomID primitive.ObjectID, imageURL, videoURL, audioURL *string) (*domain.Post, error) {
 	// Create post object
 	now := time.Now()
 	post := &domain.Post{
+		RoomID:    roomID,
 		UserID:    userID,
 		Text:      text,
 		Image:     imageURL,
