@@ -21,4 +21,5 @@ var (
 	ErrTokenNotFound           = errors.New("token not found")
 	ErrCodeAlreadyExists       = errors.New("room code already exists")
 	ErrRoomNotFound            = errors.New("room not found")
+	ErrEmailSendFailed         = errors.New("email send failed")
 )
