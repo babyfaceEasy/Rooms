@@ -22,7 +22,7 @@ The JWT token is obtained from the login endpoint (`POST /api/v1/auth/login`).
 
 ## Overview
 
-The Posts module allows users to create, retrieve, and delete posts. Posts support optional image and video attachments that are stored in S3-compatible object storage (MinIO for development, AWS S3 for production).
+The Posts module allows users to create, retrieve, and delete posts. Posts support optional image, video, and audio attachments that are stored in S3-compatible object storage (MinIO for development, AWS S3 for production).
 
 ### Supported File Types
 
@@ -30,13 +30,15 @@ The Posts module allows users to create, retrieve, and delete posts. Posts suppo
 
 **Videos:** mp4, webm, mov, avi
 
+**Audio:** mp3, wav, m4a, aac, flac, ogg
+
 ---
 
 ## Endpoints
 
 ### 1. Create Post
 
-Creates a new post with optional image/video attachments.
+Creates a new post with optional image, video, and audio attachments.
 
 **Endpoint:** `POST /api/v1/posts`
 
@@ -51,6 +53,7 @@ Creates a new post with optional image/video attachments.
 | text | string | Yes | Post text content (1-5000 characters) |
 | image | file | No | Image file (max size limited by S3 bucket config) |
 | video | file | No | Video file (max size limited by S3 bucket config) |
+| audio | file | No | Audio file (max size limited by S3 bucket config) |
 
 **Example Request (using curl):**
 
@@ -72,12 +75,19 @@ curl -X POST http://localhost:3000/api/v1/posts \
   -F "text=Watch this video!" \
   -F "video=@/path/to/video.mp4"
 
-# Create post with both image and video
+# Create post with audio
 curl -X POST http://localhost:3000/api/v1/posts \
   -H "Authorization: Bearer <access_token>" \
-  -F "text=Media gallery" \
+  -F "text=Listen to this podcast episode!" \
+  -F "audio=@/path/to/episode.mp3"
+
+# Create post with image, video, and audio
+curl -X POST http://localhost:3000/api/v1/posts \
+  -H "Authorization: Bearer <access_token>" \
+  -F "text=Full media package" \
   -F "image=@/path/to/image.png" \
-  -F "video=@/path/to/video.webm"
+  -F "video=@/path/to/video.webm" \
+  -F "audio=@/path/to/audio.wav"
 ```
 
 **Success Response (201 Created):**
@@ -108,8 +118,28 @@ curl -X POST http://localhost:3000/api/v1/posts \
     "text": "Check out this photo!",
     "image": "posts/images/507f1f77bcf86cd799439012/sunset.jpg",
     "video": null,
+    "audio": null,
     "created_at": "2024-06-28T21:32:00Z",
     "updated_at": "2024-06-28T21:32:00Z"
+  },
+  "message": "post created successfully",
+  "status": 201
+}
+```
+
+**Success Response with Audio (201 Created):**
+
+```json
+{
+  "data": {
+    "id": "507f1f77bcf86cd799439015",
+    "user_id": "507f1f77bcf86cd799439012",
+    "text": "Listen to this podcast episode!",
+    "image": null,
+    "video": null,
+    "audio": "posts/audio/507f1f77bcf86cd799439012/episode.mp3",
+    "created_at": "2024-06-28T21:35:00Z",
+    "updated_at": "2024-06-28T21:35:00Z"
   },
   "message": "post created successfully",
   "status": 201
@@ -123,12 +153,14 @@ curl -X POST http://localhost:3000/api/v1/posts \
 | 400 | invalid input | Missing text field or invalid request format |
 | 400 | invalid image type | Image file has unsupported extension |
 | 400 | invalid video type | Video file has unsupported extension |
+| 400 | invalid audio type | Audio file has unsupported extension |
 | 400 | text is required | Text field is empty |
 | 400 | text must be at least 1 character | Text too short |
 | 400 | text must not exceed 5000 characters | Text too long |
 | 401 | unauthorized | Missing or invalid JWT token |
 | 500 | failed to upload image | S3 upload error for image |
 | 500 | failed to upload video | S3 upload error for video |
+| 500 | failed to upload audio | S3 upload error for audio |
 
 **Example Error Response (400 - Invalid Image Type):**
 
@@ -181,6 +213,7 @@ curl -X GET http://localhost:3000/api/v1/posts/507f1f77bcf86cd799439013 \
     "text": "This is my first post!",
     "image": null,
     "video": null,
+    "audio": null,
     "created_at": "2024-06-28T21:30:00Z",
     "updated_at": "2024-06-28T21:30:00Z"
   },
@@ -271,6 +304,7 @@ curl -X DELETE http://localhost:3000/api/v1/posts/507f1f77bcf86cd799439013 \
   "text": "string (1-5000 characters)",
   "image": "string or null (S3 object key)",
   "video": "string or null (S3 object key)",
+  "audio": "string or null (S3 object key)",
   "created_at": "string (ISO 8601 timestamp)",
   "updated_at": "string (ISO 8601 timestamp)",
   "deleted_at": "string (ISO 8601 timestamp) or null"
@@ -286,6 +320,7 @@ curl -X DELETE http://localhost:3000/api/v1/posts/507f1f77bcf86cd799439013 \
 | text | string | Post content |
 | image | string\|null | S3 path to image (nullable) |
 | video | string\|null | S3 path to video (nullable) |
+| audio | string\|null | S3 path to audio file (nullable) |
 | created_at | string | Creation timestamp |
 | updated_at | string | Last update timestamp |
 | deleted_at | string\|null | Soft delete timestamp (null if active) |
@@ -317,6 +352,24 @@ curl -X POST http://localhost:3000/api/v1/posts \
 curl -X POST http://localhost:3000/api/v1/posts \
   -H "Authorization: Bearer eyJhbGc..." \
   -F "text=Check this out" \
+  -F "video=@video.mp4"
+```
+
+### 4. Create a Post with Audio
+
+```bash
+curl -X POST http://localhost:3000/api/v1/posts \
+  -H "Authorization: Bearer eyJhbGc..." \
+  -F "text=Listen to this podcast episode" \
+  -F "audio=@episode.mp3"
+```
+
+### 5. Create a Post with Multiple Media Types
+
+```bash
+curl -X POST http://localhost:3000/api/v1/posts \
+  -H "Authorization: Bearer eyJhbGc..." \
+  -F "text=Full multimedia post" \
   -F "video=@tutorial.mp4"
 ```
 
@@ -343,11 +396,13 @@ Files are stored in S3 with the following path structure:
 ```
 posts/images/{user_id}/{filename}
 posts/videos/{user_id}/{filename}
+posts/audio/{user_id}/{filename}
 ```
 
 **Example Paths:**
 - `posts/images/507f1f77bcf86cd799439012/vacation-photo.jpg`
 - `posts/videos/507f1f77bcf86cd799439012/birthday-video.mp4`
+- `posts/audio/507f1f77bcf86cd799439012/podcast-episode.mp3`
 
 ### Local Development (MinIO)
 
