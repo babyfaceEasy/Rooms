@@ -24,7 +24,9 @@
 | `POST` | `/rooms` | ✅ | Create a new room |
 | `GET` | `/rooms` | ✅ | List user's rooms |
 | `GET` | `/rooms/:code` | ✅ | Get room by code |
-| `GET` | `/rooms/:code/members` | ✅ | Get room members |
+| `GET` | `/rooms/by-id/:id` | ✅ | Get room by ID |
+| `GET` | `/rooms/:code/members` | ✅ | Get room member IDs |
+| `GET` | `/rooms/:code/users` | ✅ | Get room member details |
 | `POST` | `/rooms/join` | ✅ | Join an existing room |
 | `DELETE` | `/rooms/:code` | ✅ | Delete or leave a room |
 
@@ -168,6 +170,7 @@ Users can create and join rooms to collaborate. Posts are scoped to rooms.
 | `unauthorized` | 401 | Protected endpoints |
 | `not a member of this room` | 403 | Posts (create/view) |
 | `room not found` | 404 | Rooms |
+| `cannot join own room` | 400 | Rooms (join) |
 | `post not found` | 404 | Posts |
 | `user not found` | 404 | Profile, Update, Change Password |
 | `room code already exists` | 409 | Create room |

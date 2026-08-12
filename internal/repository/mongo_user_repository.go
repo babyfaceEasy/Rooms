@@ -7,11 +7,12 @@ import (
 	"strings"
 	"time"
 
+	"temp_backend/internal/domain"
+
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"temp_backend/internal/domain"
 )
 
 // MongoUserRepository implements UserRepository for MongoDB.
@@ -92,6 +93,31 @@ func (r *MongoUserRepository) GetByID(ctx context.Context, id primitive.ObjectID
 	return &user, nil
 }
 
+// GetByIDs retrieves multiple users by their IDs.
+func (r *MongoUserRepository) GetByIDs(ctx context.Context, ids []primitive.ObjectID) ([]*domain.User, error) {
+	if len(ids) == 0 {
+		return []*domain.User{}, nil
+	}
+
+	filter := bson.M{
+		"_id":        bson.M{"$in": ids},
+		"deleted_at": bson.M{"$eq": nil},
+	}
+
+	cursor, err := r.collection.Find(ctx, filter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query users: %w", err)
+	}
+	defer cursor.Close(ctx)
+
+	var users []*domain.User
+	if err := cursor.All(ctx, &users); err != nil {
+		return nil, fmt.Errorf("failed to decode users: %w", err)
+	}
+
+	return users, nil
+}
+
 // Update updates an existing user record.
 func (r *MongoUserRepository) Update(ctx context.Context, user *domain.User) error {
 	result, err := r.collection.UpdateOne(
@@ -99,11 +125,11 @@ func (r *MongoUserRepository) Update(ctx context.Context, user *domain.User) err
 		bson.M{"_id": user.ID},
 		bson.M{
 			"$set": bson.M{
-				"name":              user.Name,
-				"email":             strings.ToLower(user.Email),
-				"password_hash":     user.PasswordHash,
-				"is_age_verified":   user.IsAgeVerified,
-				"updated_at":        user.UpdatedAt,
+				"name":            user.Name,
+				"email":           strings.ToLower(user.Email),
+				"password_hash":   user.PasswordHash,
+				"is_age_verified": user.IsAgeVerified,
+				"updated_at":      user.UpdatedAt,
 			},
 		},
 	)

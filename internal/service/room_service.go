@@ -16,18 +16,23 @@ type RoomService interface {
 	AddUserToRoom(ctx context.Context, code string, userID primitive.ObjectID) (*domain.Room, error)
 	GetRoom(ctx context.Context, code string) (*domain.Room, error)
 	GetRoomByID(ctx context.Context, roomID primitive.ObjectID) (*domain.Room, error)
+	GetRoomUsers(ctx context.Context, code string) ([]*domain.User, error)
 	LeaveRoom(ctx context.Context, code string, userID primitive.ObjectID) error
 	DeleteRoom(ctx context.Context, code string, userID primitive.ObjectID) error
 	ListUserRooms(ctx context.Context, userID primitive.ObjectID) ([]*domain.Room, error)
 }
 
 type roomService struct {
-	repo repository.RoomRepository
+	repo     repository.RoomRepository
+	userRepo repository.UserRepository
 }
 
 // NewRoomService creates a new room service
-func NewRoomService(repo repository.RoomRepository) RoomService {
-	return &roomService{repo: repo}
+func NewRoomService(repo repository.RoomRepository, userRepo repository.UserRepository) RoomService {
+	return &roomService{
+		repo:     repo,
+		userRepo: userRepo,
+	}
 }
 
 // CreateRoom creates a new room with validation
@@ -104,6 +109,28 @@ func (s *roomService) GetRoomByID(ctx context.Context, roomID primitive.ObjectID
 	}
 
 	return room, nil
+}
+
+// GetRoomUsers retrieves all users in a room by room code
+func (s *roomService) GetRoomUsers(ctx context.Context, code string) ([]*domain.User, error) {
+	// Get room by code
+	room, err := s.repo.GetByCode(ctx, code)
+	if err != nil {
+		return nil, err
+	}
+
+	// Collect all user IDs (owner + members)
+	userIDs := make([]primitive.ObjectID, 0, len(room.Members)+1)
+	userIDs = append(userIDs, room.CreatedBy)
+	userIDs = append(userIDs, room.Members...)
+
+	// Get all users
+	users, err := s.userRepo.GetByIDs(ctx, userIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	return users, nil
 }
 
 // LeaveRoom removes a user from a room
