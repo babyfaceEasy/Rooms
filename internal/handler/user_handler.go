@@ -33,6 +33,7 @@ type RegisterRequest struct {
 // UserResponse represents a user in HTTP responses (no password).
 type UserResponse struct {
 	ID        string `json:"id"`
+	Code      string `json:"code"`
 	Name      string `json:"name"`
 	Email     string `json:"email"`
 	CreatedAt string `json:"created_at"`
@@ -98,6 +99,7 @@ func (h *UserHandler) Register(c *fiber.Ctx) error {
 
 	response := UserResponse{
 		ID:        user.ID.Hex(),
+		Code:      user.Code,
 		Name:      user.Name,
 		Email:     user.Email,
 		CreatedAt: user.CreatedAt.Format("2006-01-02T15:04:05Z"),
@@ -127,6 +129,7 @@ func (h *UserHandler) GetUser(c *fiber.Ctx) error {
 
 	response := UserResponse{
 		ID:        user.ID.Hex(),
+		Code:      user.Code,
 		Name:      user.Name,
 		Email:     user.Email,
 		CreatedAt: user.CreatedAt.Format("2006-01-02T15:04:05Z"),

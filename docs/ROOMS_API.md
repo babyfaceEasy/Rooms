@@ -420,6 +420,7 @@ Retrieves full user details for all members of a room. Only the room owner or me
   "data": [
     {
       "id": "507f1f77bcf86cd799439012",
+      "code": "12345678",
       "name": "John Doe",
       "email": "john@example.com",
       "is_age_verified": true,
@@ -427,6 +428,7 @@ Retrieves full user details for all members of a room. Only the room owner or me
     },
     {
       "id": "507f1f77bcf86cd799439013",
+      "code": "87654321",
       "name": "Jane Smith",
       "email": "jane@example.com",
       "is_age_verified": true,

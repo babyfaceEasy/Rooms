@@ -248,12 +248,14 @@ func TestRegisterRequest_Structure(t *testing.T) {
 func TestUserResponse_Structure(t *testing.T) {
 	resp := UserResponse{
 		ID:        "507f1f77bcf86cd799439011",
+		Code:      "12345678",
 		Name:      "John Doe",
 		Email:     "john@example.com",
 		CreatedAt: "2026-06-28T19:00:00Z",
 	}
 
 	assert.Equal(t, "507f1f77bcf86cd799439011", resp.ID)
+	assert.Equal(t, "12345678", resp.Code)
 	assert.Equal(t, "John Doe", resp.Name)
 	assert.Equal(t, "john@example.com", resp.Email)
 	assert.Equal(t, "2026-06-28T19:00:00Z", resp.CreatedAt)
