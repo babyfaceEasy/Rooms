@@ -4,10 +4,11 @@ import (
 	"os"
 	"strings"
 
-	"github.com/gofiber/fiber/v2"
 	"temp_backend/internal/handler"
 	"temp_backend/internal/middleware"
 	"temp_backend/internal/service"
+
+	"github.com/gofiber/fiber/v2"
 )
 
 func (s *Server) registerRoutes(itemHandler *handler.ItemHandler, userHandler *handler.UserHandler, authHandler *handler.AuthHandler, roomHandler *handler.RoomHandler, postHandler *handler.PostHandler, authService service.AuthService) {
@@ -56,6 +57,7 @@ func (s *Server) registerRoutes(itemHandler *handler.ItemHandler, userHandler *h
 	apiProtected.Post("/rooms", roomHandler.CreateRoom)
 	apiProtected.Post("/rooms/join", roomHandler.AddUserToRoom)
 	apiProtected.Get("/rooms", roomHandler.ListUserRooms)
+	apiProtected.Get("/rooms/by-id/:id", roomHandler.GetRoomByID)
 	apiProtected.Get("/rooms/:code", roomHandler.GetRoom)
 	apiProtected.Get("/rooms/:code/members", roomHandler.GetRoomMembers)
 	apiProtected.Delete("/rooms/:code", roomHandler.HandleRoomDelete)

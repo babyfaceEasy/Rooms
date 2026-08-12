@@ -6,9 +6,10 @@ import (
 	"testing"
 	"time"
 
+	"temp_backend/internal/domain"
+
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"temp_backend/internal/domain"
 )
 
 // MockRoomService is a mock implementation for testing
@@ -16,6 +17,7 @@ type MockRoomService struct {
 	createRoomFunc    func(ctx context.Context, name, code string, userID primitive.ObjectID) (*domain.Room, error)
 	addUserToRoomFunc func(ctx context.Context, code string, userID primitive.ObjectID) (*domain.Room, error)
 	getRoom           func(ctx context.Context, code string) (*domain.Room, error)
+	getRoomByID       func(ctx context.Context, roomID primitive.ObjectID) (*domain.Room, error)
 	leaveRoom         func(ctx context.Context, code string, userID primitive.ObjectID) error
 	deleteRoom        func(ctx context.Context, code string, userID primitive.ObjectID) error
 	listUserRooms     func(ctx context.Context, userID primitive.ObjectID) ([]*domain.Room, error)
@@ -38,6 +40,13 @@ func (m *MockRoomService) AddUserToRoom(ctx context.Context, code string, userID
 func (m *MockRoomService) GetRoom(ctx context.Context, code string) (*domain.Room, error) {
 	if m.getRoom != nil {
 		return m.getRoom(ctx, code)
+	}
+	return nil, nil
+}
+
+func (m *MockRoomService) GetRoomByID(ctx context.Context, roomID primitive.ObjectID) (*domain.Room, error) {
+	if m.getRoomByID != nil {
+		return m.getRoomByID(ctx, roomID)
 	}
 	return nil, nil
 }
@@ -678,5 +687,3 @@ func TestListUserRooms_MultipleRooms(t *testing.T) {
 	handler := NewRoomHandler(mockService)
 	assert.NotNil(t, handler.ListUserRooms)
 }
-
-
