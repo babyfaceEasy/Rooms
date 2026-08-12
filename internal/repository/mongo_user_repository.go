@@ -131,6 +131,23 @@ func (r *MongoUserRepository) GetByIDs(ctx context.Context, ids []primitive.Obje
 	return users, nil
 }
 
+// GetByCode retrieves a user by their customer code (excluding soft-deleted users).
+func (r *MongoUserRepository) GetByCode(ctx context.Context, code string) (*domain.User, error) {
+	var user domain.User
+	filter := bson.M{
+		"code":       code,
+		"deleted_at": bson.M{"$eq": nil},
+	}
+	err := r.collection.FindOne(ctx, filter).Decode(&user)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return nil, fmt.Errorf("user not found: %w", domain.ErrUserNotFound)
+		}
+		return nil, fmt.Errorf("failed to query user: %w", err)
+	}
+	return &user, nil
+}
+
 // Update updates an existing user record.
 func (r *MongoUserRepository) Update(ctx context.Context, user *domain.User) error {
 	result, err := r.collection.UpdateOne(

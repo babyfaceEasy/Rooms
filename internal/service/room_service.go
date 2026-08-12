@@ -14,6 +14,7 @@ import (
 type RoomService interface {
 	CreateRoom(ctx context.Context, name, code string, userID primitive.ObjectID) (*domain.Room, error)
 	AddUserToRoom(ctx context.Context, code string, userID primitive.ObjectID) (*domain.Room, error)
+	AddUserToRoomByUserCode(ctx context.Context, roomCode, userCode string) (*domain.Room, error)
 	GetRoom(ctx context.Context, code string) (*domain.Room, error)
 	GetRoomByID(ctx context.Context, roomID primitive.ObjectID) (*domain.Room, error)
 	GetRoomUsers(ctx context.Context, code string) ([]*domain.User, error)
@@ -221,6 +222,18 @@ func (s *roomService) DeleteRoom(ctx context.Context, code string, userID primit
 	}
 
 	return nil
+}
+
+// AddUserToRoomByUserCode adds a user to a room using the user's customer code and room code
+func (s *roomService) AddUserToRoomByUserCode(ctx context.Context, roomCode, userCode string) (*domain.Room, error) {
+	// Get user by their customer code
+	user, err := s.userRepo.GetByCode(ctx, userCode)
+	if err != nil {
+		return nil, err
+	}
+
+	// Add user to room by room code
+	return s.AddUserToRoom(ctx, roomCode, user.ID)
 }
 
 // ListUserRooms retrieves all rooms where the user is the creator or a member

@@ -28,6 +28,7 @@
 | `GET` | `/rooms/:code/members` | ✅ | Get room member IDs |
 | `GET` | `/rooms/:code/users` | ✅ | Get room member details |
 | `POST` | `/rooms/join` | ✅ | Join an existing room |
+| `POST` | `/rooms/add-member-by-code` | ✅ | Add user to room by user code |
 | `DELETE` | `/rooms/:code` | ✅ | Delete or leave a room |
 
 ### Posts

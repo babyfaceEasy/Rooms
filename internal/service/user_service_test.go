@@ -18,6 +18,7 @@ type MockUserRepository struct {
 	getByEmailFunc func(ctx context.Context, email string) (*domain.User, error)
 	getByIDFunc    func(ctx context.Context, id primitive.ObjectID) (*domain.User, error)
 	getByIDsFunc   func(ctx context.Context, ids []primitive.ObjectID) ([]*domain.User, error)
+	getByCodeFunc  func(ctx context.Context, code string) (*domain.User, error)
 	updateFunc     func(ctx context.Context, user *domain.User) error
 	deleteFunc     func(ctx context.Context, id primitive.ObjectID) error
 	softDeleteFunc func(ctx context.Context, id primitive.ObjectID) error
@@ -49,6 +50,13 @@ func (m *MockUserRepository) GetByIDs(ctx context.Context, ids []primitive.Objec
 		return m.getByIDsFunc(ctx, ids)
 	}
 	return []*domain.User{}, nil
+}
+
+func (m *MockUserRepository) GetByCode(ctx context.Context, code string) (*domain.User, error) {
+	if m.getByCodeFunc != nil {
+		return m.getByCodeFunc(ctx, code)
+	}
+	return nil, domain.ErrUserNotFound
 }
 
 func (m *MockUserRepository) Update(ctx context.Context, user *domain.User) error {

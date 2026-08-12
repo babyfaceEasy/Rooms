@@ -176,7 +176,103 @@ Adds the authenticated user to a room by room code.
 
 ---
 
-### 3. List User's Rooms
+### 3. Add User to Room by User Code
+
+Adds a specified user to a room using the user's unique customer code. This endpoint allows adding a user to a room without requiring the target user's MongoDB ObjectID.
+
+**Endpoint:** `POST /api/v1/rooms/add-member-by-code`
+
+**Authentication:** Required
+
+**Request Body:**
+
+```json
+{
+  "room_code": "CONF_A_001",
+  "user_code": "12345678"
+}
+```
+
+**Request Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| room_code | string | Yes | Unique room code |
+| user_code | string | Yes | Target user's 8-digit customer code |
+
+**Success Response (200 OK) - New Member Added:**
+
+```json
+{
+  "data": {
+    "id": "507f1f77bcf86cd799439011",
+    "name": "Conference Room A",
+    "code": "CONF_A_001",
+    "created_by": "507f1f77bcf86cd799439012",
+    "members": [
+      "507f1f77bcf86cd799439013",
+      "507f1f77bcf86cd799439014",
+      "507f1f77bcf86cd799439015"
+    ],
+    "created_at": "2024-06-28T21:15:00Z",
+    "updated_at": "2024-06-28T21:30:00Z"
+  },
+  "message": "user added to room successfully",
+  "status": 200
+}
+```
+
+**Success Response (200 OK) - Already a Member:**
+
+```json
+{
+  "data": {
+    "id": "507f1f77bcf86cd799439011",
+    "name": "Conference Room A",
+    "code": "CONF_A_001",
+    "created_by": "507f1f77bcf86cd799439012",
+    "members": [
+      "507f1f77bcf86cd799439013",
+      "507f1f77bcf86cd799439014"
+    ],
+    "created_at": "2024-06-28T21:15:00Z",
+    "updated_at": "2024-06-28T21:30:00Z"
+  },
+  "message": "user is already a member of this room",
+  "status": 200
+}
+```
+
+**Error Responses:**
+
+| Status | Error | Description |
+|--------|-------|-------------|
+| 400 | invalid input | Missing room_code or user_code |
+| 404 | user not found | User with the specified user_code doesn't exist |
+| 404 | room not found | Room with the specified room_code doesn't exist |
+| 500 | internal server error | Server error |
+
+**Example Error Response (404 - User Not Found):**
+
+```json
+{
+  "error": "user not found",
+  "status": 404
+}
+```
+
+**Example Error Response (404 - Room Not Found):**
+
+```json
+{
+  "error": "room not found",
+  "status": 404
+}
+```
+
+---
+
+### 4. List User's Rooms
 
 Retrieves all rooms the authenticated user is part of (as owner or member).
 
@@ -238,7 +334,7 @@ Retrieves all rooms the authenticated user is part of (as owner or member).
 
 ---
 
-### 4. Get Room Details
+### 5. Get Room Details
 
 Retrieves details of a specific room. Only the room owner or members can access.
 
@@ -291,7 +387,7 @@ Retrieves details of a specific room. Only the room owner or members can access.
 
 ---
 
-### 5. Get Room Details by ID
+### 6. Get Room Details by ID
 
 Retrieves details of a specific room by its ID. Only the room owner or members can access.
 
@@ -355,7 +451,7 @@ Retrieves details of a specific room by its ID. Only the room owner or members c
 
 ---
 
-### 6. Get Room Members
+### 7. Get Room Members
 
 Lists all members of a room. Only the room owner or members can access.
 
@@ -399,7 +495,7 @@ Lists all members of a room. Only the room owner or members can access.
 
 ---
 
-### 7. Get Room Users
+### 8. Get Room Users
 
 Retrieves full user details for all members of a room. Only the room owner or members can access.
 
@@ -462,7 +558,7 @@ Retrieves full user details for all members of a room. Only the room owner or me
 
 ---
 
-### 8. Remove Member from Room
+### 9. Remove Member from Room
 
 Removes a member from a room. Only the room owner can perform this action.
 
@@ -530,7 +626,7 @@ Removes a member from a room. Only the room owner can perform this action.
 
 ---
 
-### 9. Leave Room
+### 10. Leave Room
 
 Removes the authenticated user from a room. Only members can leave a room; room owners/creators cannot use this endpoint.
 
@@ -586,9 +682,9 @@ Removes the authenticated user from a room. Only members can leave a room; room 
 
 ---
 
-### 10. Delete or Leave Room
+### 11. Delete or Leave Room
 
-**Deprecated**: Use `POST /api/v1/rooms/:code/leave` for members to leave a room (see Endpoint #9).
+**Deprecated**: Use `POST /api/v1/rooms/:code/leave` for members to leave a room (see Endpoint #10).
 
 This endpoint maintains backward compatibility and handles both delete (owner) and leave (member) operations.
 
@@ -641,7 +737,7 @@ This endpoint maintains backward compatibility and handles both delete (owner) a
 
 ---
 
-### 11. Get Posts by Room Code
+### 12. Get Posts by Room Code
 
 Retrieves all posts for a specific room. Only room members can retrieve posts from a room.
 
