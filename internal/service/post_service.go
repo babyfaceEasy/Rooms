@@ -14,6 +14,7 @@ import (
 type PostService interface {
 	CreatePost(ctx context.Context, text string, userID, roomID primitive.ObjectID, imageURL, videoURL, audioURL *string) (*domain.Post, error)
 	GetPost(ctx context.Context, id primitive.ObjectID) (*domain.Post, error)
+	GetPostsByRoomID(ctx context.Context, roomID primitive.ObjectID) ([]*domain.Post, error)
 	DeletePost(ctx context.Context, id, userID primitive.ObjectID) error
 }
 
@@ -62,6 +63,16 @@ func (s *postService) GetPost(ctx context.Context, id primitive.ObjectID) (*doma
 	}
 
 	return post, nil
+}
+
+// GetPostsByRoomID retrieves all posts for a specific room
+func (s *postService) GetPostsByRoomID(ctx context.Context, roomID primitive.ObjectID) ([]*domain.Post, error) {
+	posts, err := s.repo.GetByRoomID(ctx, roomID)
+	if err != nil {
+		return nil, err
+	}
+
+	return posts, nil
 }
 
 // DeletePost soft-deletes a post (only creator can delete)

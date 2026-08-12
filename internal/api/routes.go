@@ -11,7 +11,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
-func (s *Server) registerRoutes(itemHandler *handler.ItemHandler, userHandler *handler.UserHandler, authHandler *handler.AuthHandler, roomHandler *handler.RoomHandler, postHandler *handler.PostHandler, authService service.AuthService) {
+func (s *Server) registerRoutes(itemHandler *handler.ItemHandler, userHandler *handler.UserHandler, authHandler *handler.AuthHandler, roomHandler *handler.RoomHandler, postHandler *handler.PostHandler, commentHandler *handler.CommentHandler, authService service.AuthService) {
 	s.app.Get("/health", func(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusOK).JSON(fiber.Map{
 			"status": "ok",
@@ -61,6 +61,7 @@ func (s *Server) registerRoutes(itemHandler *handler.ItemHandler, userHandler *h
 	apiProtected.Get("/rooms/:code", roomHandler.GetRoom)
 	apiProtected.Get("/rooms/:code/members", roomHandler.GetRoomMembers)
 	apiProtected.Get("/rooms/:code/users", roomHandler.GetRoomUsers)
+	apiProtected.Get("/rooms/:code/posts", postHandler.GetPostsByRoomCode)
 	apiProtected.Post("/rooms/:code/remove-member", roomHandler.RemoveMemberFromRoom)
 	apiProtected.Post("/rooms/:code/leave", roomHandler.LeaveRoom)
 	apiProtected.Delete("/rooms/:code", roomHandler.HandleRoomDelete)
@@ -69,6 +70,11 @@ func (s *Server) registerRoutes(itemHandler *handler.ItemHandler, userHandler *h
 	apiProtected.Post("/posts", postHandler.CreatePost)
 	apiProtected.Get("/posts/:id", postHandler.GetPost)
 	apiProtected.Delete("/posts/:id", postHandler.DeletePost)
+
+	// Comment routes (protected)
+	apiProtected.Post("/posts/:id/comments", commentHandler.CreateComment)
+	apiProtected.Get("/posts/:id/comments", commentHandler.GetCommentsByPostID)
+	apiProtected.Delete("/comments/:id", commentHandler.DeleteComment)
 
 	// Item routes (protected)
 	apiProtected.Post("/items", itemHandler.CreateItem)

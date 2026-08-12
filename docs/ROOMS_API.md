@@ -639,6 +639,97 @@ This endpoint maintains backward compatibility and handles both delete (owner) a
 
 ---
 
+### 11. Get Posts by Room Code
+
+Retrieves all posts for a specific room. Only room members can retrieve posts from a room.
+
+**Endpoint:** `GET /api/v1/rooms/:code/posts`
+
+**Authentication:** Required
+
+**URL Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| code | string | Yes | Unique room code |
+
+**Success Response (200 OK):**
+
+```json
+{
+  "data": [
+    {
+      "id": "507f1f77bcf86cd799439020",
+      "room_id": "507f1f77bcf86cd799439011",
+      "room_code": "TEAM_001",
+      "room_name": "Team Meeting Room",
+      "user_id": "507f1f77bcf86cd799439013",
+      "text": "Hello team! Let's discuss the Q3 roadmap.",
+      "image": null,
+      "video": null,
+      "audio": null,
+      "created_at": "2024-06-28T21:15:00Z",
+      "updated_at": "2024-06-28T21:15:00Z"
+    },
+    {
+      "id": "507f1f77bcf86cd799439021",
+      "room_id": "507f1f77bcf86cd799439011",
+      "room_code": "TEAM_001",
+      "room_name": "Team Meeting Room",
+      "user_id": "507f1f77bcf86cd799439014",
+      "text": "Great idea! I've already started the Q3 planning document.",
+      "image": "https://s3.amazonaws.com/temp-bucket/items/...",
+      "video": null,
+      "audio": null,
+      "created_at": "2024-06-28T21:16:30Z",
+      "updated_at": "2024-06-28T21:16:30Z"
+    }
+  ],
+  "count": 2,
+  "message": "posts retrieved successfully",
+  "status": 200
+}
+```
+
+**Empty Response (200 OK):**
+
+```json
+{
+  "data": [],
+  "count": 0,
+  "message": "posts retrieved successfully",
+  "status": 200
+}
+```
+
+**Error Responses:**
+
+| Status | Error | Description |
+|--------|-------|-------------|
+| 403 | forbidden | User is not a member of the room |
+| 404 | room not found | Room doesn't exist |
+| 500 | internal server error | Server error |
+
+**Example Error Response (403 - Not a Member):**
+
+```json
+{
+  "error": "not a member of this room",
+  "status": 403
+}
+```
+
+**Example Error Response (404):**
+
+```json
+{
+  "error": "room not found",
+  "status": 404
+}
+```
+
+---
+
 ## HTTP Status Codes
 
 | Code | Meaning | Usage |

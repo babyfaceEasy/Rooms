@@ -5,14 +5,15 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
-	flogger "github.com/gofiber/fiber/v2/middleware/logger"
-	"github.com/gofiber/fiber/v2/middleware/recover"
-	"github.com/gofiber/fiber/v2/middleware/requestid"
 	"temp_backend/config"
 	"temp_backend/internal/handler"
 	"temp_backend/internal/middleware"
 	"temp_backend/internal/service"
+
+	"github.com/gofiber/fiber/v2"
+	flogger "github.com/gofiber/fiber/v2/middleware/logger"
+	"github.com/gofiber/fiber/v2/middleware/recover"
+	"github.com/gofiber/fiber/v2/middleware/requestid"
 )
 
 // Server wraps the Fiber application and its dependencies.
@@ -23,7 +24,7 @@ type Server struct {
 }
 
 // NewServer builds a configured Fiber server and wires all routes.
-func NewServer(cfg config.Config, logger *slog.Logger, itemHandler *handler.ItemHandler, userHandler *handler.UserHandler, authHandler *handler.AuthHandler, roomHandler *handler.RoomHandler, postHandler *handler.PostHandler, authService service.AuthService) *Server {
+func NewServer(cfg config.Config, logger *slog.Logger, itemHandler *handler.ItemHandler, userHandler *handler.UserHandler, authHandler *handler.AuthHandler, roomHandler *handler.RoomHandler, postHandler *handler.PostHandler, commentHandler *handler.CommentHandler, authService service.AuthService) *Server {
 	app := fiber.New(fiber.Config{
 		AppName:      cfg.App.Name,
 		ErrorHandler: middleware.NewErrorHandler(logger),
@@ -44,7 +45,7 @@ func NewServer(cfg config.Config, logger *slog.Logger, itemHandler *handler.Item
 		cfg:    cfg,
 		logger: logger,
 	}
-	s.registerRoutes(itemHandler, userHandler, authHandler, roomHandler, postHandler, authService)
+	s.registerRoutes(itemHandler, userHandler, authHandler, roomHandler, postHandler, commentHandler, authService)
 	return s
 }
 
