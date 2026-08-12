@@ -491,6 +491,21 @@ func (h *RoomHandler) LeaveRoom(c *fiber.Ctx) error {
 		})
 	}
 
+	// Get room to provide context-specific error messages
+	room, err := h.svc.GetRoom(c.Context(), roomCode)
+	if err != nil {
+		return h.handleError(c, err)
+	}
+
+	// Check if user is the owner
+	if room.CreatedBy == userObjID {
+		return c.Status(fiber.StatusForbidden).JSON(map[string]interface{}{
+			"error":   "room owners cannot leave their own room",
+			"message": "delete the room instead if you want to remove it",
+			"status":  fiber.StatusForbidden,
+		})
+	}
+
 	// Leave room via service
 	if err := h.svc.LeaveRoom(c.Context(), roomCode, userObjID); err != nil {
 		return h.handleError(c, err)

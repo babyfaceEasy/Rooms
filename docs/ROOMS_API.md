@@ -528,9 +528,67 @@ Removes a member from a room. Only the room owner can perform this action.
 
 ---
 
-### 9. Delete or Leave Room
+### 9. Leave Room
 
-Deletes a room (if owner) or leaves a room (if member).
+Removes the authenticated user from a room. Only members can leave a room; room owners/creators cannot use this endpoint.
+
+**Endpoint:** `POST /api/v1/rooms/:code/leave`
+
+**Authentication:** Required
+
+**URL Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| code | string | Yes | Unique room code |
+
+**Request Body:** None
+
+**Success Response (200 OK):**
+
+```json
+{
+  "data": null,
+  "message": "you have left the room successfully",
+  "status": 200
+}
+```
+
+**Error Responses:**
+
+| Status | Error | Description |
+|--------|-------|-------------|
+| 400 | invalid input | User is not a member of the room |
+| 403 | forbidden | User is the room owner/creator (cannot leave their own room) |
+| 404 | room not found | Room doesn't exist |
+| 500 | internal server error | Server error |
+
+**Example Error Response (403 - Owner):**
+
+```json
+{
+  "error": "room owners cannot leave their own room",
+  "message": "delete the room instead if you want to remove it",
+  "status": 403
+}
+```
+
+**Example Error Response (400 - Not a Member):**
+
+```json
+{
+  "error": "invalid input",
+  "status": 400
+}
+```
+
+---
+
+### 10. Delete or Leave Room
+
+**Deprecated**: Use `POST /api/v1/rooms/:code/leave` for members to leave a room (see Endpoint #9).
+
+This endpoint maintains backward compatibility and handles both delete (owner) and leave (member) operations.
 
 **Endpoint:** `DELETE /api/v1/rooms/:code`
 
