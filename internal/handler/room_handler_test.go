@@ -18,6 +18,7 @@ type MockRoomService struct {
 	addUserToRoomFunc func(ctx context.Context, code string, userID primitive.ObjectID) (*domain.Room, error)
 	getRoom           func(ctx context.Context, code string) (*domain.Room, error)
 	getRoomByID       func(ctx context.Context, roomID primitive.ObjectID) (*domain.Room, error)
+	getRoomUsers      func(ctx context.Context, code string) ([]*domain.User, error)
 	leaveRoom         func(ctx context.Context, code string, userID primitive.ObjectID) error
 	deleteRoom        func(ctx context.Context, code string, userID primitive.ObjectID) error
 	listUserRooms     func(ctx context.Context, userID primitive.ObjectID) ([]*domain.Room, error)
@@ -47,6 +48,13 @@ func (m *MockRoomService) GetRoom(ctx context.Context, code string) (*domain.Roo
 func (m *MockRoomService) GetRoomByID(ctx context.Context, roomID primitive.ObjectID) (*domain.Room, error) {
 	if m.getRoomByID != nil {
 		return m.getRoomByID(ctx, roomID)
+	}
+	return nil, nil
+}
+
+func (m *MockRoomService) GetRoomUsers(ctx context.Context, code string) ([]*domain.User, error) {
+	if m.getRoomUsers != nil {
+		return m.getRoomUsers(ctx, code)
 	}
 	return nil, nil
 }

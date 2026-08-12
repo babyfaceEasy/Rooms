@@ -104,7 +104,7 @@ Adds the authenticated user to a room by room code.
 |-----------|------|----------|-------------|
 | code | string | Yes | Unique room code |
 
-**Success Response (201 Created):**
+**Success Response (200 OK) - New Member Added:**
 
 ```json
 {
@@ -121,7 +121,28 @@ Adds the authenticated user to a room by room code.
     "updated_at": "2024-06-28T21:30:00Z"
   },
   "message": "user added to room successfully",
-  "status": 201
+  "status": 200
+}
+```
+
+**Success Response (200 OK) - Already a Member:**
+
+```json
+{
+  "data": {
+    "id": "507f1f77bcf86cd799439011",
+    "name": "Conference Room A",
+    "code": "CONF_A_001",
+    "created_by": "507f1f77bcf86cd799439012",
+    "members": [
+      "507f1f77bcf86cd799439013",
+      "507f1f77bcf86cd799439014"
+    ],
+    "created_at": "2024-06-28T21:15:00Z",
+    "updated_at": "2024-06-28T21:30:00Z"
+  },
+  "message": "you are already a member of this room",
+  "status": 200
 }
 ```
 
@@ -130,6 +151,7 @@ Adds the authenticated user to a room by room code.
 | Status | Error | Description |
 |--------|-------|-------------|
 | 400 | invalid input | Missing code |
+| 400 | cannot join own room | User is the room creator |
 | 404 | room not found | Room with code doesn't exist |
 | 500 | internal server error | Server error |
 
@@ -139,6 +161,16 @@ Adds the authenticated user to a room by room code.
 {
   "error": "room not found",
   "status": 404
+}
+```
+
+**Example Error Response (400 - Creator):**
+
+```json
+{
+  "error": "cannot join own room",
+  "message": "you are the creator of this room and are already a member",
+  "status": 400
 }
 ```
 
@@ -259,7 +291,71 @@ Retrieves details of a specific room. Only the room owner or members can access.
 
 ---
 
-### 5. Get Room Members
+### 5. Get Room Details by ID
+
+Retrieves details of a specific room by its ID. Only the room owner or members can access.
+
+**Endpoint:** `GET /api/v1/rooms/by-id/:id`
+
+**Authentication:** Required
+
+**URL Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| id | string | Yes | Room ID (MongoDB ObjectID hex) |
+
+**Success Response (200 OK):**
+
+```json
+{
+  "data": {
+    "id": "507f1f77bcf86cd799439011",
+    "name": "Conference Room A",
+    "code": "CONF_A_001",
+    "created_by": "507f1f77bcf86cd799439012",
+    "members": [
+      "507f1f77bcf86cd799439013",
+      "507f1f77bcf86cd799439014"
+    ],
+    "created_at": "2024-06-28T21:15:00Z",
+    "updated_at": "2024-06-28T21:30:00Z"
+  },
+  "message": "room details retrieved successfully",
+  "status": 200
+}
+```
+
+**Error Responses:**
+
+| Status | Error | Description |
+|--------|-------|-------------|
+| 400 | invalid room id | Invalid ObjectID format |
+| 403 | forbidden | User is not owner or member |
+| 404 | room not found | Room doesn't exist |
+| 500 | internal server error | Server error |
+
+**Example Error Response (400):**
+
+```json
+{
+  "error": "invalid room id",
+  "status": 400
+}
+```
+
+**Example Error Response (403):**
+
+```json
+{
+  "error": "you do not have permission to access this room",
+  "status": 403
+}
+```
+
+---
+
+### 6. Get Room Members
 
 Lists all members of a room. Only the room owner or members can access.
 
@@ -303,7 +399,68 @@ Lists all members of a room. Only the room owner or members can access.
 
 ---
 
-### 6. Delete or Leave Room
+### 7. Get Room Users
+
+Retrieves full user details for all members of a room. Only the room owner or members can access.
+
+**Endpoint:** `GET /api/v1/rooms/:code/users`
+
+**Authentication:** Required
+
+**URL Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| code | string | Yes | Unique room code |
+
+**Success Response (200 OK):**
+
+```json
+{
+  "data": [
+    {
+      "id": "507f1f77bcf86cd799439012",
+      "name": "John Doe",
+      "email": "john@example.com",
+      "is_age_verified": true,
+      "created_at": "2024-06-20T10:30:00Z"
+    },
+    {
+      "id": "507f1f77bcf86cd799439013",
+      "name": "Jane Smith",
+      "email": "jane@example.com",
+      "is_age_verified": true,
+      "created_at": "2024-06-22T14:15:00Z"
+    }
+  ],
+  "count": 2,
+  "message": "room users retrieved successfully",
+  "status": 200
+}
+```
+
+**Error Responses:**
+
+| Status | Error | Description |
+|--------|-------|-------------|
+| 403 | forbidden | User is not owner or member |
+| 404 | room not found | Room doesn't exist |
+| 500 | internal server error | Server error |
+
+**Example Error Response (403):**
+
+```json
+{
+  "error": "you do not have permission to access this room",
+  "status": 403
+}
+```
+
+**Note:** This endpoint returns the owner and all members with their full user details (name, email, etc.), unlike `/rooms/:code/members` which only returns user IDs.
+
+---
+
+### 8. Delete or Leave Room
 
 Deletes a room (if owner) or leaves a room (if member).
 

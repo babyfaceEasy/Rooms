@@ -113,7 +113,7 @@ func main() {
 
 	// Room repositories and service
 	roomRepo := repository.NewMongoRoomRepository(mongoClient.Database(cfg.Mongo.Database))
-	roomService := service.NewRoomService(roomRepo)
+	roomService := service.NewRoomService(roomRepo, userRepo)
 	roomHandler := handler.NewRoomHandler(roomService)
 
 	// Post repositories and service
