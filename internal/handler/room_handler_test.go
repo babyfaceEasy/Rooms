@@ -14,15 +14,16 @@ import (
 
 // MockRoomService is a mock implementation for testing
 type MockRoomService struct {
-	createRoomFunc       func(ctx context.Context, name, code string, userID primitive.ObjectID) (*domain.Room, error)
-	addUserToRoomFunc    func(ctx context.Context, code string, userID primitive.ObjectID) (*domain.Room, error)
-	getRoom              func(ctx context.Context, code string) (*domain.Room, error)
-	getRoomByID          func(ctx context.Context, roomID primitive.ObjectID) (*domain.Room, error)
-	getRoomUsers         func(ctx context.Context, code string) ([]*domain.User, error)
-	leaveRoom            func(ctx context.Context, code string, userID primitive.ObjectID) error
-	removeMemberFromRoom func(ctx context.Context, code string, ownerID, memberID primitive.ObjectID) error
-	deleteRoom           func(ctx context.Context, code string, userID primitive.ObjectID) error
-	listUserRooms        func(ctx context.Context, userID primitive.ObjectID) ([]*domain.Room, error)
+	createRoomFunc          func(ctx context.Context, name, code string, userID primitive.ObjectID) (*domain.Room, error)
+	addUserToRoomFunc       func(ctx context.Context, code string, userID primitive.ObjectID) (*domain.Room, error)
+	addUserToRoomByUserCode func(ctx context.Context, roomCode, userCode string) (*domain.Room, error)
+	getRoom                 func(ctx context.Context, code string) (*domain.Room, error)
+	getRoomByID             func(ctx context.Context, roomID primitive.ObjectID) (*domain.Room, error)
+	getRoomUsers            func(ctx context.Context, code string) ([]*domain.User, error)
+	leaveRoom               func(ctx context.Context, code string, userID primitive.ObjectID) error
+	removeMemberFromRoom    func(ctx context.Context, code string, ownerID, memberID primitive.ObjectID) error
+	deleteRoom              func(ctx context.Context, code string, userID primitive.ObjectID) error
+	listUserRooms           func(ctx context.Context, userID primitive.ObjectID) ([]*domain.Room, error)
 }
 
 func (m *MockRoomService) CreateRoom(ctx context.Context, name, code string, userID primitive.ObjectID) (*domain.Room, error) {
@@ -35,6 +36,13 @@ func (m *MockRoomService) CreateRoom(ctx context.Context, name, code string, use
 func (m *MockRoomService) AddUserToRoom(ctx context.Context, code string, userID primitive.ObjectID) (*domain.Room, error) {
 	if m.addUserToRoomFunc != nil {
 		return m.addUserToRoomFunc(ctx, code, userID)
+	}
+	return nil, nil
+}
+
+func (m *MockRoomService) AddUserToRoomByUserCode(ctx context.Context, roomCode, userCode string) (*domain.Room, error) {
+	if m.addUserToRoomByUserCode != nil {
+		return m.addUserToRoomByUserCode(ctx, roomCode, userCode)
 	}
 	return nil, nil
 }

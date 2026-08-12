@@ -14,6 +14,7 @@ type UserRepository interface {
 	GetByEmail(ctx context.Context, email string) (*domain.User, error)
 	GetByID(ctx context.Context, id primitive.ObjectID) (*domain.User, error)
 	GetByIDs(ctx context.Context, ids []primitive.ObjectID) ([]*domain.User, error)
+	GetByCode(ctx context.Context, code string) (*domain.User, error)
 	Update(ctx context.Context, user *domain.User) error
 	Delete(ctx context.Context, id primitive.ObjectID) error
 	SoftDelete(ctx context.Context, id primitive.ObjectID) error

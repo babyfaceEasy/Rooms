@@ -21,6 +21,12 @@ type AddUserToRoomRequest struct {
 	Code string `json:"code"`
 }
 
+// AddUserToRoomByUserCodeRequest represents the request to add a user by their customer code
+type AddUserToRoomByUserCodeRequest struct {
+	RoomCode string `json:"room_code"`
+	UserCode string `json:"user_code"`
+}
+
 // RemoveMemberFromRoomRequest represents the request to remove a member from a room
 type RemoveMemberFromRoomRequest struct {
 	MemberID string `json:"member_id"`
@@ -665,6 +671,55 @@ func (h *RoomHandler) handleError(c *fiber.Ctx, err error) error {
 			"status": fiber.StatusInternalServerError,
 		})
 	}
+}
+
+// AddUserToRoomByUserCode adds a user to a room using the user's customer code
+func (h *RoomHandler) AddUserToRoomByUserCode(c *fiber.Ctx) error {
+	// Parse request body
+	var req AddUserToRoomByUserCodeRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
+			"error":  "invalid input",
+			"status": fiber.StatusBadRequest,
+		})
+	}
+
+	// Validate request fields
+	if req.RoomCode == "" || req.UserCode == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
+			"error":  "room_code and user_code are required",
+			"status": fiber.StatusBadRequest,
+		})
+	}
+
+	// Add user to room via service
+	room, err := h.svc.AddUserToRoomByUserCode(c.Context(), req.RoomCode, req.UserCode)
+	if err != nil {
+		return h.handleError(c, err)
+	}
+
+	// Convert members to string slice for response
+	members := make([]string, len(room.Members))
+	for i, m := range room.Members {
+		members[i] = m.Hex()
+	}
+
+	// Convert domain Room to RoomResponse
+	response := &RoomResponse{
+		ID:        room.ID.Hex(),
+		Name:      room.Name,
+		Code:      room.Code,
+		CreatedBy: room.CreatedBy.Hex(),
+		Members:   members,
+		CreatedAt: room.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		UpdatedAt: room.UpdatedAt.Format("2006-01-02T15:04:05Z"),
+	}
+
+	return c.Status(fiber.StatusOK).JSON(map[string]interface{}{
+		"data":    response,
+		"message": "user added to room successfully",
+		"status":  fiber.StatusOK,
+	})
 }
 
 // GetRoomUsers retrieves all user details for members of a room - only owner and members can access
