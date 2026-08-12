@@ -7,13 +7,15 @@ import (
 	"testing"
 	"time"
 
+	"temp_backend/internal/domain"
+	"temp_backend/internal/repository"
+	"temp_backend/internal/service"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"temp_backend/internal/repository"
-	"temp_backend/internal/service"
 )
 
 // setupMongoContainer starts a MongoDB testcontainer and returns the URI and cleanup function.
@@ -48,20 +50,6 @@ func setupMongoContainer(t *testing.T) (string, func()) {
 	return uri, cleanup
 }
 
-type RegisterRequest struct {
-	Name         string `json:"name"`
-	Email        string `json:"email"`
-	Password     string `json:"password"`
-	AgeVerified  bool   `json:"age_verified"`
-}
-
-type RegisterResponse struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	Email     string `json:"email"`
-	CreatedAt string `json:"created_at"`
-}
-
 func TestRegistration_FullFlow(t *testing.T) {
 	mongoURI, cleanup := setupMongoContainer(t)
 	defer cleanup()
@@ -75,7 +63,9 @@ func TestRegistration_FullFlow(t *testing.T) {
 	// Create repositories and services
 	userRepo, err := repository.NewMongoUserRepository(db)
 	assert.NoError(t, err)
-	userService := service.NewUserService(userRepo)
+	refreshTokenRepo, err := repository.NewMongoRefreshTokenRepository(db)
+	assert.NoError(t, err)
+	userService := service.NewUserService(userRepo, refreshTokenRepo)
 
 	// Test successful registration
 	user, err := userService.Register(context.Background(), "John Doe", "john@example.com", "SecurePass123!", true)
@@ -105,12 +95,14 @@ func TestRegistration_ConcurrentRegistrations(t *testing.T) {
 
 	userRepo, err := repository.NewMongoUserRepository(db)
 	assert.NoError(t, err)
-	userService := service.NewUserService(userRepo)
+	refreshTokenRepo, err := repository.NewMongoRefreshTokenRepository(db)
+	assert.NoError(t, err)
+	userService := service.NewUserService(userRepo, refreshTokenRepo)
 
 	// Register multiple users concurrently
 	var wg sync.WaitGroup
 	var mu sync.Mutex
-	var results []*api.User
+	var results []*domain.User
 	var errs []error
 
 	numGoroutines := 10
@@ -163,7 +155,9 @@ func TestRegistration_EmailUniquenessConstraint(t *testing.T) {
 
 	userRepo, err := repository.NewMongoUserRepository(db)
 	assert.NoError(t, err)
-	userService := service.NewUserService(userRepo)
+	refreshTokenRepo, err := repository.NewMongoRefreshTokenRepository(db)
+	assert.NoError(t, err)
+	userService := service.NewUserService(userRepo, refreshTokenRepo)
 
 	// Register first user
 	user1, err := userService.Register(
@@ -205,7 +199,9 @@ func TestRegistration_DataPersistence(t *testing.T) {
 	{
 		userRepo, err := repository.NewMongoUserRepository(db)
 		assert.NoError(t, err)
-		userService := service.NewUserService(userRepo)
+		refreshTokenRepo, err := repository.NewMongoRefreshTokenRepository(db)
+		assert.NoError(t, err)
+		userService := service.NewUserService(userRepo, refreshTokenRepo)
 
 		user, err := userService.Register(
 			context.Background(),
@@ -244,7 +240,9 @@ func TestRegistration_ValidationErrors(t *testing.T) {
 
 	userRepo, err := repository.NewMongoUserRepository(db)
 	assert.NoError(t, err)
-	userService := service.NewUserService(userRepo)
+	refreshTokenRepo, err := repository.NewMongoRefreshTokenRepository(db)
+	assert.NoError(t, err)
+	userService := service.NewUserService(userRepo, refreshTokenRepo)
 
 	testCases := []struct {
 		name        string
@@ -336,7 +334,9 @@ func TestRegistration_UserDeletion(t *testing.T) {
 
 	userRepo, err := repository.NewMongoUserRepository(db)
 	assert.NoError(t, err)
-	userService := service.NewUserService(userRepo)
+	refreshTokenRepo, err := repository.NewMongoRefreshTokenRepository(db)
+	assert.NoError(t, err)
+	userService := service.NewUserService(userRepo, refreshTokenRepo)
 
 	// Register user
 	user, err := userService.Register(

@@ -75,10 +75,11 @@ func (m *MongoCommentRepository) GetByPostID(ctx context.Context, postID primiti
 
 // DeleteComment soft-deletes a comment by ID
 func (m *MongoCommentRepository) DeleteComment(ctx context.Context, id primitive.ObjectID) error {
+	now := time.Now().UTC()
 	result, err := m.collection.UpdateOne(
 		ctx,
 		bson.M{"_id": id},
-		bson.M{"$set": bson.M{"deleted_at": primitive.NewDateTimeFromTime(ctx.Value("now").(time.Time))}},
+		bson.M{"$set": bson.M{"deleted_at": &now}},
 	)
 	if err != nil {
 		return err
