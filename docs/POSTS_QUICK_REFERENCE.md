@@ -7,6 +7,9 @@
 | POST | `/api/v1/posts` | Create post (text, optional image/video) | Required |
 | GET | `/api/v1/posts/:id` | Get post by ID | Required |
 | DELETE | `/api/v1/posts/:id` | Delete post (soft delete, owner only) | Required |
+| POST | `/api/v1/posts/:id/comments` | Create comment on post | Required |
+| GET | `/api/v1/posts/:id/comments` | Get all comments for post | Required |
+| DELETE | `/api/v1/comments/:id` | Delete comment (author only) | Required |
 
 ## Quick Examples
 
@@ -45,13 +48,34 @@ curl -X DELETE http://localhost:3000/api/v1/posts/507f1f77bcf86cd799439013 \
   -H "Authorization: Bearer TOKEN"
 ```
 
+### Create Comment
+```bash
+curl -X POST http://localhost:3000/api/v1/posts/507f1f77bcf86cd799439013/comments \
+  -H "Authorization: Bearer TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"post_id":"507f1f77bcf86cd799439013","text":"Great post!"}'
+```
+
+### Get Comments for Post
+```bash
+curl -X GET http://localhost:3000/api/v1/posts/507f1f77bcf86cd799439013/comments \
+  -H "Authorization: Bearer TOKEN"
+```
+
+### Delete Comment
+```bash
+curl -X DELETE http://localhost:3000/api/v1/comments/507f1f77bcf86cd799439020 \
+  -H "Authorization: Bearer TOKEN"
+```
+
 ## Validation Rules
 
 | Field | Rule |
 |-------|------|
-| text | Required, 1-5000 characters |
+| text (post) | Required, 1-5000 characters |
 | image | Optional, jpg/jpeg/png/gif/webp |
 | video | Optional, mp4/webm/mov/avi |
+| text (comment) | Required, 1-1000 characters |
 
 ## Response Codes
 
@@ -77,3 +101,6 @@ curl -X DELETE http://localhost:3000/api/v1/posts/507f1f77bcf86cd799439013 \
 - One image + one video per post (both optional)
 - Files validated by extension before upload
 - JWT token required for all endpoints
+- Comments are text-only (1-1000 characters)
+- Only comment author can delete their own comment
+- Comments linked to posts via `post_id`

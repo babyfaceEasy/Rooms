@@ -298,6 +298,76 @@ func (h *PostHandler) GetPost(c *fiber.Ctx) error {
 	})
 }
 
+// GetPostsByRoomCode retrieves all posts for a room (room code in URL parameter)
+func (h *PostHandler) GetPostsByRoomCode(c *fiber.Ctx) error {
+	// Extract user ID from context
+	userID, ok := c.Locals("user_id").(string)
+	if !ok || userID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(map[string]interface{}{
+			"error":  "unauthorized",
+			"status": fiber.StatusUnauthorized,
+		})
+	}
+
+	// Convert user ID from string to ObjectID
+	userObjID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
+			"error":  "invalid user id",
+			"status": fiber.StatusBadRequest,
+		})
+	}
+
+	// Get room code from URL parameter
+	roomCode := c.Params("code")
+	if roomCode == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
+			"error":  "room code is required",
+			"status": fiber.StatusBadRequest,
+		})
+	}
+
+	// Get room by code to verify it exists and user is a member
+	room, err := h.roomRepo.GetByCode(c.Context(), roomCode)
+	if err != nil {
+		return h.handleError(c, err)
+	}
+
+	// Verify user is room member
+	isMember, err := h.roomRepo.IsUserMember(c.Context(), room.ID, userObjID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(map[string]interface{}{
+			"error":  "internal server error",
+			"status": fiber.StatusInternalServerError,
+		})
+	}
+	if !isMember {
+		return c.Status(fiber.StatusForbidden).JSON(map[string]interface{}{
+			"error":  "not a member of this room",
+			"status": fiber.StatusForbidden,
+		})
+	}
+
+	// Get posts for the room via service
+	posts, err := h.svc.GetPostsByRoomID(c.Context(), room.ID)
+	if err != nil {
+		return h.handleError(c, err)
+	}
+
+	// Convert domain Posts to PostResponses
+	var responses []*PostResponse
+	for _, post := range posts {
+		responses = append(responses, h.toPostResponse(post, room))
+	}
+
+	return c.Status(fiber.StatusOK).JSON(map[string]interface{}{
+		"data":    responses,
+		"count":   len(responses),
+		"message": "posts retrieved successfully",
+		"status":  fiber.StatusOK,
+	})
+}
+
 // DeletePost deletes a post (owner only)
 func (h *PostHandler) DeletePost(c *fiber.Ctx) error {
 	// Extract user ID from context

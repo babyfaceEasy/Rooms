@@ -121,7 +121,12 @@ func main() {
 	postService := service.NewPostService(postRepo)
 	postHandler := handler.NewPostHandler(postService, storageRepo, roomRepo)
 
-	server := api.NewServer(cfg, logger, itemHandler, userHandler, authHandler, roomHandler, postHandler, authService)
+	// Comment repositories and service
+	commentRepo := repository.NewMongoCommentRepository(mongoClient.Database(cfg.Mongo.Database).Collection("comments"))
+	commentService := service.NewCommentService(commentRepo, postRepo)
+	commentHandler := handler.NewCommentHandler(commentService)
+
+	server := api.NewServer(cfg, logger, itemHandler, userHandler, authHandler, roomHandler, postHandler, commentHandler, authService)
 
 	go func() {
 		if err := server.Start(); err != nil && !errors.Is(err, http.ErrServerClosed) {

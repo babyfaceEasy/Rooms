@@ -469,3 +469,244 @@ go test ./internal/domain ./internal/service ./internal/handler -v -k Post
 # Run tests with coverage
 go test ./internal/service -cover
 ```
+
+---
+
+## Comments Module
+
+The Comments module allows users to add text comments to posts. Comments are stored as separate documents in MongoDB and linked to posts via `post_id`.
+
+### Comment Limits
+
+- **Text Length:** 1-1000 characters
+- **Delete Permission:** Only the comment author can delete their own comment
+
+### Comment Endpoints
+
+### 1. Create Comment
+
+Creates a new comment on a post.
+
+**Endpoint:** `POST /api/v1/posts/:id/comments`
+
+**Authentication:** Required
+
+**URL Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| id | string | Yes | Post ID (MongoDB ObjectID) |
+
+**Request Body:**
+
+```json
+{
+  "post_id": "507f1f77bcf86cd799439013",
+  "text": "Great post! I really enjoyed this."
+}
+```
+
+**Request Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| post_id | string | Yes | Post ID (must match URL parameter) |
+| text | string | Yes | Comment text (1-1000 characters) |
+
+**Success Response (201 Created):**
+
+```json
+{
+  "data": {
+    "id": "507f1f77bcf86cd799439020",
+    "post_id": "507f1f77bcf86cd799439013",
+    "user_id": "507f1f77bcf86cd799439012",
+    "text": "Great post! I really enjoyed this.",
+    "created_at": "2024-06-28T22:15:00Z",
+    "updated_at": "2024-06-28T22:15:00Z"
+  },
+  "message": "comment created successfully",
+  "status": 201
+}
+```
+
+**Error Responses:**
+
+| Status | Error | Description |
+|--------|-------|-------------|
+| 400 | invalid request body | Missing or invalid JSON |
+| 400 | post_id is required | Missing post_id field |
+| 400 | comment text is required | Text field is empty |
+| 400 | comment text exceeds maximum length of 1000 characters | Text too long |
+| 400 | invalid post id | Invalid ObjectID format |
+| 401 | unauthorized | Missing or invalid JWT token |
+| 404 | post not found | Post doesn't exist |
+| 500 | internal server error | Server error |
+
+**Example Error Response (404 - Post Not Found):**
+
+```json
+{
+  "error": "post not found",
+  "status": 404
+}
+```
+
+**Example Error Response (400 - Text Required):**
+
+```json
+{
+  "error": "comment text is required",
+  "status": 400
+}
+```
+
+**Example Request (curl):**
+
+```bash
+curl -X POST http://localhost:3000/api/v1/posts/507f1f77bcf86cd799439013/comments \
+  -H "Authorization: Bearer <access_token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "post_id": "507f1f77bcf86cd799439013",
+    "text": "Great post! I really enjoyed this."
+  }'
+```
+
+---
+
+### 2. Get Comments for Post
+
+Retrieves all comments for a specific post.
+
+**Endpoint:** `GET /api/v1/posts/:id/comments`
+
+**Authentication:** Required
+
+**URL Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| id | string | Yes | Post ID (MongoDB ObjectID) |
+
+**Success Response (200 OK):**
+
+```json
+{
+  "data": [
+    {
+      "id": "507f1f77bcf86cd799439020",
+      "post_id": "507f1f77bcf86cd799439013",
+      "user_id": "507f1f77bcf86cd799439012",
+      "text": "Great post! I really enjoyed this.",
+      "created_at": "2024-06-28T22:15:00Z",
+      "updated_at": "2024-06-28T22:15:00Z"
+    },
+    {
+      "id": "507f1f77bcf86cd799439021",
+      "post_id": "507f1f77bcf86cd799439013",
+      "user_id": "507f1f77bcf86cd799439014",
+      "text": "Thanks for sharing this!",
+      "created_at": "2024-06-28T22:20:00Z",
+      "updated_at": "2024-06-28T22:20:00Z"
+    }
+  ],
+  "count": 2,
+  "message": "comments retrieved successfully",
+  "status": 200
+}
+```
+
+**Empty Response (200 OK):**
+
+```json
+{
+  "data": [],
+  "count": 0,
+  "message": "comments retrieved successfully",
+  "status": 200
+}
+```
+
+**Error Responses:**
+
+| Status | Error | Description |
+|--------|-------|-------------|
+| 400 | post id is required | Missing URL parameter |
+| 400 | invalid post id | Invalid ObjectID format |
+| 401 | unauthorized | Missing or invalid JWT token |
+| 500 | internal server error | Server error |
+
+**Example Request (curl):**
+
+```bash
+curl http://localhost:3000/api/v1/posts/507f1f77bcf86cd799439013/comments \
+  -H "Authorization: Bearer <access_token>"
+```
+
+---
+
+### 3. Delete Comment
+
+Deletes a comment. Only the comment author can delete their own comment.
+
+**Endpoint:** `DELETE /api/v1/comments/:id`
+
+**Authentication:** Required
+
+**URL Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| id | string | Yes | Comment ID (MongoDB ObjectID) |
+
+**Success Response (200 OK):**
+
+```json
+{
+  "data": null,
+  "message": "comment deleted successfully",
+  "status": 200
+}
+```
+
+**Error Responses:**
+
+| Status | Error | Description |
+|--------|-------|-------------|
+| 400 | comment id is required | Missing URL parameter |
+| 400 | invalid comment id | Invalid ObjectID format |
+| 401 | unauthorized | Missing or invalid JWT token |
+| 403 | forbidden | User is not the comment author |
+| 404 | comment not found | Comment doesn't exist |
+| 500 | internal server error | Server error |
+
+**Example Error Response (403 - Not Author):**
+
+```json
+{
+  "error": "you are not authorized to perform this action on this comment",
+  "status": 403
+}
+```
+
+**Example Request (curl):**
+
+```bash
+curl -X DELETE http://localhost:3000/api/v1/comments/507f1f77bcf86cd799439020 \
+  -H "Authorization: Bearer <access_token>"
+```
+
+---
+
+## HTTP Status Codes
+
+| Code | Meaning | Usage |
+|------|---------|-------|
+| 200 | OK | Successful GET, DELETE |
+| 201 | Created | Successful POST (create comment) |
+| 400 | Bad Request | Invalid input or validation error |
+| 401 | Unauthorized | Missing or invalid JWT token |
+| 403 | Forbidden | User lacks permission (not comment author) |
+| 404 | Not Found | Resource (post, comment) doesn't exist |
+| 500 | Internal Server Error | Unexpected server error |
