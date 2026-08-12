@@ -82,7 +82,8 @@ Build and publish dev:
   before_script:
     - $(aws ecr get-login --no-include-email --region $AWS_REGION | tr -d '\r')
     - chmod 0755  utils/update_application_variable.sh
-    - 'sh utils/update_application_variable.sh "$APP_NAME" "$PORT" "$APP_ENV" "info" "$MONGO_URI" "$MONGO_DATABASE" "10s" "$S3_ENDPOINT_URL" "$S3_REGION" "$S3_BUCKET" "$S3_ACCESS_KEY" "$S3_SECRET_KEY" "$S3_USE_SSL" "$S3_PRESIGNED_EXPIRY" "$JWT_SECRET_KEY"'
+    - 'sh utils/update_application_variable.sh "$APP_NAME" "$PORT" "$APP_ENV" "info" "$MONGO_URI" "$MONGO_DATABASE" "10s" "$S3_ENDPOINT_URL" "$S3_REGION" "$S3_BUCKET" "$S3_ACCESS_KEY" "$S3_SECRET_KEY" "$S3_USE_SSL" "$S3_PRESIGNED_EXPIRY" "$JWT_SECRET_KEY" \
+      '
     - pwd && ls && ls -la
     - cat .env
 
@@ -126,7 +127,9 @@ Deploy To DEV:
   before_script:
     - echo "Updating Docker container on virtual machine"
     - chmod 400 $VIRTUAL_MACHINE_SSH_KEY_DEV
-    - 'sh utils/update_application_variable.sh "$APP_NAME" "$PORT" "development" "info" "$MONGO_URI" "$MONGO_DATABASE" "10s" "$S3_ENDPOINT_URL" "$S3_REGION" "$S3_BUCKET" "$S3_ACCESS_KEY" "$S3_SECRET_KEY" "$S3_USE_SSL" "$S3_PRESIGNED_EXPIRY" "LKBSSPsjj3jZSQ3TuYuGVVAmiyu1CAB4OxouAW2fZRU" '
+    - 'sh utils/update_application_variable.sh "$APP_NAME" "$PORT" "development" "info" "$MONGO_URI" "$MONGO_DATABASE" "10s" "$S3_ENDPOINT_URL" "$S3_REGION" "$S3_BUCKET" "$S3_ACCESS_KEY" "$S3_SECRET_KEY" "$S3_USE_SSL" "$S3_PRESIGNED_EXPIRY" "LKBSSPsjj3jZSQ3TuYuGVVAmiyu1CAB4OxouAW2fZRU" 
+      "$SENDGRID_API_KEY" "$SENDGRID_ENABLED" "$SENDGRID_PASSWORD_RESET_TEMPLATE_ID" "$SENDGRID_SENDER_EMAIL" "$SENDGRID_VERIFICATION_TEMPLATE_ID"
+      '
     - pwd && ls && ls -la
     - cat .env
   script:
@@ -190,7 +193,9 @@ publish_prod:
   before_script:
     - $(aws ecr get-login --no-include-email --region $AWS_REGION | tr -d '\r')
     - chmod 0755  utils/update_application_variable.sh
-    - 'sh utils/update_application_variable.sh "$APP_NAME" "$PORT" "production" "info" "$MONGO_URI" "$MONGO_DATABASE" "10s" "$S3_ENDPOINT_URL" "$S3_REGION" "$S3_BUCKET" "$S3_ACCESS_KEY" "$S3_SECRET_KEY" "$S3_USE_SSL" "$S3_PRESIGNED_EXPIRY" "$JWT_SECRET_KEY" '
+    - 'sh utils/update_application_variable.sh "$APP_NAME" "$PORT" "production" "info" "$MONGO_URI" "$MONGO_DATABASE" "10s" "$S3_ENDPOINT_URL" "$S3_REGION" "$S3_BUCKET" "$S3_ACCESS_KEY" "$S3_SECRET_KEY" "$S3_USE_SSL" "$S3_PRESIGNED_EXPIRY" "$JWT_SECRET_KEY" \
+       "$SENDGRID_API_KEY" "$SENDGRID_ENABLED" "$SENDGRID_PASSWORD_RESET_TEMPLATE_ID" "$SENDGRID_SENDER_EMAIL" "$SENDGRID_VERIFICATION_TEMPLATE_ID"
+      '
     - ls -la
     - cat .env
 
@@ -214,7 +219,9 @@ Deploy To Prod:
   before_script:
     - echo "Updating Docker container on virtual machine"
     - chmod 400 $VIRTUAL_MACHINE_SSH_KEY_DEV
-    - 'sh utils/update_application_variable.sh "$APP_NAME" "$PORT" "production" "info" "$MONGO_URI" "$MONGO_DATABASE" "10s" "$S3_ENDPOINT_URL" "$S3_REGION" "$S3_BUCKET" "$S3_ACCESS_KEY" "$S3_SECRET_KEY" "$S3_USE_SSL" "$S3_PRESIGNED_EXPIRY" "$JWT_SECRET_KEY" '
+    - 'sh utils/update_application_variable.sh "$APP_NAME" "$PORT" "production" "info" "$MONGO_URI" "$MONGO_DATABASE" "10s" "$S3_ENDPOINT_URL" "$S3_REGION" "$S3_BUCKET" "$S3_ACCESS_KEY" "$S3_SECRET_KEY" "$S3_USE_SSL" "$S3_PRESIGNED_EXPIRY" "$JWT_SECRET_KEY" 
+       "$SENDGRID_API_KEY" "$SENDGRID_ENABLED" "$SENDGRID_PASSWORD_RESET_TEMPLATE_ID" "$SENDGRID_SENDER_EMAIL" "$SENDGRID_VERIFICATION_TEMPLATE_ID"
+      '
     - pwd && ls && ls -la
     - cat .env
 
