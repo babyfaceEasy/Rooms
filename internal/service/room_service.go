@@ -4,9 +4,10 @@ import (
 	"context"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"temp_backend/internal/domain"
 	"temp_backend/internal/repository"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // RoomService defines the interface for room business logic
@@ -14,6 +15,7 @@ type RoomService interface {
 	CreateRoom(ctx context.Context, name, code string, userID primitive.ObjectID) (*domain.Room, error)
 	AddUserToRoom(ctx context.Context, code string, userID primitive.ObjectID) (*domain.Room, error)
 	GetRoom(ctx context.Context, code string) (*domain.Room, error)
+	GetRoomByID(ctx context.Context, roomID primitive.ObjectID) (*domain.Room, error)
 	LeaveRoom(ctx context.Context, code string, userID primitive.ObjectID) error
 	DeleteRoom(ctx context.Context, code string, userID primitive.ObjectID) error
 	ListUserRooms(ctx context.Context, userID primitive.ObjectID) ([]*domain.Room, error)
@@ -94,6 +96,16 @@ func (s *roomService) GetRoom(ctx context.Context, code string) (*domain.Room, e
 	return room, nil
 }
 
+// GetRoomByID retrieves a room by ID
+func (s *roomService) GetRoomByID(ctx context.Context, roomID primitive.ObjectID) (*domain.Room, error) {
+	room, err := s.repo.GetByID(ctx, roomID)
+	if err != nil {
+		return nil, err
+	}
+
+	return room, nil
+}
+
 // LeaveRoom removes a user from a room
 func (s *roomService) LeaveRoom(ctx context.Context, code string, userID primitive.ObjectID) error {
 	// Get room by code
@@ -153,4 +165,3 @@ func (s *roomService) ListUserRooms(ctx context.Context, userID primitive.Object
 
 	return rooms, nil
 }
-

@@ -3,10 +3,11 @@ package handler
 import (
 	"errors"
 
-	"github.com/gofiber/fiber/v2"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"temp_backend/internal/domain"
 	"temp_backend/internal/service"
+
+	"github.com/gofiber/fiber/v2"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // CreateRoomRequest represents the request to create a room
@@ -22,13 +23,13 @@ type AddUserToRoomRequest struct {
 
 // RoomResponse represents a room in the response
 type RoomResponse struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	Code      string `json:"code"`
-	CreatedBy string `json:"created_by"`
+	ID        string   `json:"id"`
+	Name      string   `json:"name"`
+	Code      string   `json:"code"`
+	CreatedBy string   `json:"created_by"`
 	Members   []string `json:"members,omitempty"`
-	CreatedAt string `json:"created_at"`
-	UpdatedAt string `json:"updated_at"`
+	CreatedAt string   `json:"created_at"`
+	UpdatedAt string   `json:"updated_at"`
 }
 
 // RoomMembersResponse represents the members of a room
@@ -193,6 +194,91 @@ func (h *RoomHandler) GetRoom(c *fiber.Ctx) error {
 
 	// Get room via service
 	room, err := h.svc.GetRoom(c.Context(), roomCode)
+	if err != nil {
+		return h.handleError(c, err)
+	}
+
+	// Check authorization: user must be owner or member
+	isOwner := room.CreatedBy == userObjID
+	isMember := false
+	for _, m := range room.Members {
+		if m == userObjID {
+			isMember = true
+			break
+		}
+	}
+
+	if !isOwner && !isMember {
+		return c.Status(fiber.StatusForbidden).JSON(map[string]interface{}{
+			"error":  "you do not have permission to access this room",
+			"status": fiber.StatusForbidden,
+		})
+	}
+
+	// Convert members to string slice for response
+	members := make([]string, len(room.Members))
+	for i, m := range room.Members {
+		members[i] = m.Hex()
+	}
+
+	// Convert domain Room to RoomResponse
+	response := &RoomResponse{
+		ID:        room.ID.Hex(),
+		Name:      room.Name,
+		Code:      room.Code,
+		CreatedBy: room.CreatedBy.Hex(),
+		Members:   members,
+		CreatedAt: room.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		UpdatedAt: room.UpdatedAt.Format("2006-01-02T15:04:05Z"),
+	}
+
+	return c.Status(fiber.StatusOK).JSON(map[string]interface{}{
+		"data":    response,
+		"message": "room details retrieved successfully",
+		"status":  fiber.StatusOK,
+	})
+}
+
+// GetRoomByID retrieves room details by ID - only owner and members can access
+func (h *RoomHandler) GetRoomByID(c *fiber.Ctx) error {
+	// Extract user ID from context
+	userID, ok := c.Locals("user_id").(string)
+	if !ok || userID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(map[string]interface{}{
+			"error":  "unauthorized",
+			"status": fiber.StatusUnauthorized,
+		})
+	}
+
+	// Convert user ID from string to ObjectID
+	userObjID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
+			"error":  "invalid user id",
+			"status": fiber.StatusBadRequest,
+		})
+	}
+
+	// Get room ID from URL parameter
+	roomIDStr := c.Params("id")
+	if roomIDStr == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
+			"error":  "room id is required",
+			"status": fiber.StatusBadRequest,
+		})
+	}
+
+	// Convert room ID from string to ObjectID
+	roomID, err := primitive.ObjectIDFromHex(roomIDStr)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
+			"error":  "invalid room id",
+			"status": fiber.StatusBadRequest,
+		})
+	}
+
+	// Get room via service
+	room, err := h.svc.GetRoomByID(c.Context(), roomID)
 	if err != nil {
 		return h.handleError(c, err)
 	}
@@ -486,9 +572,8 @@ func (h *RoomHandler) ListUserRooms(c *fiber.Ctx) error {
 	}
 
 	return c.Status(fiber.StatusOK).JSON(map[string]interface{}{
-		"data":    responses,
-		"count":   len(responses),
-		"status":  fiber.StatusOK,
+		"data":   responses,
+		"count":  len(responses),
+		"status": fiber.StatusOK,
 	})
 }
-
