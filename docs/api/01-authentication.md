@@ -75,6 +75,7 @@ Content-Type: application/json
 {
   "data": {
     "id": "507f1f77bcf86cd799439011",
+    "code": "87654321",
     "name": "John Doe",
     "email": "john@example.com",
     "age_verified": true,
@@ -84,6 +85,16 @@ Content-Type: application/json
   "status": 201
 }
 ```
+
+### Response Fields
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Unique user identifier (MongoDB ObjectID in hex format) |
+| `code` | string | Unique 8-digit customer code (assigned automatically) |
+| `name` | string | User's full name |
+| `email` | string | User's email address |
+| `age_verified` | boolean | Age verification status |
+| `created_at` | string | ISO 8601 timestamp of account creation |
 
 ### Error Responses
 
@@ -138,6 +149,8 @@ curl -X POST http://localhost:8080/api/v1/auth/register \
     "age_verified": true
   }'
 ```
+
+---
 
 ---
 
@@ -381,6 +394,7 @@ No request body.
 {
   "data": {
     "id": "507f1f77bcf86cd799439011",
+    "code": "87654321",
     "name": "John Doe",
     "email": "john@example.com"
   },
@@ -388,6 +402,14 @@ No request body.
   "status": 200
 }
 ```
+
+### Response Fields
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | User's unique identifier |
+| `code` | string | User's unique 8-digit customer code |
+| `name` | string | User's full name |
+| `email` | string | User's email address |
 
 ### Error Responses
 
@@ -448,6 +470,7 @@ Content-Type: application/json
 {
   "data": {
     "id": "507f1f77bcf86cd799439011",
+    "code": "87654321",
     "name": "John Smith",
     "email": "john@example.com"
   },

@@ -25,16 +25,29 @@ func NewMongoUserRepository(db *mongo.Database) (*MongoUserRepository, error) {
 	collection := db.Collection("users")
 
 	// Ensure unique index on email field
-	indexModel := mongo.IndexModel{
+	emailIndexModel := mongo.IndexModel{
 		Keys: bson.D{
 			{Key: "email", Value: 1},
 		},
 		Options: options.Index().SetUnique(true),
 	}
 
-	_, err := collection.Indexes().CreateOne(context.Background(), indexModel)
+	_, err := collection.Indexes().CreateOne(context.Background(), emailIndexModel)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create email index: %w", err)
+	}
+
+	// Ensure unique index on code field
+	codeIndexModel := mongo.IndexModel{
+		Keys: bson.D{
+			{Key: "code", Value: 1},
+		},
+		Options: options.Index().SetUnique(true),
+	}
+
+	_, err = collection.Indexes().CreateOne(context.Background(), codeIndexModel)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create code index: %w", err)
 	}
 
 	return &MongoUserRepository{collection: collection}, nil

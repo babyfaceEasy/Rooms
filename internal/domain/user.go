@@ -9,6 +9,7 @@ import (
 // User represents a customer account with authentication credentials and age verification.
 type User struct {
 	ID            primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
+	Code          string             `json:"code" bson:"code"`
 	Name          string             `json:"name" bson:"name"`
 	Email         string             `json:"email" bson:"email"`
 	PasswordHash  string             `json:"-" bson:"password_hash"`
