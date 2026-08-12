@@ -460,7 +460,75 @@ Retrieves full user details for all members of a room. Only the room owner or me
 
 ---
 
-### 8. Delete or Leave Room
+### 8. Remove Member from Room
+
+Removes a member from a room. Only the room owner can perform this action.
+
+**Endpoint:** `POST /api/v1/rooms/:code/remove-member`
+
+**Authentication:** Required
+
+**URL Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| code | string | Yes | Unique room code |
+
+**Request Body:**
+
+```json
+{
+  "member_id": "507f1f77bcf86cd799439013"
+}
+```
+
+**Request Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| member_id | string | Yes | MongoDB ObjectID hex of the member to remove |
+
+**Success Response (200 OK):**
+
+```json
+{
+  "data": null,
+  "message": "member removed from room successfully",
+  "status": 200
+}
+```
+
+**Error Responses:**
+
+| Status | Error | Description |
+|--------|-------|-------------|
+| 400 | invalid input | Member not found in room members list |
+| 400 | invalid member id | Invalid ObjectID format |
+| 403 | forbidden | User is not the room owner |
+| 404 | room not found | Room doesn't exist |
+| 500 | internal server error | Server error |
+
+**Example Error Response (403):**
+
+```json
+{
+  "error": "you do not have permission to perform this action",
+  "status": 403
+}
+```
+
+**Example Error Response (400 - Member not found):**
+
+```json
+{
+  "error": "invalid input",
+  "status": 400
+}
+```
+
+---
+
+### 9. Delete or Leave Room
 
 Deletes a room (if owner) or leaves a room (if member).
 
