@@ -14,14 +14,15 @@ import (
 
 // MockRoomService is a mock implementation for testing
 type MockRoomService struct {
-	createRoomFunc    func(ctx context.Context, name, code string, userID primitive.ObjectID) (*domain.Room, error)
-	addUserToRoomFunc func(ctx context.Context, code string, userID primitive.ObjectID) (*domain.Room, error)
-	getRoom           func(ctx context.Context, code string) (*domain.Room, error)
-	getRoomByID       func(ctx context.Context, roomID primitive.ObjectID) (*domain.Room, error)
-	getRoomUsers      func(ctx context.Context, code string) ([]*domain.User, error)
-	leaveRoom         func(ctx context.Context, code string, userID primitive.ObjectID) error
-	deleteRoom        func(ctx context.Context, code string, userID primitive.ObjectID) error
-	listUserRooms     func(ctx context.Context, userID primitive.ObjectID) ([]*domain.Room, error)
+	createRoomFunc       func(ctx context.Context, name, code string, userID primitive.ObjectID) (*domain.Room, error)
+	addUserToRoomFunc    func(ctx context.Context, code string, userID primitive.ObjectID) (*domain.Room, error)
+	getRoom              func(ctx context.Context, code string) (*domain.Room, error)
+	getRoomByID          func(ctx context.Context, roomID primitive.ObjectID) (*domain.Room, error)
+	getRoomUsers         func(ctx context.Context, code string) ([]*domain.User, error)
+	leaveRoom            func(ctx context.Context, code string, userID primitive.ObjectID) error
+	removeMemberFromRoom func(ctx context.Context, code string, ownerID, memberID primitive.ObjectID) error
+	deleteRoom           func(ctx context.Context, code string, userID primitive.ObjectID) error
+	listUserRooms        func(ctx context.Context, userID primitive.ObjectID) ([]*domain.Room, error)
 }
 
 func (m *MockRoomService) CreateRoom(ctx context.Context, name, code string, userID primitive.ObjectID) (*domain.Room, error) {
@@ -62,6 +63,13 @@ func (m *MockRoomService) GetRoomUsers(ctx context.Context, code string) ([]*dom
 func (m *MockRoomService) LeaveRoom(ctx context.Context, code string, userID primitive.ObjectID) error {
 	if m.leaveRoom != nil {
 		return m.leaveRoom(ctx, code, userID)
+	}
+	return nil
+}
+
+func (m *MockRoomService) RemoveMemberFromRoom(ctx context.Context, code string, ownerID, memberID primitive.ObjectID) error {
+	if m.removeMemberFromRoom != nil {
+		return m.removeMemberFromRoom(ctx, code, ownerID, memberID)
 	}
 	return nil
 }

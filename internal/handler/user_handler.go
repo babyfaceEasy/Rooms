@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -92,7 +93,7 @@ func (h *UserHandler) Register(c *fiber.Ctx) error {
 			"user_name":  user.Name,
 			"user_email": user.Email,
 		}
-		_ = h.emailService.SendVerificationEmail(c.UserContext(), user.ID, user.Email, dynamicData)
+		_ = h.emailService.SendVerificationEmail(context.Background(), user.ID, user.Email, dynamicData)
 	}()
 
 	response := UserResponse{

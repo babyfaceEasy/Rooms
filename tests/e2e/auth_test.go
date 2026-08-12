@@ -4,23 +4,25 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"github.com/testcontainers/testcontainers-go"
-	"github.com/testcontainers/testcontainers-go/wait"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 	"temp_backend/config"
 	"temp_backend/internal/api"
 	"temp_backend/internal/handler"
 	"temp_backend/internal/repository"
 	"temp_backend/internal/service"
+
+	"github.com/gofiber/fiber/v2"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/wait"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type LoginRequest struct {
@@ -45,11 +47,22 @@ type RefreshResponse struct {
 	TokenType   string `json:"token_type"`
 }
 
+// MockEmailService is a mock implementation for testing
+type MockEmailService struct{}
+
+func (m *MockEmailService) SendVerificationEmail(ctx context.Context, userID primitive.ObjectID, recipientEmail string, dynamicData map[string]string) error {
+	return nil
+}
+
+func (m *MockEmailService) SendPasswordResetEmail(ctx context.Context, userID primitive.ObjectID, recipientEmail string, dynamicData map[string]string) error {
+	return nil
+}
+
 type RegisterRequest struct {
-	Name         string `json:"name"`
-	Email        string `json:"email"`
-	Password     string `json:"password"`
-	AgeVerified  bool   `json:"age_verified"`
+	Name        string `json:"name"`
+	Email       string `json:"email"`
+	Password    string `json:"password"`
+	AgeVerified bool   `json:"age_verified"`
 }
 
 type RegisterResponse struct {
@@ -58,7 +71,7 @@ type RegisterResponse struct {
 	Email string `json:"email"`
 }
 
-func setupAuthTestEnvironment(t *testing.T) (*http.Server, *mongo.Client, func()) {
+func setupAuthTestEnvironment(t *testing.T) (*fiber.App, *mongo.Client, func()) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -94,52 +107,43 @@ func setupAuthTestEnvironment(t *testing.T) (*http.Server, *mongo.Client, func()
 	userRepo, err := repository.NewMongoUserRepository(db)
 	require.NoError(t, err)
 
-	refreshTokenRepo := repository.NewMongoRefreshTokenRepository(db)
+	refreshTokenRepo, err := repository.NewMongoRefreshTokenRepository(db)
+	require.NoError(t, err)
 
 	// Create services
-	userService := service.NewUserService(userRepo)
+	userService := service.NewUserService(userRepo, refreshTokenRepo)
 
-	cfg := config.Config{
-		App: config.App{
-			Name: "test_backend",
-		},
-		JWT: config.JWT{
-			Secret:           "this-is-a-test-secret-key-that-is-at-least-32-chars",
-			AccessTokenTTL:   1 * time.Hour,
-			RefreshTokenTTL:  7 * 24 * time.Hour,
-		},
-	}
+	cfg := config.Config{}
+	cfg.App.Name = "test_backend"
+	cfg.JWT.Secret = "this-is-a-test-secret-key-that-is-at-least-32-chars"
+	cfg.JWT.AccessTokenTTL = 1 * time.Hour
+	cfg.JWT.RefreshTokenTTL = 7 * 24 * time.Hour
 
 	authService := service.NewAuthService(userRepo, refreshTokenRepo, cfg)
 
 	// Create handlers
-	userHandler := handler.NewUserHandler(userService)
-	authHandler := handler.NewAuthHandler(authService, userService)
+	emailService := &MockEmailService{}
+	userHandler := handler.NewUserHandler(userService, emailService)
+	authHandler := handler.NewAuthHandler(authService)
 
-	// Create server
-	server := api.NewServer(cfg, nil, nil, userHandler, authHandler, authService)
+	// Create server (with nil for handlers not used in auth tests)
+	server := api.NewServer(cfg, nil, nil, userHandler, authHandler, nil, nil, nil, authService)
 
 	// Start server
-	httpServer := &http.Server{
-		Addr:    ":9999",
-		Handler: server.GetApp(),
-	}
-
+	app := server.GetApp()
 	go func() {
-		_ = httpServer.ListenAndServe()
+		_ = app.Listen(":9999")
 	}()
 
 	// Give server time to start
 	time.Sleep(500 * time.Millisecond)
 
 	cleanup := func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		_ = httpServer.Shutdown(ctx)
+		_ = app.Shutdown()
 		_ = container.Terminate(context.Background())
 	}
 
-	return httpServer, client, cleanup
+	return app, client, cleanup
 }
 
 func makeRequest(t *testing.T, method, path string, body interface{}, token string) (int, []byte) {
