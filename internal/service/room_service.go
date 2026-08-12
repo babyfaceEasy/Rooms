@@ -18,6 +18,7 @@ type RoomService interface {
 	GetRoomByID(ctx context.Context, roomID primitive.ObjectID) (*domain.Room, error)
 	GetRoomUsers(ctx context.Context, code string) ([]*domain.User, error)
 	LeaveRoom(ctx context.Context, code string, userID primitive.ObjectID) error
+	RemoveMemberFromRoom(ctx context.Context, code string, ownerID, memberID primitive.ObjectID) error
 	DeleteRoom(ctx context.Context, code string, userID primitive.ObjectID) error
 	ListUserRooms(ctx context.Context, userID primitive.ObjectID) ([]*domain.Room, error)
 }
@@ -156,6 +157,40 @@ func (s *roomService) LeaveRoom(ctx context.Context, code string, userID primiti
 
 	// Remove user from room members
 	if err := s.repo.RemoveUserFromRoom(ctx, room.ID, userID); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// RemoveMemberFromRoom removes a member from a room (only owner can remove)
+func (s *roomService) RemoveMemberFromRoom(ctx context.Context, code string, ownerID, memberID primitive.ObjectID) error {
+	// Get room by code
+	room, err := s.repo.GetByCode(ctx, code)
+	if err != nil {
+		return err
+	}
+
+	// Check if requester is the owner
+	if room.CreatedBy != ownerID {
+		return domain.ErrForbidden
+	}
+
+	// Check if member to remove exists in the room members
+	isMember := false
+	for _, m := range room.Members {
+		if m == memberID {
+			isMember = true
+			break
+		}
+	}
+
+	if !isMember {
+		return domain.ErrInvalidInput
+	}
+
+	// Remove member from room
+	if err := s.repo.RemoveUserFromRoom(ctx, room.ID, memberID); err != nil {
 		return err
 	}
 

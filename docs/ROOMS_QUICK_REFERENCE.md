@@ -11,6 +11,7 @@
 | **GET** | `/api/v1/rooms/by-id/:id` | Get room details by ID | ✅ | Room object |
 | **GET** | `/api/v1/rooms/:code/members` | List member IDs | ✅ | Member ID array |
 | **GET** | `/api/v1/rooms/:code/users` | List member details | ✅ | User details array |
+| **POST** | `/api/v1/rooms/:code/remove-member` | Remove member (owner only) | ✅ | Empty (null) |
 | **DELETE** | `/api/v1/rooms/:code` | Delete/leave room | ✅ | Empty (null) |
 
 ---
@@ -68,6 +69,15 @@ curl http://localhost:3000/api/v1/rooms/MY_ROOM_001/members \
 ```bash
 curl http://localhost:3000/api/v1/rooms/MY_ROOM_001/users \
   -H "Authorization: Bearer $TOKEN"
+```
+
+### Remove Member from Room
+
+```bash
+curl -X POST http://localhost:3000/api/v1/rooms/MY_ROOM_001/remove-member \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"member_id":"507f1f77bcf86cd799439013"}'
 ```
 
 ### Leave/Delete Room

@@ -21,6 +21,11 @@ type AddUserToRoomRequest struct {
 	Code string `json:"code"`
 }
 
+// RemoveMemberFromRoomRequest represents the request to remove a member from a room
+type RemoveMemberFromRoomRequest struct {
+	MemberID string `json:"member_id"`
+}
+
 // RoomResponse represents a room in the response
 type RoomResponse struct {
 	ID        string   `json:"id"`
@@ -498,6 +503,65 @@ func (h *RoomHandler) LeaveRoom(c *fiber.Ctx) error {
 	})
 }
 
+// RemoveMemberFromRoom removes a member from the room (only owner can remove)
+func (h *RoomHandler) RemoveMemberFromRoom(c *fiber.Ctx) error {
+	// Extract user ID from context (owner/requester)
+	userID, ok := c.Locals("user_id").(string)
+	if !ok || userID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(map[string]interface{}{
+			"error":  "unauthorized",
+			"status": fiber.StatusUnauthorized,
+		})
+	}
+
+	// Convert user ID from string to ObjectID
+	ownerObjID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
+			"error":  "invalid user id",
+			"status": fiber.StatusBadRequest,
+		})
+	}
+
+	// Get room code from URL parameter
+	roomCode := c.Params("code")
+	if roomCode == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
+			"error":  "room code is required",
+			"status": fiber.StatusBadRequest,
+		})
+	}
+
+	// Parse request body for member ID to remove
+	var req RemoveMemberFromRoomRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
+			"error":  "invalid input",
+			"status": fiber.StatusBadRequest,
+		})
+	}
+
+	// Convert member ID from string to ObjectID
+	memberObjID, err := primitive.ObjectIDFromHex(req.MemberID)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
+			"error":  "invalid member id",
+			"status": fiber.StatusBadRequest,
+		})
+	}
+
+	// Remove member from room via service
+	if err := h.svc.RemoveMemberFromRoom(c.Context(), roomCode, ownerObjID, memberObjID); err != nil {
+		return h.handleError(c, err)
+	}
+
+	return c.Status(fiber.StatusOK).JSON(map[string]interface{}{
+		"data":    nil,
+		"message": "member removed from room successfully",
+		"status":  fiber.StatusOK,
+	})
+}
+
 // HandleRoomDelete handles both delete room (owner) and leave room (member)
 func (h *RoomHandler) HandleRoomDelete(c *fiber.Ctx) error {
 	// Extract user ID from context
@@ -564,6 +628,11 @@ func (h *RoomHandler) handleError(c *fiber.Ctx, err error) error {
 		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
 			"error":  "invalid input",
 			"status": fiber.StatusBadRequest,
+		})
+	case errors.Is(err, domain.ErrForbidden):
+		return c.Status(fiber.StatusForbidden).JSON(map[string]interface{}{
+			"error":  "you do not have permission to perform this action",
+			"status": fiber.StatusForbidden,
 		})
 	case errors.Is(err, domain.ErrCodeAlreadyExists):
 		return c.Status(fiber.StatusConflict).JSON(map[string]interface{}{
