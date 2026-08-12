@@ -142,7 +142,12 @@ func (s *roomService) LeaveRoom(ctx context.Context, code string, userID primiti
 		return err
 	}
 
-	// Check if user is a member (not the owner)
+	// Check if user is the owner - owners cannot leave their own room
+	if room.CreatedBy == userID {
+		return domain.ErrForbidden
+	}
+
+	// Check if user is a member
 	isMember := false
 	for _, m := range room.Members {
 		if m == userID {
