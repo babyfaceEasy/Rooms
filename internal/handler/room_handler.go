@@ -133,8 +133,57 @@ func (h *RoomHandler) AddUserToRoom(c *fiber.Ctx) error {
 		})
 	}
 
+	// Get room first to check if user is the creator or already a member
+	room, err := h.svc.GetRoom(c.Context(), req.Code)
+	if err != nil {
+		return h.handleError(c, err)
+	}
+
+	// Check if the user is the creator
+	if room.CreatedBy == userObjID {
+		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
+			"error":   "cannot join own room",
+			"message": "you are the creator of this room and are already a member",
+			"status":  fiber.StatusBadRequest,
+		})
+	}
+
+	// Check if user is already a member
+	isAlreadyMember := false
+	for _, m := range room.Members {
+		if m == userObjID {
+			isAlreadyMember = true
+			break
+		}
+	}
+
+	// If already a member, return success without calling the service
+	if isAlreadyMember {
+		// Convert members to string slice for response
+		members := make([]string, len(room.Members))
+		for i, m := range room.Members {
+			members[i] = m.Hex()
+		}
+
+		response := &RoomResponse{
+			ID:        room.ID.Hex(),
+			Name:      room.Name,
+			Code:      room.Code,
+			CreatedBy: room.CreatedBy.Hex(),
+			Members:   members,
+			CreatedAt: room.CreatedAt.Format("2006-01-02T15:04:05Z"),
+			UpdatedAt: room.UpdatedAt.Format("2006-01-02T15:04:05Z"),
+		}
+
+		return c.Status(fiber.StatusOK).JSON(map[string]interface{}{
+			"data":    response,
+			"message": "you are already a member of this room",
+			"status":  fiber.StatusOK,
+		})
+	}
+
 	// Add user to room via service
-	room, err := h.svc.AddUserToRoom(c.Context(), req.Code, userObjID)
+	room, err = h.svc.AddUserToRoom(c.Context(), req.Code, userObjID)
 	if err != nil {
 		return h.handleError(c, err)
 	}
