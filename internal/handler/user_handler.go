@@ -1,35 +1,39 @@
 package handler
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
-	"github.com/gofiber/fiber/v2"
 	"temp_backend/internal/domain"
 	"temp_backend/internal/service"
+
+	"github.com/gofiber/fiber/v2"
 )
 
 // UserHandler exposes HTTP endpoints for user management.
 type UserHandler struct {
-	svc service.UserService
+	svc          service.UserService
+	emailService service.EmailService
 }
 
 // NewUserHandler creates a new UserHandler.
-func NewUserHandler(svc service.UserService) *UserHandler {
-	return &UserHandler{svc: svc}
+func NewUserHandler(svc service.UserService, emailService service.EmailService) *UserHandler {
+	return &UserHandler{svc: svc, emailService: emailService}
 }
 
 // RegisterRequest represents the registration request payload.
 type RegisterRequest struct {
-	Name         string `json:"name" form:"name"`
-	Email        string `json:"email" form:"email"`
-	Password     string `json:"password" form:"password"`
-	AgeVerified  bool   `json:"age_verified" form:"age_verified"`
+	Name        string `json:"name" form:"name"`
+	Email       string `json:"email" form:"email"`
+	Password    string `json:"password" form:"password"`
+	AgeVerified bool   `json:"age_verified" form:"age_verified"`
 }
 
 // UserResponse represents a user in HTTP responses (no password).
 type UserResponse struct {
 	ID        string `json:"id"`
+	Code      string `json:"code"`
 	Name      string `json:"name"`
 	Email     string `json:"email"`
 	CreatedAt string `json:"created_at"`
@@ -84,8 +88,18 @@ func (h *UserHandler) Register(c *fiber.Ctx) error {
 		return fmt.Errorf("register user: %w", err)
 	}
 
+	// Send verification email asynchronously (gracefully degrade if it fails)
+	go func() {
+		dynamicData := map[string]string{
+			"user_name":  user.Name,
+			"user_email": user.Email,
+		}
+		_ = h.emailService.SendVerificationEmail(context.Background(), user.ID, user.Email, dynamicData)
+	}()
+
 	response := UserResponse{
 		ID:        user.ID.Hex(),
+		Code:      user.Code,
 		Name:      user.Name,
 		Email:     user.Email,
 		CreatedAt: user.CreatedAt.Format("2006-01-02T15:04:05Z"),
@@ -115,6 +129,7 @@ func (h *UserHandler) GetUser(c *fiber.Ctx) error {
 
 	response := UserResponse{
 		ID:        user.ID.Hex(),
+		Code:      user.Code,
 		Name:      user.Name,
 		Email:     user.Email,
 		CreatedAt: user.CreatedAt.Format("2006-01-02T15:04:05Z"),

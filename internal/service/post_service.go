@@ -4,15 +4,17 @@ import (
 	"context"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"temp_backend/internal/domain"
 	"temp_backend/internal/repository"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // PostService defines the interface for post business logic
 type PostService interface {
-	CreatePost(ctx context.Context, text string, userID primitive.ObjectID, imageURL, videoURL *string) (*domain.Post, error)
+	CreatePost(ctx context.Context, text string, userID, roomID primitive.ObjectID, imageURL, videoURL, audioURL *string) (*domain.Post, error)
 	GetPost(ctx context.Context, id primitive.ObjectID) (*domain.Post, error)
+	GetPostsByRoomID(ctx context.Context, roomID primitive.ObjectID) ([]*domain.Post, error)
 	DeletePost(ctx context.Context, id, userID primitive.ObjectID) error
 }
 
@@ -26,14 +28,16 @@ func NewPostService(repo repository.PostRepository) PostService {
 }
 
 // CreatePost creates a new post with validation
-func (s *postService) CreatePost(ctx context.Context, text string, userID primitive.ObjectID, imageURL, videoURL *string) (*domain.Post, error) {
+func (s *postService) CreatePost(ctx context.Context, text string, userID, roomID primitive.ObjectID, imageURL, videoURL, audioURL *string) (*domain.Post, error) {
 	// Create post object
 	now := time.Now()
 	post := &domain.Post{
+		RoomID:    roomID,
 		UserID:    userID,
 		Text:      text,
 		Image:     imageURL,
 		Video:     videoURL,
+		Audio:     audioURL,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
@@ -59,6 +63,16 @@ func (s *postService) GetPost(ctx context.Context, id primitive.ObjectID) (*doma
 	}
 
 	return post, nil
+}
+
+// GetPostsByRoomID retrieves all posts for a specific room
+func (s *postService) GetPostsByRoomID(ctx context.Context, roomID primitive.ObjectID) ([]*domain.Post, error) {
+	posts, err := s.repo.GetByRoomID(ctx, roomID)
+	if err != nil {
+		return nil, err
+	}
+
+	return posts, nil
 }
 
 // DeletePost soft-deletes a post (only creator can delete)

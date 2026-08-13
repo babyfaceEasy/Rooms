@@ -6,9 +6,10 @@ import (
 	"testing"
 	"time"
 
+	"temp_backend/internal/domain"
+
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"temp_backend/internal/domain"
 )
 
 // MockPostRepository is a mock implementation for testing
@@ -16,6 +17,7 @@ type MockPostRepository struct {
 	createFunc      func(ctx context.Context, post *domain.Post) error
 	getByIDFunc     func(ctx context.Context, id primitive.ObjectID) (*domain.Post, error)
 	deletePostFunc  func(ctx context.Context, id primitive.ObjectID) error
+	getByRoomIDFunc func(ctx context.Context, roomID primitive.ObjectID) ([]*domain.Post, error)
 }
 
 func (m *MockPostRepository) Create(ctx context.Context, post *domain.Post) error {
@@ -39,8 +41,16 @@ func (m *MockPostRepository) DeletePost(ctx context.Context, id primitive.Object
 	return nil
 }
 
+func (m *MockPostRepository) GetByRoomID(ctx context.Context, roomID primitive.ObjectID) ([]*domain.Post, error) {
+	if m.getByRoomIDFunc != nil {
+		return m.getByRoomIDFunc(ctx, roomID)
+	}
+	return []*domain.Post{}, nil
+}
+
 func TestCreatePost_Success(t *testing.T) {
 	userID := primitive.NewObjectID()
+	roomID := primitive.NewObjectID()
 	text := "This is my first post"
 
 	repoMock := &MockPostRepository{
@@ -51,23 +61,26 @@ func TestCreatePost_Success(t *testing.T) {
 	}
 
 	svc := NewPostService(repoMock)
-	post, err := svc.CreatePost(context.Background(), text, userID, nil, nil)
+	post, err := svc.CreatePost(context.Background(), text, userID, roomID, nil, nil, nil)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, post)
 	assert.Equal(t, text, post.Text)
 	assert.Equal(t, userID, post.UserID)
+	assert.Equal(t, roomID, post.RoomID)
 	assert.Nil(t, post.Image)
 	assert.Nil(t, post.Video)
+	assert.Nil(t, post.Audio)
 }
 
 func TestCreatePost_EmptyText(t *testing.T) {
 	userID := primitive.NewObjectID()
+	roomID := primitive.NewObjectID()
 
 	repoMock := &MockPostRepository{}
 
 	svc := NewPostService(repoMock)
-	post, err := svc.CreatePost(context.Background(), "", userID, nil, nil)
+	post, err := svc.CreatePost(context.Background(), "", userID, roomID, nil, nil, nil)
 
 	assert.Error(t, err)
 	assert.Nil(t, post)
@@ -76,6 +89,7 @@ func TestCreatePost_EmptyText(t *testing.T) {
 
 func TestCreatePost_TextTooLong(t *testing.T) {
 	userID := primitive.NewObjectID()
+	roomID := primitive.NewObjectID()
 	longText := ""
 	for i := 0; i < 5001; i++ {
 		longText += "a"
@@ -84,7 +98,7 @@ func TestCreatePost_TextTooLong(t *testing.T) {
 	repoMock := &MockPostRepository{}
 
 	svc := NewPostService(repoMock)
-	post, err := svc.CreatePost(context.Background(), longText, userID, nil, nil)
+	post, err := svc.CreatePost(context.Background(), longText, userID, roomID, nil, nil, nil)
 
 	assert.Error(t, err)
 	assert.Nil(t, post)
@@ -93,6 +107,7 @@ func TestCreatePost_TextTooLong(t *testing.T) {
 
 func TestCreatePost_WithImage(t *testing.T) {
 	userID := primitive.NewObjectID()
+	roomID := primitive.NewObjectID()
 	text := "Check out this image!"
 	imageURL := "https://s3.amazonaws.com/bucket/image.jpg"
 
@@ -104,7 +119,7 @@ func TestCreatePost_WithImage(t *testing.T) {
 	}
 
 	svc := NewPostService(repoMock)
-	post, err := svc.CreatePost(context.Background(), text, userID, &imageURL, nil)
+	post, err := svc.CreatePost(context.Background(), text, userID, roomID, &imageURL, nil, nil)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, post)
@@ -114,6 +129,7 @@ func TestCreatePost_WithImage(t *testing.T) {
 
 func TestCreatePost_WithVideo(t *testing.T) {
 	userID := primitive.NewObjectID()
+	roomID := primitive.NewObjectID()
 	text := "Check out this video!"
 	videoURL := "https://s3.amazonaws.com/bucket/video.mp4"
 
@@ -125,7 +141,7 @@ func TestCreatePost_WithVideo(t *testing.T) {
 	}
 
 	svc := NewPostService(repoMock)
-	post, err := svc.CreatePost(context.Background(), text, userID, nil, &videoURL)
+	post, err := svc.CreatePost(context.Background(), text, userID, roomID, nil, &videoURL, nil)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, post)
@@ -135,6 +151,7 @@ func TestCreatePost_WithVideo(t *testing.T) {
 
 func TestCreatePost_RepositoryError(t *testing.T) {
 	userID := primitive.NewObjectID()
+	roomID := primitive.NewObjectID()
 	text := "This post will fail"
 
 	repoMock := &MockPostRepository{
@@ -144,7 +161,7 @@ func TestCreatePost_RepositoryError(t *testing.T) {
 	}
 
 	svc := NewPostService(repoMock)
-	post, err := svc.CreatePost(context.Background(), text, userID, nil, nil)
+	post, err := svc.CreatePost(context.Background(), text, userID, roomID, nil, nil, nil)
 
 	assert.Error(t, err)
 	assert.Nil(t, post)

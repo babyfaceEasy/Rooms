@@ -34,6 +34,13 @@ type Config struct {
 		AccessTokenTTL  time.Duration
 		RefreshTokenTTL time.Duration
 	}
+	SendGrid struct {
+		APIKey                  string
+		SenderEmail             string
+		Enabled                 bool
+		VerificationTemplateID  string
+		PasswordResetTemplateID string
+	}
 }
 
 // Load reads configuration from environment variables and applies sensible defaults.
@@ -60,6 +67,12 @@ func Load() (Config, error) {
 	cfg.JWT.Secret = getEnv("JWT_SECRET", "")
 	cfg.JWT.AccessTokenTTL = parseDuration(getEnv("ACCESS_TOKEN_TTL", "1h"))
 	cfg.JWT.RefreshTokenTTL = parseDuration(getEnv("REFRESH_TOKEN_TTL", "168h"))
+
+	cfg.SendGrid.APIKey = getEnv("SENDGRID_API_KEY", "")
+	cfg.SendGrid.SenderEmail = getEnv("SENDGRID_SENDER_EMAIL", "noreply@tempbackend.com")
+	cfg.SendGrid.Enabled = parseBool(getEnv("SENDGRID_ENABLED", "true"))
+	cfg.SendGrid.VerificationTemplateID = getEnv("SENDGRID_VERIFICATION_TEMPLATE_ID", "")
+	cfg.SendGrid.PasswordResetTemplateID = getEnv("SENDGRID_PASSWORD_RESET_TEMPLATE_ID", "")
 
 	if cfg.Mongo.URI == "" {
 		return cfg, fmt.Errorf("MONGO_URI is required")

@@ -23,6 +23,7 @@ import (
 	"temp_backend/internal/service"
 	"temp_backend/pkg/mongodb"
 	pks3 "temp_backend/pkg/s3"
+	pksendgrid "temp_backend/pkg/sendgrid"
 )
 
 func main() {
@@ -85,8 +86,26 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Email repositories and service (initialized early for use in user handler)
+	emailRepo, err := repository.NewMongoEmailRepository(mongoClient.Database(cfg.Mongo.Database))
+	if err != nil {
+		logger.Error("email repository initialization failed", slog.Any("error", err))
+		os.Exit(1)
+	}
+
+	sendgridClient := pksendgrid.NewClient(cfg.SendGrid.APIKey)
+	emailService := service.NewEmailService(
+		emailRepo,
+		sendgridClient,
+		cfg.SendGrid.SenderEmail,
+		cfg.SendGrid.Enabled,
+		cfg.SendGrid.VerificationTemplateID,
+		cfg.SendGrid.PasswordResetTemplateID,
+		logger,
+	)
+
 	userService := service.NewUserService(userRepo, refreshTokenRepo)
-	userHandler := handler.NewUserHandler(userService)
+	userHandler := handler.NewUserHandler(userService, emailService)
 
 	// Auth services
 	authService := service.NewAuthService(userRepo, refreshTokenRepo, cfg)
@@ -94,15 +113,20 @@ func main() {
 
 	// Room repositories and service
 	roomRepo := repository.NewMongoRoomRepository(mongoClient.Database(cfg.Mongo.Database))
-	roomService := service.NewRoomService(roomRepo)
+	roomService := service.NewRoomService(roomRepo, userRepo)
 	roomHandler := handler.NewRoomHandler(roomService)
 
 	// Post repositories and service
 	postRepo := repository.NewMongoPostRepository(mongoClient.Database(cfg.Mongo.Database))
 	postService := service.NewPostService(postRepo)
-	postHandler := handler.NewPostHandler(postService, storageRepo)
+	postHandler := handler.NewPostHandler(postService, storageRepo, roomRepo)
 
-	server := api.NewServer(cfg, logger, itemHandler, userHandler, authHandler, roomHandler, postHandler, authService)
+	// Comment repositories and service
+	commentRepo := repository.NewMongoCommentRepository(mongoClient.Database(cfg.Mongo.Database).Collection("comments"))
+	commentService := service.NewCommentService(commentRepo, postRepo)
+	commentHandler := handler.NewCommentHandler(commentService)
+
+	server := api.NewServer(cfg, logger, itemHandler, userHandler, authHandler, roomHandler, postHandler, commentHandler, authService)
 
 	go func() {
 		if err := server.Start(); err != nil && !errors.Is(err, http.ErrServerClosed) {

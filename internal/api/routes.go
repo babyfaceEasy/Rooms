@@ -1,16 +1,35 @@
 package api
 
 import (
-	"github.com/gofiber/fiber/v2"
+	"os"
+	"strings"
+
 	"temp_backend/internal/handler"
 	"temp_backend/internal/middleware"
 	"temp_backend/internal/service"
+
+	"github.com/gofiber/fiber/v2"
 )
 
-func (s *Server) registerRoutes(itemHandler *handler.ItemHandler, userHandler *handler.UserHandler, authHandler *handler.AuthHandler, roomHandler *handler.RoomHandler, postHandler *handler.PostHandler, authService service.AuthService) {
+func (s *Server) registerRoutes(itemHandler *handler.ItemHandler, userHandler *handler.UserHandler, authHandler *handler.AuthHandler, roomHandler *handler.RoomHandler, postHandler *handler.PostHandler, commentHandler *handler.CommentHandler, authService service.AuthService) {
 	s.app.Get("/health", func(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusOK).JSON(fiber.Map{
 			"status": "ok",
+		})
+	})
+
+	// DEBUG: returns all environment variables visible to the process.
+	// This endpoint is intended for local testing only and must not be deployed to production.
+	s.app.Get("/debug/env", func(c *fiber.Ctx) error {
+		envVars := make(map[string]string)
+		for _, env := range os.Environ() {
+			parts := strings.SplitN(env, "=", 2)
+			if len(parts) == 2 {
+				envVars[parts[0]] = parts[1]
+			}
+		}
+		return c.JSON(fiber.Map{
+			"env": envVars,
 		})
 	})
 
@@ -37,15 +56,26 @@ func (s *Server) registerRoutes(itemHandler *handler.ItemHandler, userHandler *h
 	// Room routes (protected)
 	apiProtected.Post("/rooms", roomHandler.CreateRoom)
 	apiProtected.Post("/rooms/join", roomHandler.AddUserToRoom)
+	apiProtected.Post("/rooms/add-member-by-code", roomHandler.AddUserToRoomByUserCode)
 	apiProtected.Get("/rooms", roomHandler.ListUserRooms)
+	apiProtected.Get("/rooms/by-id/:id", roomHandler.GetRoomByID)
 	apiProtected.Get("/rooms/:code", roomHandler.GetRoom)
 	apiProtected.Get("/rooms/:code/members", roomHandler.GetRoomMembers)
+	apiProtected.Get("/rooms/:code/users", roomHandler.GetRoomUsers)
+	apiProtected.Get("/rooms/:code/posts", postHandler.GetPostsByRoomCode)
+	apiProtected.Post("/rooms/:code/remove-member", roomHandler.RemoveMemberFromRoom)
+	apiProtected.Post("/rooms/:code/leave", roomHandler.LeaveRoom)
 	apiProtected.Delete("/rooms/:code", roomHandler.HandleRoomDelete)
 
 	// Post routes (protected)
 	apiProtected.Post("/posts", postHandler.CreatePost)
 	apiProtected.Get("/posts/:id", postHandler.GetPost)
 	apiProtected.Delete("/posts/:id", postHandler.DeletePost)
+
+	// Comment routes (protected)
+	apiProtected.Post("/posts/:id/comments", commentHandler.CreateComment)
+	apiProtected.Get("/posts/:id/comments", commentHandler.GetCommentsByPostID)
+	apiProtected.Delete("/comments/:id", commentHandler.DeleteComment)
 
 	// Item routes (protected)
 	apiProtected.Post("/items", itemHandler.CreateItem)
