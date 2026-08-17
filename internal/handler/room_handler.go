@@ -64,6 +64,7 @@ type UserDetailResponse struct {
 	Name          string `json:"name"`
 	Email         string `json:"email"`
 	IsAgeVerified bool   `json:"is_age_verified"`
+	Creator       bool   `json:"creator"`
 	CreatedAt     string `json:"created_at"`
 }
 
@@ -788,6 +789,7 @@ func (h *RoomHandler) GetRoomUsers(c *fiber.Ctx) error {
 			Name:          user.Name,
 			Email:         user.Email,
 			IsAgeVerified: user.IsAgeVerified,
+			Creator:       user.ID == room.CreatedBy,
 			CreatedAt:     user.CreatedAt.Format("2006-01-02T15:04:05Z"),
 		}
 	}

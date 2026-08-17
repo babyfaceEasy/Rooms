@@ -142,6 +142,7 @@ curl -X DELETE http://localhost:3000/api/v1/rooms/MY_ROOM_001 \
   "name": "string",
   "email": "string",
   "is_age_verified": boolean,
+  "creator": boolean,
   "created_at": "string (ISO 8601)"
 }
 ```
