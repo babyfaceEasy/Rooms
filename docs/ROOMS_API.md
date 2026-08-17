@@ -520,6 +520,7 @@ Retrieves full user details for all members of a room. Only the room owner or me
       "name": "John Doe",
       "email": "john@example.com",
       "is_age_verified": true,
+      "creator": true,
       "created_at": "2024-06-20T10:30:00Z"
     },
     {
@@ -528,6 +529,7 @@ Retrieves full user details for all members of a room. Only the room owner or me
       "name": "Jane Smith",
       "email": "jane@example.com",
       "is_age_verified": true,
+      "creator": false,
       "created_at": "2024-06-22T14:15:00Z"
     }
   ],
@@ -554,7 +556,7 @@ Retrieves full user details for all members of a room. Only the room owner or me
 }
 ```
 
-**Note:** This endpoint returns the owner and all members with their full user details (name, email, etc.), unlike `/rooms/:code/members` which only returns user IDs.
+**Note:** This endpoint returns the owner and all members with their full user details (name, email, etc.), unlike `/rooms/:code/members` which only returns user IDs. Each user object includes a `creator` boolean field — `true` for the room creator, `false` for all other members.
 
 ---
 
