@@ -43,6 +43,7 @@ type UserResponse struct {
 type ProfileResponse struct {
 	Name  string `json:"name"`
 	Email string `json:"email"`
+	Code  string `json:"code"`
 }
 
 // UpdateProfileRequest represents the request payload for updating a profile.
@@ -189,6 +190,7 @@ func (h *UserHandler) ViewProfile(c *fiber.Ctx) error {
 	response := ProfileResponse{
 		Name:  user.Name,
 		Email: user.Email,
+		Code:  user.Code,
 	}
 
 	return c.Status(fiber.StatusOK).JSON(response)
