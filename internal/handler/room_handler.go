@@ -1,8 +1,6 @@
 package handler
 
 import (
-	"errors"
-
 	"temp_backend/internal/domain"
 	"temp_backend/internal/service"
 
@@ -78,34 +76,25 @@ func (h *RoomHandler) CreateRoom(c *fiber.Ctx) error {
 	// Extract user ID from context
 	userID, ok := c.Locals("user_id").(string)
 	if !ok || userID == "" {
-		return c.Status(fiber.StatusUnauthorized).JSON(map[string]interface{}{
-			"error":  "unauthorized",
-			"status": fiber.StatusUnauthorized,
-		})
+		return domain.ErrUnauthorized
 	}
 
 	// Convert user ID from string to ObjectID
 	userObjID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
-			"error":  "invalid user id",
-			"status": fiber.StatusBadRequest,
-		})
+		return &domain.AppError{Code: "INVALID_USER_ID", Message: "Invalid user ID", HTTPStatus: fiber.StatusBadRequest}
 	}
 
 	// Parse request body
 	var req CreateRoomRequest
 	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
-			"error":  "invalid input",
-			"status": fiber.StatusBadRequest,
-		})
+		return domain.ErrInvalidInput
 	}
 
 	// Create room via service
 	room, err := h.svc.CreateRoom(c.Context(), req.Name, req.Code, userObjID)
 	if err != nil {
-		return h.handleError(c, err)
+		return err
 	}
 
 	// Convert domain Room to RoomResponse
@@ -130,43 +119,30 @@ func (h *RoomHandler) AddUserToRoom(c *fiber.Ctx) error {
 	// Extract user ID from context
 	userID, ok := c.Locals("user_id").(string)
 	if !ok || userID == "" {
-		return c.Status(fiber.StatusUnauthorized).JSON(map[string]interface{}{
-			"error":  "unauthorized",
-			"status": fiber.StatusUnauthorized,
-		})
+		return domain.ErrUnauthorized
 	}
 
 	// Convert user ID from string to ObjectID
 	userObjID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
-			"error":  "invalid user id",
-			"status": fiber.StatusBadRequest,
-		})
+		return &domain.AppError{Code: "INVALID_USER_ID", Message: "Invalid user ID", HTTPStatus: fiber.StatusBadRequest}
 	}
 
 	// Parse request body
 	var req AddUserToRoomRequest
 	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
-			"error":  "invalid input",
-			"status": fiber.StatusBadRequest,
-		})
+		return domain.ErrInvalidInput
 	}
 
 	// Get room first to check if user is the creator or already a member
 	room, err := h.svc.GetRoom(c.Context(), req.Code)
 	if err != nil {
-		return h.handleError(c, err)
+		return err
 	}
 
 	// Check if the user is the creator
 	if room.CreatedBy == userObjID {
-		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
-			"error":   "cannot join own room",
-			"message": "you are the creator of this room and are already a member",
-			"status":  fiber.StatusBadRequest,
-		})
+		return domain.ErrCannotJoinOwnRoom
 	}
 
 	// Check if user is already a member
@@ -206,7 +182,7 @@ func (h *RoomHandler) AddUserToRoom(c *fiber.Ctx) error {
 	// Add user to room via service
 	room, err = h.svc.AddUserToRoom(c.Context(), req.Code, userObjID)
 	if err != nil {
-		return h.handleError(c, err)
+		return err
 	}
 
 	// Convert members to string slice for response
@@ -238,34 +214,25 @@ func (h *RoomHandler) GetRoom(c *fiber.Ctx) error {
 	// Extract user ID from context
 	userID, ok := c.Locals("user_id").(string)
 	if !ok || userID == "" {
-		return c.Status(fiber.StatusUnauthorized).JSON(map[string]interface{}{
-			"error":  "unauthorized",
-			"status": fiber.StatusUnauthorized,
-		})
+		return domain.ErrUnauthorized
 	}
 
 	// Convert user ID from string to ObjectID
 	userObjID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
-			"error":  "invalid user id",
-			"status": fiber.StatusBadRequest,
-		})
+		return &domain.AppError{Code: "INVALID_USER_ID", Message: "Invalid user ID", HTTPStatus: fiber.StatusBadRequest}
 	}
 
 	// Get room code from URL parameter
 	roomCode := c.Params("code")
 	if roomCode == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
-			"error":  "room code is required",
-			"status": fiber.StatusBadRequest,
-		})
+		return &domain.AppError{Code: "ROOM_CODE_REQUIRED", Message: "Room code is required", HTTPStatus: fiber.StatusBadRequest}
 	}
 
 	// Get room via service
 	room, err := h.svc.GetRoom(c.Context(), roomCode)
 	if err != nil {
-		return h.handleError(c, err)
+		return err
 	}
 
 	// Check authorization: user must be owner or member
@@ -279,10 +246,7 @@ func (h *RoomHandler) GetRoom(c *fiber.Ctx) error {
 	}
 
 	if !isOwner && !isMember {
-		return c.Status(fiber.StatusForbidden).JSON(map[string]interface{}{
-			"error":  "you do not have permission to access this room",
-			"status": fiber.StatusForbidden,
-		})
+		return domain.ErrForbidden
 	}
 
 	// Convert members to string slice for response
@@ -314,43 +278,31 @@ func (h *RoomHandler) GetRoomByID(c *fiber.Ctx) error {
 	// Extract user ID from context
 	userID, ok := c.Locals("user_id").(string)
 	if !ok || userID == "" {
-		return c.Status(fiber.StatusUnauthorized).JSON(map[string]interface{}{
-			"error":  "unauthorized",
-			"status": fiber.StatusUnauthorized,
-		})
+		return domain.ErrUnauthorized
 	}
 
 	// Convert user ID from string to ObjectID
 	userObjID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
-			"error":  "invalid user id",
-			"status": fiber.StatusBadRequest,
-		})
+		return &domain.AppError{Code: "INVALID_USER_ID", Message: "Invalid user ID", HTTPStatus: fiber.StatusBadRequest}
 	}
 
 	// Get room ID from URL parameter
 	roomIDStr := c.Params("id")
 	if roomIDStr == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
-			"error":  "room id is required",
-			"status": fiber.StatusBadRequest,
-		})
+		return &domain.AppError{Code: "ROOM_ID_REQUIRED", Message: "Room ID is required", HTTPStatus: fiber.StatusBadRequest}
 	}
 
 	// Convert room ID from string to ObjectID
 	roomID, err := primitive.ObjectIDFromHex(roomIDStr)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
-			"error":  "invalid room id",
-			"status": fiber.StatusBadRequest,
-		})
+		return &domain.AppError{Code: "INVALID_ROOM_ID", Message: "Invalid room ID", HTTPStatus: fiber.StatusBadRequest}
 	}
 
 	// Get room via service
 	room, err := h.svc.GetRoomByID(c.Context(), roomID)
 	if err != nil {
-		return h.handleError(c, err)
+		return err
 	}
 
 	// Check authorization: user must be owner or member
@@ -364,10 +316,7 @@ func (h *RoomHandler) GetRoomByID(c *fiber.Ctx) error {
 	}
 
 	if !isOwner && !isMember {
-		return c.Status(fiber.StatusForbidden).JSON(map[string]interface{}{
-			"error":  "you do not have permission to access this room",
-			"status": fiber.StatusForbidden,
-		})
+		return domain.ErrForbidden
 	}
 
 	// Convert members to string slice for response
@@ -399,34 +348,25 @@ func (h *RoomHandler) GetRoomMembers(c *fiber.Ctx) error {
 	// Extract user ID from context
 	userID, ok := c.Locals("user_id").(string)
 	if !ok || userID == "" {
-		return c.Status(fiber.StatusUnauthorized).JSON(map[string]interface{}{
-			"error":  "unauthorized",
-			"status": fiber.StatusUnauthorized,
-		})
+		return domain.ErrUnauthorized
 	}
 
 	// Convert user ID from string to ObjectID
 	userObjID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
-			"error":  "invalid user id",
-			"status": fiber.StatusBadRequest,
-		})
+		return &domain.AppError{Code: "INVALID_USER_ID", Message: "Invalid user ID", HTTPStatus: fiber.StatusBadRequest}
 	}
 
 	// Get room code from URL parameter
 	roomCode := c.Params("code")
 	if roomCode == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
-			"error":  "room code is required",
-			"status": fiber.StatusBadRequest,
-		})
+		return &domain.AppError{Code: "ROOM_CODE_REQUIRED", Message: "Room code is required", HTTPStatus: fiber.StatusBadRequest}
 	}
 
 	// Get room via service
 	room, err := h.svc.GetRoom(c.Context(), roomCode)
 	if err != nil {
-		return h.handleError(c, err)
+		return err
 	}
 
 	// Check authorization: user must be owner or member
@@ -440,10 +380,7 @@ func (h *RoomHandler) GetRoomMembers(c *fiber.Ctx) error {
 	}
 
 	if !isOwner && !isMember {
-		return c.Status(fiber.StatusForbidden).JSON(map[string]interface{}{
-			"error":  "you do not have permission to access this room",
-			"status": fiber.StatusForbidden,
-		})
+		return domain.ErrForbidden
 	}
 
 	// Convert members to string slice for response
@@ -474,48 +411,35 @@ func (h *RoomHandler) LeaveRoom(c *fiber.Ctx) error {
 	// Extract user ID from context
 	userID, ok := c.Locals("user_id").(string)
 	if !ok || userID == "" {
-		return c.Status(fiber.StatusUnauthorized).JSON(map[string]interface{}{
-			"error":  "unauthorized",
-			"status": fiber.StatusUnauthorized,
-		})
+		return domain.ErrUnauthorized
 	}
 
 	// Convert user ID from string to ObjectID
 	userObjID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
-			"error":  "invalid user id",
-			"status": fiber.StatusBadRequest,
-		})
+		return &domain.AppError{Code: "INVALID_USER_ID", Message: "Invalid user ID", HTTPStatus: fiber.StatusBadRequest}
 	}
 
 	// Get room code from URL parameter
 	roomCode := c.Params("code")
 	if roomCode == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
-			"error":  "room code is required",
-			"status": fiber.StatusBadRequest,
-		})
+		return &domain.AppError{Code: "ROOM_CODE_REQUIRED", Message: "Room code is required", HTTPStatus: fiber.StatusBadRequest}
 	}
 
 	// Get room to provide context-specific error messages
 	room, err := h.svc.GetRoom(c.Context(), roomCode)
 	if err != nil {
-		return h.handleError(c, err)
+		return err
 	}
 
 	// Check if user is the owner
 	if room.CreatedBy == userObjID {
-		return c.Status(fiber.StatusForbidden).JSON(map[string]interface{}{
-			"error":   "room owners cannot leave their own room",
-			"message": "delete the room instead if you want to remove it",
-			"status":  fiber.StatusForbidden,
-		})
+		return domain.ErrOwnerCannotLeaveRoom
 	}
 
 	// Leave room via service
 	if err := h.svc.LeaveRoom(c.Context(), roomCode, userObjID); err != nil {
-		return h.handleError(c, err)
+		return err
 	}
 
 	return c.Status(fiber.StatusOK).JSON(map[string]interface{}{
@@ -530,51 +454,36 @@ func (h *RoomHandler) RemoveMemberFromRoom(c *fiber.Ctx) error {
 	// Extract user ID from context (owner/requester)
 	userID, ok := c.Locals("user_id").(string)
 	if !ok || userID == "" {
-		return c.Status(fiber.StatusUnauthorized).JSON(map[string]interface{}{
-			"error":  "unauthorized",
-			"status": fiber.StatusUnauthorized,
-		})
+		return domain.ErrUnauthorized
 	}
 
 	// Convert user ID from string to ObjectID
 	ownerObjID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
-			"error":  "invalid user id",
-			"status": fiber.StatusBadRequest,
-		})
+		return &domain.AppError{Code: "INVALID_USER_ID", Message: "Invalid user ID", HTTPStatus: fiber.StatusBadRequest}
 	}
 
 	// Get room code from URL parameter
 	roomCode := c.Params("code")
 	if roomCode == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
-			"error":  "room code is required",
-			"status": fiber.StatusBadRequest,
-		})
+		return &domain.AppError{Code: "ROOM_CODE_REQUIRED", Message: "Room code is required", HTTPStatus: fiber.StatusBadRequest}
 	}
 
 	// Parse request body for member ID to remove
 	var req RemoveMemberFromRoomRequest
 	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
-			"error":  "invalid input",
-			"status": fiber.StatusBadRequest,
-		})
+		return domain.ErrInvalidInput
 	}
 
 	// Convert member ID from string to ObjectID
 	memberObjID, err := primitive.ObjectIDFromHex(req.MemberID)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
-			"error":  "invalid member id",
-			"status": fiber.StatusBadRequest,
-		})
+		return &domain.AppError{Code: "INVALID_MEMBER_ID", Message: "Invalid member ID", HTTPStatus: fiber.StatusBadRequest}
 	}
 
 	// Remove member from room via service
 	if err := h.svc.RemoveMemberFromRoom(c.Context(), roomCode, ownerObjID, memberObjID); err != nil {
-		return h.handleError(c, err)
+		return err
 	}
 
 	return c.Status(fiber.StatusOK).JSON(map[string]interface{}{
@@ -589,40 +498,31 @@ func (h *RoomHandler) HandleRoomDelete(c *fiber.Ctx) error {
 	// Extract user ID from context
 	userID, ok := c.Locals("user_id").(string)
 	if !ok || userID == "" {
-		return c.Status(fiber.StatusUnauthorized).JSON(map[string]interface{}{
-			"error":  "unauthorized",
-			"status": fiber.StatusUnauthorized,
-		})
+		return domain.ErrUnauthorized
 	}
 
 	// Convert user ID from string to ObjectID
 	userObjID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
-			"error":  "invalid user id",
-			"status": fiber.StatusBadRequest,
-		})
+		return &domain.AppError{Code: "INVALID_USER_ID", Message: "Invalid user ID", HTTPStatus: fiber.StatusBadRequest}
 	}
 
 	// Get room code from URL parameter
 	roomCode := c.Params("code")
 	if roomCode == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
-			"error":  "room code is required",
-			"status": fiber.StatusBadRequest,
-		})
+		return &domain.AppError{Code: "ROOM_CODE_REQUIRED", Message: "Room code is required", HTTPStatus: fiber.StatusBadRequest}
 	}
 
 	// Get room to check if user is owner
 	room, err := h.svc.GetRoom(c.Context(), roomCode)
 	if err != nil {
-		return h.handleError(c, err)
+		return err
 	}
 
 	// If user is the owner, delete the room; otherwise, leave the room
 	if room.CreatedBy == userObjID {
 		if err := h.svc.DeleteRoom(c.Context(), roomCode, userObjID); err != nil {
-			return h.handleError(c, err)
+			return err
 		}
 		return c.Status(fiber.StatusOK).JSON(map[string]interface{}{
 			"data":    nil,
@@ -633,7 +533,7 @@ func (h *RoomHandler) HandleRoomDelete(c *fiber.Ctx) error {
 
 	// User is a member, so leave the room
 	if err := h.svc.LeaveRoom(c.Context(), roomCode, userObjID); err != nil {
-		return h.handleError(c, err)
+		return err
 	}
 
 	return c.Status(fiber.StatusOK).JSON(map[string]interface{}{
@@ -643,35 +543,10 @@ func (h *RoomHandler) HandleRoomDelete(c *fiber.Ctx) error {
 	})
 }
 
-// handleError maps service errors to HTTP responses
+// handleError is kept for call sites that wrap non-domain errors.
+// It delegates to the global error handler by returning the error.
 func (h *RoomHandler) handleError(c *fiber.Ctx, err error) error {
-	switch {
-	case errors.Is(err, domain.ErrInvalidInput):
-		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
-			"error":  "invalid input",
-			"status": fiber.StatusBadRequest,
-		})
-	case errors.Is(err, domain.ErrForbidden):
-		return c.Status(fiber.StatusForbidden).JSON(map[string]interface{}{
-			"error":  "you do not have permission to perform this action",
-			"status": fiber.StatusForbidden,
-		})
-	case errors.Is(err, domain.ErrCodeAlreadyExists):
-		return c.Status(fiber.StatusConflict).JSON(map[string]interface{}{
-			"error":  "room code already exists",
-			"status": fiber.StatusConflict,
-		})
-	case errors.Is(err, domain.ErrRoomNotFound):
-		return c.Status(fiber.StatusNotFound).JSON(map[string]interface{}{
-			"error":  "room not found",
-			"status": fiber.StatusNotFound,
-		})
-	default:
-		return c.Status(fiber.StatusInternalServerError).JSON(map[string]interface{}{
-			"error":  "internal server error",
-			"status": fiber.StatusInternalServerError,
-		})
-	}
+	return err
 }
 
 // AddUserToRoomByUserCode adds a user to a room using the user's customer code
@@ -679,24 +554,18 @@ func (h *RoomHandler) AddUserToRoomByUserCode(c *fiber.Ctx) error {
 	// Parse request body
 	var req AddUserToRoomByUserCodeRequest
 	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
-			"error":  "invalid input",
-			"status": fiber.StatusBadRequest,
-		})
+		return domain.ErrInvalidInput
 	}
 
 	// Validate request fields
 	if req.RoomCode == "" || req.UserCode == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
-			"error":  "room_code and user_code are required",
-			"status": fiber.StatusBadRequest,
-		})
+		return &domain.AppError{Code: "INVALID_INPUT", Message: "room_code and user_code are required", HTTPStatus: fiber.StatusBadRequest}
 	}
 
 	// Add user to room via service
 	room, err := h.svc.AddUserToRoomByUserCode(c.Context(), req.RoomCode, req.UserCode)
 	if err != nil {
-		return h.handleError(c, err)
+		return err
 	}
 
 	// Convert members to string slice for response
@@ -728,34 +597,25 @@ func (h *RoomHandler) GetRoomUsers(c *fiber.Ctx) error {
 	// Extract user ID from context
 	userID, ok := c.Locals("user_id").(string)
 	if !ok || userID == "" {
-		return c.Status(fiber.StatusUnauthorized).JSON(map[string]interface{}{
-			"error":  "unauthorized",
-			"status": fiber.StatusUnauthorized,
-		})
+		return domain.ErrUnauthorized
 	}
 
 	// Convert user ID from string to ObjectID
 	userObjID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
-			"error":  "invalid user id",
-			"status": fiber.StatusBadRequest,
-		})
+		return &domain.AppError{Code: "INVALID_USER_ID", Message: "Invalid user ID", HTTPStatus: fiber.StatusBadRequest}
 	}
 
 	// Get room code from URL parameter
 	roomCode := c.Params("code")
 	if roomCode == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
-			"error":  "room code is required",
-			"status": fiber.StatusBadRequest,
-		})
+		return &domain.AppError{Code: "ROOM_CODE_REQUIRED", Message: "Room code is required", HTTPStatus: fiber.StatusBadRequest}
 	}
 
 	// Get room to verify access
 	room, err := h.svc.GetRoom(c.Context(), roomCode)
 	if err != nil {
-		return h.handleError(c, err)
+		return err
 	}
 
 	// Check authorization: user must be owner or member
@@ -769,16 +629,13 @@ func (h *RoomHandler) GetRoomUsers(c *fiber.Ctx) error {
 	}
 
 	if !isOwner && !isMember {
-		return c.Status(fiber.StatusForbidden).JSON(map[string]interface{}{
-			"error":  "you do not have permission to access this room",
-			"status": fiber.StatusForbidden,
-		})
+		return domain.ErrForbidden
 	}
 
 	// Get all users in the room
 	users, err := h.svc.GetRoomUsers(c.Context(), roomCode)
 	if err != nil {
-		return h.handleError(c, err)
+		return err
 	}
 
 	// Convert domain User objects to UserDetailResponse objects
@@ -807,25 +664,19 @@ func (h *RoomHandler) ListUserRooms(c *fiber.Ctx) error {
 	// Extract user ID from context
 	userID, ok := c.Locals("user_id").(string)
 	if !ok || userID == "" {
-		return c.Status(fiber.StatusUnauthorized).JSON(map[string]interface{}{
-			"error":  "unauthorized",
-			"status": fiber.StatusUnauthorized,
-		})
+		return domain.ErrUnauthorized
 	}
 
 	// Convert user ID from string to ObjectID
 	userObjID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
-			"error":  "invalid user id",
-			"status": fiber.StatusBadRequest,
-		})
+		return &domain.AppError{Code: "INVALID_USER_ID", Message: "Invalid user ID", HTTPStatus: fiber.StatusBadRequest}
 	}
 
 	// Get user's rooms via service
 	rooms, err := h.svc.ListUserRooms(c.Context(), userObjID)
 	if err != nil {
-		return h.handleError(c, err)
+		return err
 	}
 
 	// Convert domain Room objects to RoomResponse objects

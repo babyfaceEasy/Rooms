@@ -27,7 +27,7 @@ type Server struct {
 func NewServer(cfg config.Config, logger *slog.Logger, itemHandler *handler.ItemHandler, userHandler *handler.UserHandler, authHandler *handler.AuthHandler, roomHandler *handler.RoomHandler, postHandler *handler.PostHandler, commentHandler *handler.CommentHandler, authService service.AuthService) *Server {
 	app := fiber.New(fiber.Config{
 		AppName:      cfg.App.Name,
-		ErrorHandler: middleware.NewErrorHandler(logger),
+		ErrorHandler: middleware.NewErrorHandler(logger, cfg.App.Env == "development"),
 		ReadTimeout:  30 * time.Second,
 		WriteTimeout: 30 * time.Second,
 		IdleTimeout:  60 * time.Second,

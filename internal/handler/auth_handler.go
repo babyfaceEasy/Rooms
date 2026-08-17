@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/gofiber/fiber/v2"
@@ -47,19 +46,12 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 	}
 
 	if req.Email == "" || req.Password == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "email and password are required",
-		})
+		return &domain.AppError{Code: "INVALID_INPUT", Message: "Email and password are required", HTTPStatus: fiber.StatusBadRequest}
 	}
 
 	accessToken, refreshToken, err := h.svc.Login(c.UserContext(), req.Email, req.Password)
 	if err != nil {
-		if errors.Is(err, domain.ErrInvalidCredentials) {
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"error": "invalid email or password",
-			})
-		}
-		return fmt.Errorf("login: %w", err)
+		return err
 	}
 
 	// Access token TTL is 1 hour (3600 seconds)
@@ -82,24 +74,12 @@ func (h *AuthHandler) RefreshAccessToken(c *fiber.Ctx) error {
 	}
 
 	if req.RefreshToken == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "refresh_token is required",
-		})
+		return &domain.AppError{Code: "INVALID_INPUT", Message: "Refresh token is required", HTTPStatus: fiber.StatusBadRequest}
 	}
 
 	accessToken, err := h.svc.RefreshAccessToken(c.UserContext(), req.RefreshToken)
 	if err != nil {
-		if errors.Is(err, domain.ErrTokenExpired) {
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"error": "refresh token has expired",
-			})
-		}
-		if errors.Is(err, domain.ErrTokenInvalid) {
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"error": "invalid refresh token",
-			})
-		}
-		return fmt.Errorf("refresh access token: %w", err)
+		return err
 	}
 
 	response := TokenResponse{
@@ -115,26 +95,17 @@ func (h *AuthHandler) RefreshAccessToken(c *fiber.Ctx) error {
 func (h *AuthHandler) Logout(c *fiber.Ctx) error {
 	userID := c.Locals("user_id")
 	if userID == nil {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"error": "unauthorized",
-		})
+		return domain.ErrUnauthorized
 	}
 
 	userIDStr, ok := userID.(string)
 	if !ok {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "internal server error",
-		})
+		return domain.ErrInternalServer
 	}
 
 	err := h.svc.Logout(c.UserContext(), userIDStr)
 	if err != nil {
-		if errors.Is(err, domain.ErrInvalidInput) {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"error": "invalid user id",
-			})
-		}
-		return fmt.Errorf("logout: %w", err)
+		return err
 	}
 
 	return c.SendStatus(fiber.StatusNoContent)

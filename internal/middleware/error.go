@@ -4,53 +4,53 @@ import (
 	"errors"
 	"log/slog"
 
-	"github.com/gofiber/fiber/v2"
 	"temp_backend/internal/domain"
+
+	"github.com/gofiber/fiber/v2"
 )
 
-// NewErrorHandler returns a centralized Fiber error handler that maps domain
-// errors to HTTP status codes and emits structured logs.
-func NewErrorHandler(log *slog.Logger) fiber.ErrorHandler {
+// NewErrorHandler returns a centralized Fiber error handler that maps errors
+// to structured JSON responses using AppError. When showInternal is true
+// (e.g. in development), wrapped internal errors are included in the response
+// as a "detail" field for debugging.
+func NewErrorHandler(log *slog.Logger, showInternal bool) fiber.ErrorHandler {
 	return func(c *fiber.Ctx, err error) error {
-		code := fiber.StatusInternalServerError
-		message := "internal server error"
-
-		switch {
-		case errors.Is(err, domain.ErrNotFound):
-			code = fiber.StatusNotFound
-			message = err.Error()
-		case errors.Is(err, domain.ErrInvalidInput):
-			code = fiber.StatusBadRequest
-			message = err.Error()
-		case errors.Is(err, domain.ErrConflict):
-			code = fiber.StatusConflict
-			message = err.Error()
-		case errors.Is(err, domain.ErrUnauthorized):
-			code = fiber.StatusUnauthorized
-			message = err.Error()
-		case errors.Is(err, domain.ErrForbidden):
-			code = fiber.StatusForbidden
-			message = err.Error()
+		// Extract AppError from the error chain.
+		var appErr *domain.AppError
+		if !errors.As(err, &appErr) {
+			// Allow Fiber's own *fiber.Error to set the status code and message.
+			var fiberErr *fiber.Error
+			if errors.As(err, &fiberErr) {
+				return c.Status(fiberErr.Code).JSON(fiber.Map{
+					"error":  fiberErr.Message,
+					"code":   "HTTP_ERROR",
+					"status": fiberErr.Code,
+				})
+			}
+			appErr = domain.ErrInternalServer
 		}
 
-		// Allow Fiber's own *fiber.Error to set the status code.
-		var fiberErr *fiber.Error
-		if errors.As(err, &fiberErr) {
-			code = fiberErr.Code
-			message = fiberErr.Message
+		resp := fiber.Map{
+			"error":  appErr.Message,
+			"code":   appErr.Code,
+			"status": appErr.HTTPStatus,
 		}
 
-		if code >= fiber.StatusInternalServerError {
+		// In development, include the wrapped internal error for debugging.
+		if showInternal && appErr.Err != nil {
+			resp["detail"] = appErr.Err.Error()
+		}
+
+		if appErr.HTTPStatus >= 500 {
 			log.Error("request failed",
 				slog.String("method", c.Method()),
 				slog.String("path", c.Path()),
-				slog.Int("status", code),
-				slog.String("error", err.Error()),
+				slog.Int("status", appErr.HTTPStatus),
+				slog.String("code", appErr.Code),
+				slog.String("error", appErr.Error()),
 			)
 		}
 
-		return c.Status(code).JSON(fiber.Map{
-			"error": message,
-		})
+		return c.Status(appErr.HTTPStatus).JSON(resp)
 	}
 }
