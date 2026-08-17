@@ -73,20 +73,7 @@ func (h *UserHandler) Register(c *fiber.Ctx) error {
 	user, err := h.svc.Register(c.UserContext(), req.Name, req.Email, req.Password, req.AgeVerified)
 	if err != nil {
 		// Map domain errors to HTTP status codes
-		if errors.Is(err, domain.ErrInvalidInput) ||
-			errors.Is(err, domain.ErrInvalidEmail) ||
-			errors.Is(err, domain.ErrInvalidPassword) ||
-			errors.Is(err, domain.ErrAgeVerificationRequired) {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"error": err.Error(),
-			})
-		}
-		if errors.Is(err, domain.ErrEmailAlreadyExists) {
-			return c.Status(fiber.StatusConflict).JSON(fiber.Map{
-				"error": "email already in use",
-			})
-		}
-		return fmt.Errorf("register user: %w", err)
+		return err
 	}
 
 	// Send verification email asynchronously (gracefully degrade if it fails)
@@ -115,17 +102,7 @@ func (h *UserHandler) GetUser(c *fiber.Ctx) error {
 
 	user, err := h.svc.GetUserByID(c.UserContext(), id)
 	if err != nil {
-		if errors.Is(err, domain.ErrUserNotFound) {
-			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-				"error": "user not found",
-			})
-		}
-		if errors.Is(err, domain.ErrInvalidInput) {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"error": "invalid user id",
-			})
-		}
-		return fmt.Errorf("get user: %w", err)
+		return err
 	}
 
 	response := UserResponse{
@@ -145,17 +122,7 @@ func (h *UserHandler) DeleteUser(c *fiber.Ctx) error {
 
 	err := h.svc.DeleteUser(c.UserContext(), id)
 	if err != nil {
-		if errors.Is(err, domain.ErrUserNotFound) {
-			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-				"error": "user not found",
-			})
-		}
-		if errors.Is(err, domain.ErrInvalidInput) {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"error": "invalid user id",
-			})
-		}
-		return fmt.Errorf("delete user: %w", err)
+		return err
 	}
 
 	return c.SendStatus(fiber.StatusNoContent)
@@ -167,9 +134,7 @@ func (h *UserHandler) ViewProfile(c *fiber.Ctx) error {
 	// Extract user ID from JWT context (set by auth middleware)
 	userID := c.Locals("user_id")
 	if userID == nil {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"error": "user not authenticated",
-		})
+		return domain.ErrUnauthorized
 	}
 
 	userIDStr, ok := userID.(string)
@@ -180,9 +145,7 @@ func (h *UserHandler) ViewProfile(c *fiber.Ctx) error {
 	user, err := h.svc.GetUserByID(c.UserContext(), userIDStr)
 	if err != nil {
 		if errors.Is(err, domain.ErrUserNotFound) {
-			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-				"error": "user not found",
-			})
+			return domain.ErrUserNotFound
 		}
 		return fmt.Errorf("get user profile: %w", err)
 	}
@@ -204,9 +167,7 @@ func (h *UserHandler) UpdateProfile(c *fiber.Ctx) error {
 	// Extract user ID from JWT context (set by auth middleware)
 	userID := c.Locals("user_id")
 	if userID == nil {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"error": "user not authenticated",
-		})
+		return domain.ErrUnauthorized
 	}
 
 	userIDStr, ok := userID.(string)
@@ -216,26 +177,14 @@ func (h *UserHandler) UpdateProfile(c *fiber.Ctx) error {
 
 	// Parse request body
 	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "invalid request body",
-		})
+		return domain.ErrInvalidInput
 	}
 
 	// Update user profile
 	user, err := h.svc.UpdateProfile(c.UserContext(), userIDStr, req.Name)
 	if err != nil {
 		// Map domain errors to HTTP status codes
-		if errors.Is(err, domain.ErrInvalidInput) {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"error": err.Error(),
-			})
-		}
-		if errors.Is(err, domain.ErrUserNotFound) {
-			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-				"error": "user not found",
-			})
-		}
-		return fmt.Errorf("update profile: %w", err)
+		return err
 	}
 
 	response := ProfileResponse{
@@ -254,9 +203,7 @@ func (h *UserHandler) ChangePassword(c *fiber.Ctx) error {
 	// Extract user ID from JWT context (set by auth middleware)
 	userID := c.Locals("user_id")
 	if userID == nil {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"error": "user not authenticated",
-		})
+		return domain.ErrUnauthorized
 	}
 
 	userIDStr, ok := userID.(string)
@@ -266,39 +213,22 @@ func (h *UserHandler) ChangePassword(c *fiber.Ctx) error {
 
 	// Parse request body
 	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "invalid request body",
-		})
+		return domain.ErrInvalidInput
 	}
 
 	// Validate request fields
 	if req.CurrentPassword == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "current_password is required",
-		})
+		return &domain.AppError{Code: "INVALID_INPUT", Message: "current_password is required", HTTPStatus: fiber.StatusBadRequest}
 	}
 	if req.NewPassword == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "new_password is required",
-		})
+		return &domain.AppError{Code: "INVALID_INPUT", Message: "new_password is required", HTTPStatus: fiber.StatusBadRequest}
 	}
 
 	// Change password
 	err := h.svc.ChangePassword(c.UserContext(), userIDStr, req.CurrentPassword, req.NewPassword)
 	if err != nil {
 		// Map domain errors to HTTP status codes
-		if errors.Is(err, domain.ErrInvalidInput) ||
-			errors.Is(err, domain.ErrInvalidPassword) {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"error": err.Error(),
-			})
-		}
-		if errors.Is(err, domain.ErrUserNotFound) {
-			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-				"error": "user not found",
-			})
-		}
-		return fmt.Errorf("change password: %w", err)
+		return err
 	}
 
 	return c.Status(fiber.StatusOK).JSON(ChangePasswordResponse{
@@ -312,9 +242,7 @@ func (h *UserHandler) DeleteAccount(c *fiber.Ctx) error {
 	// Extract user ID from JWT context (set by auth middleware)
 	userID := c.Locals("user_id")
 	if userID == nil {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"error": "user not authenticated",
-		})
+		return domain.ErrUnauthorized
 	}
 
 	userIDStr, ok := userID.(string)
@@ -326,17 +254,7 @@ func (h *UserHandler) DeleteAccount(c *fiber.Ctx) error {
 	err := h.svc.DeleteAccount(c.UserContext(), userIDStr)
 	if err != nil {
 		// Map domain errors to HTTP status codes
-		if errors.Is(err, domain.ErrInvalidInput) {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"error": err.Error(),
-			})
-		}
-		if errors.Is(err, domain.ErrUserNotFound) {
-			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-				"error": "user not found",
-			})
-		}
-		return fmt.Errorf("delete account: %w", err)
+		return err
 	}
 
 	return c.Status(fiber.StatusNoContent).Send(nil)

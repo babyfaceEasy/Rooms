@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"errors"
 
 	"temp_backend/internal/domain"
 	"temp_backend/internal/service"
@@ -43,59 +42,41 @@ func (h *CommentHandler) CreateComment(c *fiber.Ctx) error {
 	// Extract user ID from context
 	userID, ok := c.Locals("user_id").(string)
 	if !ok || userID == "" {
-		return c.Status(fiber.StatusUnauthorized).JSON(map[string]interface{}{
-			"error":  "unauthorized",
-			"status": fiber.StatusUnauthorized,
-		})
+		return domain.ErrUnauthorized
 	}
 
 	// Convert user ID from string to ObjectID
 	userObjID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
-			"error":  "invalid user id",
-			"status": fiber.StatusBadRequest,
-		})
+		return &domain.AppError{Code: "INVALID_USER_ID", Message: "Invalid user ID", HTTPStatus: fiber.StatusBadRequest}
 	}
 
 	// Parse request body
 	var req CreateCommentRequest
 	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
-			"error":  "invalid request body",
-			"status": fiber.StatusBadRequest,
-		})
+		return domain.ErrInvalidInput
 	}
 
 	// Validate post_id is provided
 	if req.PostID == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
-			"error":  "post_id is required",
-			"status": fiber.StatusBadRequest,
-		})
+		return &domain.AppError{Code: "POST_ID_REQUIRED", Message: "Post ID is required", HTTPStatus: fiber.StatusBadRequest}
 	}
 
 	// Convert post ID from string to ObjectID
 	postObjID, err := primitive.ObjectIDFromHex(req.PostID)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
-			"error":  "invalid post id",
-			"status": fiber.StatusBadRequest,
-		})
+		return &domain.AppError{Code: "INVALID_POST_ID", Message: "Invalid post ID", HTTPStatus: fiber.StatusBadRequest}
 	}
 
 	// Validate text is provided
 	if req.Text == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
-			"error":  "comment text is required",
-			"status": fiber.StatusBadRequest,
-		})
+		return domain.ErrCommentTextRequired
 	}
 
 	// Create comment via service
 	comment, err := h.svc.CreateComment(c.Context(), postObjID, userObjID, req.Text)
 	if err != nil {
-		return h.handleCommentError(c, err)
+		return err
 	}
 
 	// Convert to response
@@ -113,25 +94,19 @@ func (h *CommentHandler) GetCommentsByPostID(c *fiber.Ctx) error {
 	// Extract post ID from URL parameter
 	postID := c.Params("id")
 	if postID == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
-			"error":  "post id is required",
-			"status": fiber.StatusBadRequest,
-		})
+		return &domain.AppError{Code: "POST_ID_REQUIRED", Message: "Post ID is required", HTTPStatus: fiber.StatusBadRequest}
 	}
 
 	// Convert post ID from string to ObjectID
 	postObjID, err := primitive.ObjectIDFromHex(postID)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
-			"error":  "invalid post id",
-			"status": fiber.StatusBadRequest,
-		})
+		return &domain.AppError{Code: "INVALID_POST_ID", Message: "Invalid post ID", HTTPStatus: fiber.StatusBadRequest}
 	}
 
 	// Get comments via service
 	comments, err := h.svc.GetCommentsByPostID(c.Context(), postObjID)
 	if err != nil {
-		return h.handleCommentError(c, err)
+		return err
 	}
 
 	// Convert to responses
@@ -153,43 +128,31 @@ func (h *CommentHandler) DeleteComment(c *fiber.Ctx) error {
 	// Extract user ID from context
 	userID, ok := c.Locals("user_id").(string)
 	if !ok || userID == "" {
-		return c.Status(fiber.StatusUnauthorized).JSON(map[string]interface{}{
-			"error":  "unauthorized",
-			"status": fiber.StatusUnauthorized,
-		})
+		return domain.ErrUnauthorized
 	}
 
 	// Convert user ID from string to ObjectID
 	userObjID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
-			"error":  "invalid user id",
-			"status": fiber.StatusBadRequest,
-		})
+		return &domain.AppError{Code: "INVALID_USER_ID", Message: "Invalid user ID", HTTPStatus: fiber.StatusBadRequest}
 	}
 
 	// Extract comment ID from URL parameter
 	commentID := c.Params("id")
 	if commentID == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
-			"error":  "comment id is required",
-			"status": fiber.StatusBadRequest,
-		})
+		return &domain.AppError{Code: "COMMENT_ID_REQUIRED", Message: "Comment ID is required", HTTPStatus: fiber.StatusBadRequest}
 	}
 
 	// Convert comment ID from string to ObjectID
 	commentObjID, err := primitive.ObjectIDFromHex(commentID)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
-			"error":  "invalid comment id",
-			"status": fiber.StatusBadRequest,
-		})
+		return &domain.AppError{Code: "INVALID_COMMENT_ID", Message: "Invalid comment ID", HTTPStatus: fiber.StatusBadRequest}
 	}
 
 	// Delete comment via service
 	err = h.svc.DeleteComment(c.Context(), commentObjID, userObjID)
 	if err != nil {
-		return h.handleCommentError(c, err)
+		return err
 	}
 
 	return c.Status(fiber.StatusOK).JSON(map[string]interface{}{
@@ -213,46 +176,7 @@ func (h *CommentHandler) toCommentResponse(comment *domain.Comment) *CommentResp
 	}
 }
 
-// handleCommentError maps domain errors to HTTP status codes
+// handleCommentError delegates to the global error handler.
 func (h *CommentHandler) handleCommentError(c *fiber.Ctx, err error) error {
-	if errors.Is(err, domain.ErrCommentNotFound) {
-		return c.Status(fiber.StatusNotFound).JSON(map[string]interface{}{
-			"error":  "comment not found",
-			"status": fiber.StatusNotFound,
-		})
-	}
-
-	if errors.Is(err, domain.ErrUnauthorizedComment) {
-		return c.Status(fiber.StatusForbidden).JSON(map[string]interface{}{
-			"error":  "you are not authorized to perform this action on this comment",
-			"status": fiber.StatusForbidden,
-		})
-	}
-
-	if errors.Is(err, domain.ErrCommentTextRequired) {
-		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
-			"error":  "comment text is required",
-			"status": fiber.StatusBadRequest,
-		})
-	}
-
-	if errors.Is(err, domain.ErrCommentTextTooLong) {
-		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
-			"error":  "comment text exceeds maximum length of 1000 characters",
-			"status": fiber.StatusBadRequest,
-		})
-	}
-
-	if errors.Is(err, domain.ErrPostNotFound) {
-		return c.Status(fiber.StatusNotFound).JSON(map[string]interface{}{
-			"error":  "post not found",
-			"status": fiber.StatusNotFound,
-		})
-	}
-
-	// Default to 500 for unexpected errors
-	return c.Status(fiber.StatusInternalServerError).JSON(map[string]interface{}{
-		"error":  "internal server error",
-		"status": fiber.StatusInternalServerError,
-	})
+	return err
 }

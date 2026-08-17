@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"errors"
 	"mime/multipart"
 	"path/filepath"
 
@@ -54,58 +53,40 @@ func (h *PostHandler) CreatePost(c *fiber.Ctx) error {
 	// Extract user ID from context
 	userID, ok := c.Locals("user_id").(string)
 	if !ok || userID == "" {
-		return c.Status(fiber.StatusUnauthorized).JSON(map[string]interface{}{
-			"error":  "unauthorized",
-			"status": fiber.StatusUnauthorized,
-		})
+		return domain.ErrUnauthorized
 	}
 
 	// Convert user ID from string to ObjectID
 	userObjID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
-			"error":  "invalid user id",
-			"status": fiber.StatusBadRequest,
-		})
+		return &domain.AppError{Code: "INVALID_USER_ID", Message: "Invalid user ID", HTTPStatus: fiber.StatusBadRequest}
 	}
 
 	// Parse form data
 	text := c.FormValue("text")
 	if text == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
-			"error":  "text is required",
-			"status": fiber.StatusBadRequest,
-		})
+		return domain.ErrPostTextRequired
 	}
 
 	// Parse room_code from form data
 	roomCode := c.FormValue("room_code")
 	if roomCode == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
-			"error":  "room_code is required",
-			"status": fiber.StatusBadRequest,
-		})
+		return &domain.AppError{Code: "ROOM_CODE_REQUIRED", Message: "room_code is required", HTTPStatus: fiber.StatusBadRequest}
 	}
 
 	// Get room by code
 	room, err := h.roomRepo.GetByCode(c.Context(), roomCode)
 	if err != nil {
-		return h.handleError(c, err)
+		return err
 	}
 
 	// Verify user is room member
 	isMember, err := h.roomRepo.IsUserMember(c.Context(), room.ID, userObjID)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(map[string]interface{}{
-			"error":  "internal server error",
-			"status": fiber.StatusInternalServerError,
-		})
+		return domain.ErrInternalServer
 	}
 	if !isMember {
-		return c.Status(fiber.StatusForbidden).JSON(map[string]interface{}{
-			"error":  "not a member of this room",
-			"status": fiber.StatusForbidden,
-		})
+		return domain.ErrNotRoomMember
 	}
 
 	var imageURL, videoURL, audioURL *string
@@ -120,28 +101,19 @@ func (h *PostHandler) CreatePost(c *fiber.Ctx) error {
 			image := images[0]
 			file, err := image.Open()
 			if err != nil {
-				return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
-					"error":  "failed to process image",
-					"status": fiber.StatusBadRequest,
-				})
+				return &domain.AppError{Code: "MEDIA_PROCESSING_FAILED", Message: "Failed to process image", HTTPStatus: fiber.StatusBadRequest}
 			}
 			defer file.Close()
 
 			// Validate image type
 			if !isValidImageType(image.Filename) {
-				return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
-					"error":  "invalid image type",
-					"status": fiber.StatusBadRequest,
-				})
+				return &domain.AppError{Code: "INVALID_MEDIA_TYPE", Message: "Invalid image type. Allowed: jpg, jpeg, png, gif, webp", HTTPStatus: fiber.StatusBadRequest}
 			}
 
 			// Upload to S3
 			url, err := h.storage.PutObject(c.Context(), "posts/images/"+userID+"/"+image.Filename, file, image.Size, image.Header.Get("Content-Type"))
 			if err != nil {
-				return c.Status(fiber.StatusInternalServerError).JSON(map[string]interface{}{
-					"error":  "failed to upload image",
-					"status": fiber.StatusInternalServerError,
-				})
+				return &domain.AppError{Code: "MEDIA_UPLOAD_FAILED", Message: "Failed to upload image", HTTPStatus: fiber.StatusInternalServerError}
 			}
 			imageURL = &url
 		}
@@ -151,28 +123,19 @@ func (h *PostHandler) CreatePost(c *fiber.Ctx) error {
 			video := videos[0]
 			file, err := video.Open()
 			if err != nil {
-				return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
-					"error":  "failed to process video",
-					"status": fiber.StatusBadRequest,
-				})
+				return &domain.AppError{Code: "MEDIA_PROCESSING_FAILED", Message: "Failed to process video", HTTPStatus: fiber.StatusBadRequest}
 			}
 			defer file.Close()
 
 			// Validate video type
 			if !isValidVideoType(video.Filename) {
-				return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
-					"error":  "invalid video type",
-					"status": fiber.StatusBadRequest,
-				})
+				return &domain.AppError{Code: "INVALID_MEDIA_TYPE", Message: "Invalid video type. Allowed: mp4, webm, mov, avi", HTTPStatus: fiber.StatusBadRequest}
 			}
 
 			// Upload to S3
 			url, err := h.storage.PutObject(c.Context(), "posts/videos/"+userID+"/"+video.Filename, file, video.Size, video.Header.Get("Content-Type"))
 			if err != nil {
-				return c.Status(fiber.StatusInternalServerError).JSON(map[string]interface{}{
-					"error":  "failed to upload video",
-					"status": fiber.StatusInternalServerError,
-				})
+				return &domain.AppError{Code: "MEDIA_UPLOAD_FAILED", Message: "Failed to upload video", HTTPStatus: fiber.StatusInternalServerError}
 			}
 			videoURL = &url
 		}
@@ -182,28 +145,19 @@ func (h *PostHandler) CreatePost(c *fiber.Ctx) error {
 			audio := audios[0]
 			file, err := audio.Open()
 			if err != nil {
-				return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
-					"error":  "failed to process audio",
-					"status": fiber.StatusBadRequest,
-				})
+				return &domain.AppError{Code: "MEDIA_PROCESSING_FAILED", Message: "Failed to process audio", HTTPStatus: fiber.StatusBadRequest}
 			}
 			defer file.Close()
 
 			// Validate audio type
 			if !isValidAudioType(audio.Filename) {
-				return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
-					"error":  "invalid audio type",
-					"status": fiber.StatusBadRequest,
-				})
+				return &domain.AppError{Code: "INVALID_MEDIA_TYPE", Message: "Invalid audio type. Allowed: mp3, wav, m4a, aac, flac, ogg", HTTPStatus: fiber.StatusBadRequest}
 			}
 
 			// Upload to S3
 			url, err := h.storage.PutObject(c.Context(), "posts/audio/"+userID+"/"+audio.Filename, file, audio.Size, audio.Header.Get("Content-Type"))
 			if err != nil {
-				return c.Status(fiber.StatusInternalServerError).JSON(map[string]interface{}{
-					"error":  "failed to upload audio",
-					"status": fiber.StatusInternalServerError,
-				})
+				return &domain.AppError{Code: "MEDIA_UPLOAD_FAILED", Message: "Failed to upload audio", HTTPStatus: fiber.StatusInternalServerError}
 			}
 			audioURL = &url
 		}
@@ -212,7 +166,7 @@ func (h *PostHandler) CreatePost(c *fiber.Ctx) error {
 	// Create post via service with roomID
 	post, err := h.svc.CreatePost(c.Context(), text, userObjID, room.ID, imageURL, videoURL, audioURL)
 	if err != nil {
-		return h.handleError(c, err)
+		return err
 	}
 
 	// Convert domain Post to PostResponse using helper
@@ -230,63 +184,45 @@ func (h *PostHandler) GetPost(c *fiber.Ctx) error {
 	// Extract user ID from context
 	userID, ok := c.Locals("user_id").(string)
 	if !ok || userID == "" {
-		return c.Status(fiber.StatusUnauthorized).JSON(map[string]interface{}{
-			"error":  "unauthorized",
-			"status": fiber.StatusUnauthorized,
-		})
+		return domain.ErrUnauthorized
 	}
 
 	// Convert user ID from string to ObjectID
 	userObjID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
-			"error":  "invalid user id",
-			"status": fiber.StatusBadRequest,
-		})
+		return &domain.AppError{Code: "INVALID_USER_ID", Message: "Invalid user ID", HTTPStatus: fiber.StatusBadRequest}
 	}
 
 	postID := c.Params("id")
 	if postID == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
-			"error":  "post id is required",
-			"status": fiber.StatusBadRequest,
-		})
+		return &domain.AppError{Code: "POST_ID_REQUIRED", Message: "Post ID is required", HTTPStatus: fiber.StatusBadRequest}
 	}
 
 	// Convert post ID from string to ObjectID
 	postObjID, err := primitive.ObjectIDFromHex(postID)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
-			"error":  "invalid post id",
-			"status": fiber.StatusBadRequest,
-		})
+		return &domain.AppError{Code: "INVALID_POST_ID", Message: "Invalid post ID", HTTPStatus: fiber.StatusBadRequest}
 	}
 
 	// Get post via service
 	post, err := h.svc.GetPost(c.Context(), postObjID)
 	if err != nil {
-		return h.handleError(c, err)
+		return err
 	}
 
 	// Verify user is member of the room
 	isMember, err := h.roomRepo.IsUserMember(c.Context(), post.RoomID, userObjID)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(map[string]interface{}{
-			"error":  "internal server error",
-			"status": fiber.StatusInternalServerError,
-		})
+		return domain.ErrInternalServer
 	}
 	if !isMember {
-		return c.Status(fiber.StatusForbidden).JSON(map[string]interface{}{
-			"error":  "not a member of this room",
-			"status": fiber.StatusForbidden,
-		})
+		return domain.ErrNotRoomMember
 	}
 
 	// Get room to enrich response
 	room, err := h.roomRepo.GetByID(c.Context(), post.RoomID)
 	if err != nil {
-		return h.handleError(c, err)
+		return err
 	}
 
 	// Convert domain Post to PostResponse using helper
@@ -303,55 +239,40 @@ func (h *PostHandler) GetPostsByRoomCode(c *fiber.Ctx) error {
 	// Extract user ID from context
 	userID, ok := c.Locals("user_id").(string)
 	if !ok || userID == "" {
-		return c.Status(fiber.StatusUnauthorized).JSON(map[string]interface{}{
-			"error":  "unauthorized",
-			"status": fiber.StatusUnauthorized,
-		})
+		return domain.ErrUnauthorized
 	}
 
 	// Convert user ID from string to ObjectID
 	userObjID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
-			"error":  "invalid user id",
-			"status": fiber.StatusBadRequest,
-		})
+		return &domain.AppError{Code: "INVALID_USER_ID", Message: "Invalid user ID", HTTPStatus: fiber.StatusBadRequest}
 	}
 
 	// Get room code from URL parameter
 	roomCode := c.Params("code")
 	if roomCode == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
-			"error":  "room code is required",
-			"status": fiber.StatusBadRequest,
-		})
+		return &domain.AppError{Code: "ROOM_CODE_REQUIRED", Message: "room_code is required", HTTPStatus: fiber.StatusBadRequest}
 	}
 
 	// Get room by code to verify it exists and user is a member
 	room, err := h.roomRepo.GetByCode(c.Context(), roomCode)
 	if err != nil {
-		return h.handleError(c, err)
+		return err
 	}
 
 	// Verify user is room member
 	isMember, err := h.roomRepo.IsUserMember(c.Context(), room.ID, userObjID)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(map[string]interface{}{
-			"error":  "internal server error",
-			"status": fiber.StatusInternalServerError,
-		})
+		return domain.ErrInternalServer
 	}
 	if !isMember {
-		return c.Status(fiber.StatusForbidden).JSON(map[string]interface{}{
-			"error":  "not a member of this room",
-			"status": fiber.StatusForbidden,
-		})
+		return domain.ErrNotRoomMember
 	}
 
 	// Get posts for the room via service
 	posts, err := h.svc.GetPostsByRoomID(c.Context(), room.ID)
 	if err != nil {
-		return h.handleError(c, err)
+		return err
 	}
 
 	// Convert domain Posts to PostResponses
@@ -373,62 +294,44 @@ func (h *PostHandler) DeletePost(c *fiber.Ctx) error {
 	// Extract user ID from context
 	userID, ok := c.Locals("user_id").(string)
 	if !ok || userID == "" {
-		return c.Status(fiber.StatusUnauthorized).JSON(map[string]interface{}{
-			"error":  "unauthorized",
-			"status": fiber.StatusUnauthorized,
-		})
+		return domain.ErrUnauthorized
 	}
 
 	// Convert user ID from string to ObjectID
 	userObjID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
-			"error":  "invalid user id",
-			"status": fiber.StatusBadRequest,
-		})
+		return &domain.AppError{Code: "INVALID_USER_ID", Message: "Invalid user ID", HTTPStatus: fiber.StatusBadRequest}
 	}
 
 	postID := c.Params("id")
 	if postID == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
-			"error":  "post id is required",
-			"status": fiber.StatusBadRequest,
-		})
+		return &domain.AppError{Code: "POST_ID_REQUIRED", Message: "Post ID is required", HTTPStatus: fiber.StatusBadRequest}
 	}
 
 	// Convert post ID from string to ObjectID
 	postObjID, err := primitive.ObjectIDFromHex(postID)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
-			"error":  "invalid post id",
-			"status": fiber.StatusBadRequest,
-		})
+		return &domain.AppError{Code: "INVALID_POST_ID", Message: "Invalid post ID", HTTPStatus: fiber.StatusBadRequest}
 	}
 
 	// Get post to verify room membership
 	post, err := h.svc.GetPost(c.Context(), postObjID)
 	if err != nil {
-		return h.handleError(c, err)
+		return err
 	}
 
 	// Verify user is member of the room (final check)
 	isMember, err := h.roomRepo.IsUserMember(c.Context(), post.RoomID, userObjID)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(map[string]interface{}{
-			"error":  "internal server error",
-			"status": fiber.StatusInternalServerError,
-		})
+		return domain.ErrInternalServer
 	}
 	if !isMember {
-		return c.Status(fiber.StatusForbidden).JSON(map[string]interface{}{
-			"error":  "not a member of this room",
-			"status": fiber.StatusForbidden,
-		})
+		return domain.ErrNotRoomMember
 	}
 
 	// Delete post via service
 	if err := h.svc.DeletePost(c.Context(), postObjID, userObjID); err != nil {
-		return h.handleError(c, err)
+		return err
 	}
 
 	return c.Status(fiber.StatusOK).JSON(map[string]interface{}{
@@ -438,45 +341,9 @@ func (h *PostHandler) DeletePost(c *fiber.Ctx) error {
 	})
 }
 
-// handleError maps service errors to HTTP responses
+// handleError delegates to the global error handler.
 func (h *PostHandler) handleError(c *fiber.Ctx, err error) error {
-	switch {
-	case errors.Is(err, domain.ErrPostNotFound):
-		return c.Status(fiber.StatusNotFound).JSON(map[string]interface{}{
-			"error":  "post not found",
-			"status": fiber.StatusNotFound,
-		})
-	case errors.Is(err, domain.ErrRoomNotFound):
-		return c.Status(fiber.StatusNotFound).JSON(map[string]interface{}{
-			"error":  "room not found",
-			"status": fiber.StatusNotFound,
-		})
-	case errors.Is(err, domain.ErrPostTextRequired):
-		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
-			"error":  "post text is required",
-			"status": fiber.StatusBadRequest,
-		})
-	case errors.Is(err, domain.ErrPostTextTooLong):
-		return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
-			"error":  "post text exceeds maximum length (5000 characters)",
-			"status": fiber.StatusBadRequest,
-		})
-	case errors.Is(err, domain.ErrNotRoomMember):
-		return c.Status(fiber.StatusForbidden).JSON(map[string]interface{}{
-			"error":  "not a member of this room",
-			"status": fiber.StatusForbidden,
-		})
-	case errors.Is(err, domain.ErrUnauthorizedPost):
-		return c.Status(fiber.StatusForbidden).JSON(map[string]interface{}{
-			"error":  "you are not authorized to perform this action",
-			"status": fiber.StatusForbidden,
-		})
-	default:
-		return c.Status(fiber.StatusInternalServerError).JSON(map[string]interface{}{
-			"error":  "internal server error",
-			"status": fiber.StatusInternalServerError,
-		})
-	}
+	return err
 }
 
 // toPostResponse converts a domain Post and Room to a PostResponse

@@ -1,17 +1,17 @@
 package domain
 
 import (
-	"errors"
+	"net/http"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 var (
-	ErrCommentTextRequired = errors.New("comment text is required")
-	ErrCommentTextTooLong  = errors.New("comment text exceeds maximum length")
-	ErrCommentNotFound     = errors.New("comment not found")
-	ErrUnauthorizedComment = errors.New("you are not authorized to perform this action on this comment")
+	ErrCommentTextRequired = &AppError{Code: "COMMENT_TEXT_REQUIRED", Message: "Comment text is required", HTTPStatus: http.StatusBadRequest}
+	ErrCommentTextTooLong  = &AppError{Code: "COMMENT_TEXT_TOO_LONG", Message: "Comment text exceeds maximum length of 1000 characters", HTTPStatus: http.StatusBadRequest}
+	ErrCommentNotFound     = &AppError{Code: "COMMENT_NOT_FOUND", Message: "Comment not found", HTTPStatus: http.StatusNotFound}
+	ErrUnauthorizedComment = &AppError{Code: "UNAUTHORIZED_COMMENT", Message: "You are not authorized to perform this action on this comment", HTTPStatus: http.StatusForbidden}
 )
 
 // Comment represents a comment on a post
