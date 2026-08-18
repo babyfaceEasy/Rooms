@@ -41,6 +41,7 @@ type UserResponse struct {
 
 // ProfileResponse represents a user profile response (minimal data).
 type ProfileResponse struct {
+	ID    string `json:"id"`
 	Name  string `json:"name"`
 	Email string `json:"email"`
 	Code  string `json:"code"`
@@ -151,6 +152,7 @@ func (h *UserHandler) ViewProfile(c *fiber.Ctx) error {
 	}
 
 	response := ProfileResponse{
+		ID:    user.ID.Hex(),
 		Name:  user.Name,
 		Email: user.Email,
 		Code:  user.Code,
