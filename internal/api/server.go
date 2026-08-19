@@ -39,6 +39,7 @@ func NewServer(cfg config.Config, logger *slog.Logger, itemHandler *handler.Item
 	app.Use(flogger.New(flogger.Config{
 		Format: "[${time}] ${status} ${method} ${path} (${latency}) ${ip}\n",
 	}))
+	app.Use(middleware.NewGlobalRateLimiter(cfg, logger))
 
 	s := &Server{
 		app:    app,

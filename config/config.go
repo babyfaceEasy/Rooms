@@ -41,6 +41,12 @@ type Config struct {
 		VerificationTemplateID  string
 		PasswordResetTemplateID string
 	}
+	RateLimit struct {
+		GlobalMax   int
+		GlobalWindow time.Duration
+		AuthMax     int
+		AuthWindow  time.Duration
+	}
 }
 
 // Load reads configuration from environment variables and applies sensible defaults.
@@ -67,6 +73,11 @@ func Load() (Config, error) {
 	cfg.JWT.Secret = getEnv("JWT_SECRET", "")
 	cfg.JWT.AccessTokenTTL = parseDuration(getEnv("ACCESS_TOKEN_TTL", "1h"))
 	cfg.JWT.RefreshTokenTTL = parseDuration(getEnv("REFRESH_TOKEN_TTL", "168h"))
+
+	cfg.RateLimit.GlobalMax = getInt("RATE_LIMIT_GLOBAL_MAX", 100)
+	cfg.RateLimit.GlobalWindow = parseDuration(getEnv("RATE_LIMIT_GLOBAL_WINDOW", "1m"))
+	cfg.RateLimit.AuthMax = getInt("RATE_LIMIT_AUTH_MAX", 20)
+	cfg.RateLimit.AuthWindow = parseDuration(getEnv("RATE_LIMIT_AUTH_WINDOW", "1m"))
 
 	cfg.SendGrid.APIKey = getEnv("SENDGRID_API_KEY", "")
 	cfg.SendGrid.SenderEmail = getEnv("SENDGRID_SENDER_EMAIL", "noreply@tempbackend.com")
@@ -96,6 +107,15 @@ func Load() (Config, error) {
 func getEnv(key, fallback string) string {
 	if value, ok := os.LookupEnv(key); ok && value != "" {
 		return value
+	}
+	return fallback
+}
+
+func getInt(key string, fallback int) int {
+	if value, ok := os.LookupEnv(key); ok && value != "" {
+		if i, err := strconv.Atoi(value); err == nil {
+			return i
+		}
 	}
 	return fallback
 }
