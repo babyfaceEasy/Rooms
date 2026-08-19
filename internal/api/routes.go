@@ -1,9 +1,6 @@
 package api
 
 import (
-	"os"
-	"strings"
-
 	"temp_backend/internal/handler"
 	"temp_backend/internal/middleware"
 	"temp_backend/internal/service"
@@ -20,18 +17,20 @@ func (s *Server) registerRoutes(itemHandler *handler.ItemHandler, userHandler *h
 
 	// DEBUG: returns all environment variables visible to the process.
 	// This endpoint is intended for local testing only and must not be deployed to production.
-	s.app.Get("/debug/env", func(c *fiber.Ctx) error {
-		envVars := make(map[string]string)
-		for _, env := range os.Environ() {
-			parts := strings.SplitN(env, "=", 2)
-			if len(parts) == 2 {
-				envVars[parts[0]] = parts[1]
+	/*
+		s.app.Get("/debug/env", func(c *fiber.Ctx) error {
+			envVars := make(map[string]string)
+			for _, env := range os.Environ() {
+				parts := strings.SplitN(env, "=", 2)
+				if len(parts) == 2 {
+					envVars[parts[0]] = parts[1]
+				}
 			}
-		}
-		return c.JSON(fiber.Map{
-			"env": envVars,
+			return c.JSON(fiber.Map{
+				"env": envVars,
+			})
 		})
-	})
+	*/
 
 	// Public auth routes
 	authGroup := s.app.Group("/api/v1/auth")
