@@ -28,6 +28,7 @@ type Config struct {
 		SecretKey       string
 		UseSSL          bool
 		PresignedExpiry time.Duration
+		PublicURL       string
 	}
 	JWT struct {
 		Secret          string
@@ -69,6 +70,7 @@ func Load() (Config, error) {
 	cfg.S3.SecretKey = getEnv("S3_SECRET_KEY", "minioadmin")
 	cfg.S3.UseSSL = parseBool(getEnv("S3_USE_SSL", "false"))
 	cfg.S3.PresignedExpiry = parseDuration(getEnv("S3_PRESIGNED_EXPIRY", "15m"))
+	cfg.S3.PublicURL = getEnv("S3_PUBLIC_URL", "http://localhost:9000")
 
 	cfg.JWT.Secret = getEnv("JWT_SECRET", "")
 	cfg.JWT.AccessTokenTTL = parseDuration(getEnv("ACCESS_TOKEN_TTL", "1h"))

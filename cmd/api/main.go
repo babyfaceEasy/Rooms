@@ -68,7 +68,7 @@ func main() {
 
 	// Item repositories and service
 	itemRepo := repository.NewMongoItemRepository(mongoClient.Database(cfg.Mongo.Database))
-	storageRepo := repository.NewS3Repository(s3Client, cfg.S3.Bucket)
+	storageRepo := repository.NewS3Repository(s3Client, cfg.S3.Bucket, cfg.S3.PublicURL)
 	itemService := service.NewItemService(itemRepo, storageRepo)
 	itemHandler := handler.NewItemHandler(itemService)
 
@@ -119,12 +119,12 @@ func main() {
 	// Post repositories and service
 	postRepo := repository.NewMongoPostRepository(mongoClient.Database(cfg.Mongo.Database))
 	postService := service.NewPostService(postRepo)
-	postHandler := handler.NewPostHandler(postService, storageRepo, roomRepo)
+	postHandler := handler.NewPostHandler(postService, storageRepo, roomRepo, userRepo)
 
 	// Comment repositories and service
 	commentRepo := repository.NewMongoCommentRepository(mongoClient.Database(cfg.Mongo.Database).Collection("comments"))
 	commentService := service.NewCommentService(commentRepo, postRepo)
-	commentHandler := handler.NewCommentHandler(commentService)
+	commentHandler := handler.NewCommentHandler(commentService, userRepo)
 
 	server := api.NewServer(cfg, logger, itemHandler, userHandler, authHandler, roomHandler, postHandler, commentHandler, authService)
 
