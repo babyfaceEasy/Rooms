@@ -45,6 +45,7 @@ func (s *roomService) CreateRoom(ctx context.Context, name, code string, userID 
 		Name:      name,
 		Code:      code,
 		CreatedBy: userID,
+		Members:   []primitive.ObjectID{},
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
