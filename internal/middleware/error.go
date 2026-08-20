@@ -15,6 +15,9 @@ import (
 // as a "detail" field for debugging.
 func NewErrorHandler(log *slog.Logger, showInternal bool) fiber.ErrorHandler {
 	return func(c *fiber.Ctx, err error) error {
+		// Save the original error for development reporting.
+		originalErr := err
+
 		// Extract AppError from the error chain.
 		var appErr *domain.AppError
 		if !errors.As(err, &appErr) {
@@ -36,18 +39,27 @@ func NewErrorHandler(log *slog.Logger, showInternal bool) fiber.ErrorHandler {
 			"status": appErr.HTTPStatus,
 		}
 
-		// In development, include the wrapped internal error for debugging.
-		if showInternal && appErr.Err != nil {
-			resp["detail"] = appErr.Err.Error()
+		// In development, include the original error for debugging.
+		// Handles two cases:
+		//   1. A wrapped AppError with an internal cause (appErr.Err != nil)
+		//   2. A raw non-AppError that fell through to ErrInternalServer
+		if showInternal {
+			switch {
+			case appErr.Err != nil:
+				resp["detail"] = appErr.Err.Error()
+			case originalErr != appErr:
+				resp["detail"] = originalErr.Error()
+			}
 		}
 
 		if appErr.HTTPStatus >= 500 {
+			// Always log the original error, not just the generic message.
 			log.Error("request failed",
 				slog.String("method", c.Method()),
 				slog.String("path", c.Path()),
 				slog.Int("status", appErr.HTTPStatus),
 				slog.String("code", appErr.Code),
-				slog.String("error", appErr.Error()),
+				slog.String("error", originalErr.Error()),
 			)
 		}
 
