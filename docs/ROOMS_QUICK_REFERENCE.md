@@ -11,7 +11,7 @@
 | **GET** | `/api/v1/rooms/by-id/:id` | Get room details by ID | ✅ | Room object |
 | **GET** | `/api/v1/rooms/:code/members` | List member IDs | ✅ | Member ID array |
 | **GET** | `/api/v1/rooms/:code/users` | List member details | ✅ | User details array |
-| **GET** | `/api/v1/rooms/:code/posts` | Get all posts in room | ✅ | Array of posts |
+| **GET** | `/api/v1/rooms/:code/posts` | Get paginated posts in room (?page=&limit=) | ✅ | Array of posts |
 | **POST** | `/api/v1/rooms/:code/remove-member` | Remove member (owner only) | ✅ | Empty (null) |
 | **POST** | `/api/v1/rooms/:code/leave` | Leave room (member only) | ✅ | Empty (null) |
 | **DELETE** | `/api/v1/rooms/:code` | Delete/leave room | ✅ | Empty (null) |
