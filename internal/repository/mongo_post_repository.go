@@ -77,26 +77,39 @@ func (m *MongoPostRepository) DeletePost(ctx context.Context, id primitive.Objec
 	return nil
 }
 
-// GetByRoomID retrieves all posts for a room (excluding soft-deleted)
-func (m *MongoPostRepository) GetByRoomID(ctx context.Context, roomID primitive.ObjectID) ([]*domain.Post, error) {
-	cursor, err := m.collection.Find(ctx, bson.M{
+// GetByRoomID retrieves paginated posts for a room (excluding soft-deleted), newest first.
+// Returns the posts, total count matching the filter, and any error.
+func (m *MongoPostRepository) GetByRoomID(ctx context.Context, roomID primitive.ObjectID, page, limit int) ([]*domain.Post, int64, error) {
+	filter := bson.M{
 		"room_id":    roomID,
 		"deleted_at": nil,
-	}, options.Find().SetSort(bson.M{"created_at": -1}))
+	}
+
+	total, err := m.collection.CountDocuments(ctx, filter)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
+	}
+
+	skip := (page - 1) * limit
+	opts := options.Find().
+		SetSort(bson.M{"created_at": -1}).
+		SetSkip(int64(skip)).
+		SetLimit(int64(limit))
+
+	cursor, err := m.collection.Find(ctx, filter, opts)
+	if err != nil {
+		return nil, 0, err
 	}
 	defer cursor.Close(ctx)
 
 	var posts []*domain.Post
 	if err = cursor.All(ctx, &posts); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
-	// If no posts found, return empty slice instead of nil
 	if posts == nil {
 		posts = []*domain.Post{}
 	}
 
-	return posts, nil
+	return posts, total, nil
 }
