@@ -17,7 +17,7 @@ type MockPostRepository struct {
 	createFunc      func(ctx context.Context, post *domain.Post) error
 	getByIDFunc     func(ctx context.Context, id primitive.ObjectID) (*domain.Post, error)
 	deletePostFunc  func(ctx context.Context, id primitive.ObjectID) error
-	getByRoomIDFunc func(ctx context.Context, roomID primitive.ObjectID) ([]*domain.Post, error)
+	getByRoomIDFunc func(ctx context.Context, roomID primitive.ObjectID, page, limit int) ([]*domain.Post, int64, error)
 }
 
 func (m *MockPostRepository) Create(ctx context.Context, post *domain.Post) error {
@@ -41,11 +41,11 @@ func (m *MockPostRepository) DeletePost(ctx context.Context, id primitive.Object
 	return nil
 }
 
-func (m *MockPostRepository) GetByRoomID(ctx context.Context, roomID primitive.ObjectID) ([]*domain.Post, error) {
+func (m *MockPostRepository) GetByRoomID(ctx context.Context, roomID primitive.ObjectID, page, limit int) ([]*domain.Post, int64, error) {
 	if m.getByRoomIDFunc != nil {
-		return m.getByRoomIDFunc(ctx, roomID)
+		return m.getByRoomIDFunc(ctx, roomID, page, limit)
 	}
-	return []*domain.Post{}, nil
+	return []*domain.Post{}, 0, nil
 }
 
 func TestCreatePost_Success(t *testing.T) {

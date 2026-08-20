@@ -24,6 +24,7 @@ type PostResponse struct {
 	RoomCode  string  `json:"room_code"`
 	RoomName  string  `json:"room_name"`
 	UserID    string  `json:"user_id"`
+	UserName  string  `json:"user_name"`
 	Text      string  `json:"text"`
 	Image     *string `json:"image,omitempty"`
 	Video     *string `json:"video,omitempty"`
@@ -37,14 +38,16 @@ type PostHandler struct {
 	svc      service.PostService
 	storage  repository.ObjectStorage
 	roomRepo repository.RoomRepository
+	userRepo repository.UserRepository
 }
 
 // NewPostHandler creates a new post handler
-func NewPostHandler(svc service.PostService, storage repository.ObjectStorage, roomRepo repository.RoomRepository) *PostHandler {
+func NewPostHandler(svc service.PostService, storage repository.ObjectStorage, roomRepo repository.RoomRepository, userRepo repository.UserRepository) *PostHandler {
 	return &PostHandler{
 		svc:      svc,
 		storage:  storage,
 		roomRepo: roomRepo,
+		userRepo: userRepo,
 	}
 }
 
@@ -169,8 +172,15 @@ func (h *PostHandler) CreatePost(c *fiber.Ctx) error {
 		return err
 	}
 
+	// Look up user name for the response
+	user, err := h.userRepo.GetByID(c.Context(), userObjID)
+	var userName string
+	if err == nil && user != nil {
+		userName = user.Name
+	}
+
 	// Convert domain Post to PostResponse using helper
-	response := h.toPostResponse(post, room)
+	response := h.toPostResponse(post, room, userName)
 
 	return c.Status(fiber.StatusCreated).JSON(map[string]interface{}{
 		"data":    response,
@@ -225,8 +235,15 @@ func (h *PostHandler) GetPost(c *fiber.Ctx) error {
 		return err
 	}
 
+	// Look up user name for the response
+	postUser, err := h.userRepo.GetByID(c.Context(), post.UserID)
+	var userName string
+	if err == nil && postUser != nil {
+		userName = postUser.Name
+	}
+
 	// Convert domain Post to PostResponse using helper
-	response := h.toPostResponse(post, room)
+	response := h.toPostResponse(post, room, userName)
 
 	return c.Status(fiber.StatusOK).JSON(map[string]interface{}{
 		"data":   response,
@@ -234,7 +251,7 @@ func (h *PostHandler) GetPost(c *fiber.Ctx) error {
 	})
 }
 
-// GetPostsByRoomCode retrieves all posts for a room (room code in URL parameter)
+// GetPostsByRoomCode retrieves paginated posts for a room (room code in URL parameter)
 func (h *PostHandler) GetPostsByRoomCode(c *fiber.Ctx) error {
 	// Extract user ID from context
 	userID, ok := c.Locals("user_id").(string)
@@ -254,6 +271,16 @@ func (h *PostHandler) GetPostsByRoomCode(c *fiber.Ctx) error {
 		return &domain.AppError{Code: "ROOM_CODE_REQUIRED", Message: "room_code is required", HTTPStatus: fiber.StatusBadRequest}
 	}
 
+	// Parse pagination query params
+	page := c.QueryInt("page", 1)
+	limit := c.QueryInt("limit", 20)
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 100 {
+		limit = 20
+	}
+
 	// Get room by code to verify it exists and user is a member
 	room, err := h.roomRepo.GetByCode(c.Context(), roomCode)
 	if err != nil {
@@ -269,21 +296,44 @@ func (h *PostHandler) GetPostsByRoomCode(c *fiber.Ctx) error {
 		return domain.ErrNotRoomMember
 	}
 
-	// Get posts for the room via service
-	posts, err := h.svc.GetPostsByRoomID(c.Context(), room.ID)
+	// Get paginated posts for the room via service
+	posts, total, err := h.svc.GetPostsByRoomID(c.Context(), room.ID, page, limit)
 	if err != nil {
 		return err
+	}
+
+	// Batch fetch user names for all posts
+	var userIDs []primitive.ObjectID
+	seen := make(map[string]bool)
+	for _, post := range posts {
+		uid := post.UserID.Hex()
+		if !seen[uid] {
+			seen[uid] = true
+			userIDs = append(userIDs, post.UserID)
+		}
+	}
+	userMap := make(map[string]string)
+	if len(userIDs) > 0 {
+		users, err := h.userRepo.GetByIDs(c.Context(), userIDs)
+		if err == nil {
+			for _, u := range users {
+				userMap[u.ID.Hex()] = u.Name
+			}
+		}
 	}
 
 	// Convert domain Posts to PostResponses
 	var responses []*PostResponse
 	for _, post := range posts {
-		responses = append(responses, h.toPostResponse(post, room))
+		responses = append(responses, h.toPostResponse(post, room, userMap[post.UserID.Hex()]))
 	}
 
 	return c.Status(fiber.StatusOK).JSON(map[string]interface{}{
 		"data":    responses,
 		"count":   len(responses),
+		"page":    page,
+		"limit":   limit,
+		"total":   total,
 		"message": "posts retrieved successfully",
 		"status":  fiber.StatusOK,
 	})
@@ -347,13 +397,14 @@ func (h *PostHandler) handleError(c *fiber.Ctx, err error) error {
 }
 
 // toPostResponse converts a domain Post and Room to a PostResponse
-func (h *PostHandler) toPostResponse(post *domain.Post, room *domain.Room) *PostResponse {
+func (h *PostHandler) toPostResponse(post *domain.Post, room *domain.Room, userName string) *PostResponse {
 	return &PostResponse{
 		ID:        post.ID.Hex(),
 		RoomID:    post.RoomID.Hex(),
 		RoomCode:  room.Code,
 		RoomName:  room.Name,
 		UserID:    post.UserID.Hex(),
+		UserName:  userName,
 		Text:      post.Text,
 		Image:     post.Image,
 		Video:     post.Video,

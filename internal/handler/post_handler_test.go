@@ -16,7 +16,7 @@ import (
 type MockPostService struct {
 	createPostFunc       func(ctx context.Context, text string, userID, roomID primitive.ObjectID, imageURL, videoURL, audioURL *string) (*domain.Post, error)
 	getPostFunc          func(ctx context.Context, id primitive.ObjectID) (*domain.Post, error)
-	getPostsByRoomIDFunc func(ctx context.Context, roomID primitive.ObjectID) ([]*domain.Post, error)
+	getPostsByRoomIDFunc func(ctx context.Context, roomID primitive.ObjectID, page, limit int) ([]*domain.Post, int64, error)
 	deletePostFunc       func(ctx context.Context, id, userID primitive.ObjectID) error
 }
 
@@ -34,11 +34,11 @@ func (m *MockPostService) GetPost(ctx context.Context, id primitive.ObjectID) (*
 	return nil, nil
 }
 
-func (m *MockPostService) GetPostsByRoomID(ctx context.Context, roomID primitive.ObjectID) ([]*domain.Post, error) {
+func (m *MockPostService) GetPostsByRoomID(ctx context.Context, roomID primitive.ObjectID, page, limit int) ([]*domain.Post, int64, error) {
 	if m.getPostsByRoomIDFunc != nil {
-		return m.getPostsByRoomIDFunc(ctx, roomID)
+		return m.getPostsByRoomIDFunc(ctx, roomID, page, limit)
 	}
-	return nil, nil
+	return nil, 0, nil
 }
 
 func (m *MockPostService) DeletePost(ctx context.Context, id, userID primitive.ObjectID) error {

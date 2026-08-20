@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"fmt"
 	"io"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -17,15 +18,19 @@ type ObjectStorage interface {
 }
 
 type s3Repository struct {
-	client *s3.Client
-	bucket string
+	client    *s3.Client
+	bucket    string
+	publicURL string
 }
 
 // NewS3Repository returns an ObjectStorage implementation backed by the supplied S3 client.
-func NewS3Repository(client *s3.Client, bucket string) ObjectStorage {
+// The publicURL is used to construct publicly-accessible URLs (e.g. "http://localhost:9000"
+// for MinIO in development).
+func NewS3Repository(client *s3.Client, bucket, publicURL string) ObjectStorage {
 	return &s3Repository{
-		client: client,
-		bucket: bucket,
+		client:    client,
+		bucket:    bucket,
+		publicURL: publicURL,
 	}
 }
 
@@ -40,7 +45,8 @@ func (s *s3Repository) PutObject(ctx context.Context, key string, reader io.Read
 	if err != nil {
 		return "", err
 	}
-	return key, nil
+	// Return a full URL the frontend can load directly.
+	return fmt.Sprintf("%s/%s/%s", s.publicURL, s.bucket, key), nil
 }
 
 func (s *s3Repository) RemoveObject(ctx context.Context, key string) error {

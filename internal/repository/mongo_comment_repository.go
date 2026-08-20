@@ -9,6 +9,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // MongoCommentRepository implements CommentRepository using MongoDB
@@ -52,25 +53,37 @@ func (m *MongoCommentRepository) GetByID(ctx context.Context, id primitive.Objec
 	return &comment, nil
 }
 
-// GetByPostID retrieves all comments for a post (excluding soft-deleted)
-func (m *MongoCommentRepository) GetByPostID(ctx context.Context, postID primitive.ObjectID) ([]*domain.Comment, error) {
+// GetByPostID retrieves paginated comments for a post (excluding soft-deleted), oldest first.
+// Returns the comments, total count matching the filter, and any error.
+func (m *MongoCommentRepository) GetByPostID(ctx context.Context, postID primitive.ObjectID, page, limit int) ([]*domain.Comment, int64, error) {
 	filter := bson.M{
 		"post_id":    postID,
 		"deleted_at": nil,
 	}
 
-	cursor, err := m.collection.Find(ctx, filter)
+	total, err := m.collection.CountDocuments(ctx, filter)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
+	}
+
+	skip := (page - 1) * limit
+	opts := options.Find().
+		SetSort(bson.M{"created_at": 1}).
+		SetSkip(int64(skip)).
+		SetLimit(int64(limit))
+
+	cursor, err := m.collection.Find(ctx, filter, opts)
+	if err != nil {
+		return nil, 0, err
 	}
 	defer cursor.Close(ctx)
 
 	var comments []*domain.Comment
 	if err = cursor.All(ctx, &comments); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
-	return comments, nil
+	return comments, total, nil
 }
 
 // DeleteComment soft-deletes a comment by ID

@@ -8,7 +8,7 @@
 | GET | `/api/v1/posts/:id` | Get post by ID | Required |
 | DELETE | `/api/v1/posts/:id` | Delete post (soft delete, owner only) | Required |
 | POST | `/api/v1/posts/:id/comments` | Create comment on post | Required |
-| GET | `/api/v1/posts/:id/comments` | Get all comments for post | Required |
+| GET | `/api/v1/posts/:id/comments` | Get paginated comments for post (?page=&limit=) | Required |
 | DELETE | `/api/v1/comments/:id` | Delete comment (author only) | Required |
 
 ## Quick Examples
@@ -93,6 +93,55 @@ curl -X DELETE http://localhost:3000/api/v1/comments/507f1f77bcf86cd799439020 \
 
 - Images: `posts/images/{user_id}/{filename}`
 - Videos: `posts/videos/{user_id}/{filename}`
+
+## Response Changes
+
+### Post Response
+```json
+{
+  "id": "string",
+  "room_id": "string",
+  "room_code": "string",
+  "room_name": "string",
+  "user_id": "string",
+  "user_name": "string",
+  "text": "string",
+  "image": "string or null (full S3 URL)",
+  "video": "string or null (full S3 URL)",
+  "audio": "string or null (full S3 URL)",
+  "created_at": "string",
+  "updated_at": "string"
+}
+```
+
+### Comment Response
+```json
+{
+  "id": "string",
+  "post_id": "string",
+  "user_id": "string",
+  "user_name": "string",
+  "text": "string",
+  "created_at": "string",
+  "updated_at": "string"
+}
+```
+
+### Paginated List Response
+Comments and room posts return paginated results:
+```json
+{
+  "data": [...],
+  "count": 20,
+  "page": 1,
+  "limit": 20,
+  "total": 153,
+  "message": "...",
+  "status": 200
+}
+```
+
+Query parameters: `?page=1&limit=20` (default page=1, limit=20, max limit=100)
 
 ## Notes
 

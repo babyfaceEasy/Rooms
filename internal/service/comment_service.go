@@ -15,7 +15,7 @@ import (
 type CommentService interface {
 	CreateComment(ctx context.Context, postID, userID primitive.ObjectID, text string) (*domain.Comment, error)
 	GetComment(ctx context.Context, id primitive.ObjectID) (*domain.Comment, error)
-	GetCommentsByPostID(ctx context.Context, postID primitive.ObjectID) ([]*domain.Comment, error)
+	GetCommentsByPostID(ctx context.Context, postID primitive.ObjectID, page, limit int) ([]*domain.Comment, int64, error)
 	DeleteComment(ctx context.Context, id, userID primitive.ObjectID) error
 }
 
@@ -76,14 +76,14 @@ func (s *commentService) GetComment(ctx context.Context, id primitive.ObjectID) 
 	return comment, nil
 }
 
-// GetCommentsByPostID retrieves all comments for a post
-func (s *commentService) GetCommentsByPostID(ctx context.Context, postID primitive.ObjectID) ([]*domain.Comment, error) {
-	comments, err := s.commentRepo.GetByPostID(ctx, postID)
+// GetCommentsByPostID retrieves paginated comments for a post
+func (s *commentService) GetCommentsByPostID(ctx context.Context, postID primitive.ObjectID, page, limit int) ([]*domain.Comment, int64, error) {
+	comments, total, err := s.commentRepo.GetByPostID(ctx, postID, page, limit)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
-	return comments, nil
+	return comments, total, nil
 }
 
 // DeleteComment deletes a comment (owner only)
