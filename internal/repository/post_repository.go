@@ -14,4 +14,8 @@ type PostRepository interface {
 	GetByID(ctx context.Context, id primitive.ObjectID) (*domain.Post, error)
 	DeletePost(ctx context.Context, id primitive.ObjectID) error
 	GetByRoomID(ctx context.Context, roomID primitive.ObjectID, page, limit int) ([]*domain.Post, int64, error)
+	AddValidation(ctx context.Context, postID, userID primitive.ObjectID) error
+	RemoveValidation(ctx context.Context, postID, userID primitive.ObjectID) error
+	AddRespect(ctx context.Context, postID, userID primitive.ObjectID) error
+	RemoveRespect(ctx context.Context, postID, userID primitive.ObjectID) error
 }
