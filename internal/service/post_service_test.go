@@ -48,6 +48,22 @@ func (m *MockPostRepository) GetByRoomID(ctx context.Context, roomID primitive.O
 	return []*domain.Post{}, 0, nil
 }
 
+func (m *MockPostRepository) AddValidation(ctx context.Context, postID, userID primitive.ObjectID) error {
+	return nil
+}
+
+func (m *MockPostRepository) RemoveValidation(ctx context.Context, postID, userID primitive.ObjectID) error {
+	return nil
+}
+
+func (m *MockPostRepository) AddRespect(ctx context.Context, postID, userID primitive.ObjectID) error {
+	return nil
+}
+
+func (m *MockPostRepository) RemoveRespect(ctx context.Context, postID, userID primitive.ObjectID) error {
+	return nil
+}
+
 func TestCreatePost_Success(t *testing.T) {
 	userID := primitive.NewObjectID()
 	roomID := primitive.NewObjectID()
@@ -60,7 +76,7 @@ func TestCreatePost_Success(t *testing.T) {
 		},
 	}
 
-	svc := NewPostService(repoMock)
+	svc := NewPostService(repoMock, &MockRoomRepository{})
 	post, err := svc.CreatePost(context.Background(), text, userID, roomID, nil, nil, nil)
 
 	assert.NoError(t, err)
@@ -79,7 +95,7 @@ func TestCreatePost_EmptyText(t *testing.T) {
 
 	repoMock := &MockPostRepository{}
 
-	svc := NewPostService(repoMock)
+	svc := NewPostService(repoMock, &MockRoomRepository{})
 	post, err := svc.CreatePost(context.Background(), "", userID, roomID, nil, nil, nil)
 
 	assert.Error(t, err)
@@ -97,7 +113,7 @@ func TestCreatePost_TextTooLong(t *testing.T) {
 
 	repoMock := &MockPostRepository{}
 
-	svc := NewPostService(repoMock)
+	svc := NewPostService(repoMock, &MockRoomRepository{})
 	post, err := svc.CreatePost(context.Background(), longText, userID, roomID, nil, nil, nil)
 
 	assert.Error(t, err)
@@ -118,7 +134,7 @@ func TestCreatePost_WithImage(t *testing.T) {
 		},
 	}
 
-	svc := NewPostService(repoMock)
+	svc := NewPostService(repoMock, &MockRoomRepository{})
 	post, err := svc.CreatePost(context.Background(), text, userID, roomID, &imageURL, nil, nil)
 
 	assert.NoError(t, err)
@@ -140,7 +156,7 @@ func TestCreatePost_WithVideo(t *testing.T) {
 		},
 	}
 
-	svc := NewPostService(repoMock)
+	svc := NewPostService(repoMock, &MockRoomRepository{})
 	post, err := svc.CreatePost(context.Background(), text, userID, roomID, nil, &videoURL, nil)
 
 	assert.NoError(t, err)
@@ -160,7 +176,7 @@ func TestCreatePost_RepositoryError(t *testing.T) {
 		},
 	}
 
-	svc := NewPostService(repoMock)
+	svc := NewPostService(repoMock, &MockRoomRepository{})
 	post, err := svc.CreatePost(context.Background(), text, userID, roomID, nil, nil, nil)
 
 	assert.Error(t, err)
@@ -187,7 +203,7 @@ func TestGetPost_Success(t *testing.T) {
 		},
 	}
 
-	svc := NewPostService(repoMock)
+	svc := NewPostService(repoMock, &MockRoomRepository{})
 	retrievedPost, err := svc.GetPost(context.Background(), postID)
 
 	assert.NoError(t, err)
@@ -202,7 +218,7 @@ func TestGetPost_NotFound(t *testing.T) {
 		},
 	}
 
-	svc := NewPostService(repoMock)
+	svc := NewPostService(repoMock, &MockRoomRepository{})
 	post, err := svc.GetPost(context.Background(), primitive.NewObjectID())
 
 	assert.Error(t, err)
@@ -233,7 +249,7 @@ func TestDeletePost_Success(t *testing.T) {
 		},
 	}
 
-	svc := NewPostService(repoMock)
+	svc := NewPostService(repoMock, &MockRoomRepository{})
 	err := svc.DeletePost(context.Background(), postID, userID)
 
 	assert.NoError(t, err)
@@ -260,7 +276,7 @@ func TestDeletePost_NotOwner(t *testing.T) {
 		},
 	}
 
-	svc := NewPostService(repoMock)
+	svc := NewPostService(repoMock, &MockRoomRepository{})
 	err := svc.DeletePost(context.Background(), postID, otherUserID)
 
 	assert.Error(t, err)
@@ -274,7 +290,7 @@ func TestDeletePost_NotFound(t *testing.T) {
 		},
 	}
 
-	svc := NewPostService(repoMock)
+	svc := NewPostService(repoMock, &MockRoomRepository{})
 	err := svc.DeletePost(context.Background(), primitive.NewObjectID(), primitive.NewObjectID())
 
 	assert.Error(t, err)

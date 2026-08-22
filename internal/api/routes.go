@@ -70,6 +70,10 @@ func (s *Server) registerRoutes(itemHandler *handler.ItemHandler, userHandler *h
 	apiProtected.Post("/posts", postHandler.CreatePost)
 	apiProtected.Get("/posts/:id", postHandler.GetPost)
 	apiProtected.Delete("/posts/:id", postHandler.DeletePost)
+	apiProtected.Post("/posts/:id/validate", postHandler.ValidatePost)
+	apiProtected.Delete("/posts/:id/validate", postHandler.RemoveValidation)
+	apiProtected.Post("/posts/:id/respect", postHandler.RespectPost)
+	apiProtected.Delete("/posts/:id/respect", postHandler.RemoveRespect)
 
 	// Comment routes (protected)
 	apiProtected.Post("/posts/:id/comments", commentHandler.CreateComment)
