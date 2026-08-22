@@ -77,6 +77,90 @@ func (m *MongoPostRepository) DeletePost(ctx context.Context, id primitive.Objec
 	return nil
 }
 
+// AddValidation adds a user ID to the post's validations array ($addToSet prevents duplicates).
+func (m *MongoPostRepository) AddValidation(ctx context.Context, postID, userID primitive.ObjectID) error {
+	result, err := m.collection.UpdateOne(
+		ctx,
+		bson.M{"_id": postID, "deleted_at": nil},
+		bson.M{
+			"$addToSet": bson.M{"validations": userID},
+			"$set":      bson.M{"updated_at": time.Now()},
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	if result.MatchedCount == 0 {
+		return domain.ErrPostNotFound
+	}
+
+	return nil
+}
+
+// RemoveValidation removes a user ID from the post's validations array.
+func (m *MongoPostRepository) RemoveValidation(ctx context.Context, postID, userID primitive.ObjectID) error {
+	result, err := m.collection.UpdateOne(
+		ctx,
+		bson.M{"_id": postID, "deleted_at": nil},
+		bson.M{
+			"$pull": bson.M{"validations": userID},
+			"$set":  bson.M{"updated_at": time.Now()},
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	if result.MatchedCount == 0 {
+		return domain.ErrPostNotFound
+	}
+
+	return nil
+}
+
+// AddRespect adds a user ID to the post's respects array ($addToSet prevents duplicates).
+func (m *MongoPostRepository) AddRespect(ctx context.Context, postID, userID primitive.ObjectID) error {
+	result, err := m.collection.UpdateOne(
+		ctx,
+		bson.M{"_id": postID, "deleted_at": nil},
+		bson.M{
+			"$addToSet": bson.M{"respects": userID},
+			"$set":      bson.M{"updated_at": time.Now()},
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	if result.MatchedCount == 0 {
+		return domain.ErrPostNotFound
+	}
+
+	return nil
+}
+
+// RemoveRespect removes a user ID from the post's respects array.
+func (m *MongoPostRepository) RemoveRespect(ctx context.Context, postID, userID primitive.ObjectID) error {
+	result, err := m.collection.UpdateOne(
+		ctx,
+		bson.M{"_id": postID, "deleted_at": nil},
+		bson.M{
+			"$pull": bson.M{"respects": userID},
+			"$set":  bson.M{"updated_at": time.Now()},
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	if result.MatchedCount == 0 {
+		return domain.ErrPostNotFound
+	}
+
+	return nil
+}
+
 // GetByRoomID retrieves paginated posts for a room (excluding soft-deleted), newest first.
 // Returns the posts, total count matching the filter, and any error.
 func (m *MongoPostRepository) GetByRoomID(ctx context.Context, roomID primitive.ObjectID, page, limit int) ([]*domain.Post, int64, error) {

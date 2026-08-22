@@ -19,18 +19,20 @@ type CreatePostRequest struct {
 
 // PostResponse represents a post in the response
 type PostResponse struct {
-	ID        string  `json:"id"`
-	RoomID    string  `json:"room_id"`
-	RoomCode  string  `json:"room_code"`
-	RoomName  string  `json:"room_name"`
-	UserID    string  `json:"user_id"`
-	UserName  string  `json:"user_name"`
-	Text      string  `json:"text"`
-	Image     *string `json:"image,omitempty"`
-	Video     *string `json:"video,omitempty"`
-	Audio     *string `json:"audio,omitempty"`
-	CreatedAt string  `json:"created_at"`
-	UpdatedAt string  `json:"updated_at"`
+	ID               string  `json:"id"`
+	RoomID           string  `json:"room_id"`
+	RoomCode         string  `json:"room_code"`
+	RoomName         string  `json:"room_name"`
+	UserID           string  `json:"user_id"`
+	UserName         string  `json:"user_name"`
+	Text             string  `json:"text"`
+	Image            *string `json:"image,omitempty"`
+	Video            *string `json:"video,omitempty"`
+	Audio            *string `json:"audio,omitempty"`
+	ValidationsCount int     `json:"validations_count"`
+	RespectsCount    int     `json:"respects_count"`
+	CreatedAt        string  `json:"created_at"`
+	UpdatedAt        string  `json:"updated_at"`
 }
 
 // PostHandler handles post-related endpoints
@@ -391,6 +393,230 @@ func (h *PostHandler) DeletePost(c *fiber.Ctx) error {
 	})
 }
 
+// ValidatePost marks a post as valid by the authenticated user.
+func (h *PostHandler) ValidatePost(c *fiber.Ctx) error {
+	userID, ok := c.Locals("user_id").(string)
+	if !ok || userID == "" {
+		return domain.ErrUnauthorized
+	}
+
+	userObjID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return &domain.AppError{Code: "INVALID_USER_ID", Message: "Invalid user ID", HTTPStatus: fiber.StatusBadRequest}
+	}
+
+	postID := c.Params("id")
+	if postID == "" {
+		return &domain.AppError{Code: "POST_ID_REQUIRED", Message: "Post ID is required", HTTPStatus: fiber.StatusBadRequest}
+	}
+
+	postObjID, err := primitive.ObjectIDFromHex(postID)
+	if err != nil {
+		return &domain.AppError{Code: "INVALID_POST_ID", Message: "Invalid post ID", HTTPStatus: fiber.StatusBadRequest}
+	}
+
+	// Get post to verify room membership
+	post, err := h.svc.GetPost(c.Context(), postObjID)
+	if err != nil {
+		return err
+	}
+
+	// Verify user is member of the room
+	isMember, err := h.roomRepo.IsUserMember(c.Context(), post.RoomID, userObjID)
+	if err != nil {
+		return domain.ErrInternalServer
+	}
+	if !isMember {
+		return domain.ErrNotRoomMember
+	}
+
+	// Add validation
+	updatedPost, err := h.svc.ValidatePost(c.Context(), postObjID, userObjID)
+	if err != nil {
+		return err
+	}
+
+	// Look up user name for the response
+	postUser, err := h.userRepo.GetByID(c.Context(), updatedPost.UserID)
+	var userName string
+	if err == nil && postUser != nil {
+		userName = postUser.Name
+	}
+
+	room, err := h.roomRepo.GetByID(c.Context(), updatedPost.RoomID)
+	if err != nil {
+		return err
+	}
+
+	response := h.toPostResponse(updatedPost, room, userName)
+	return c.Status(fiber.StatusOK).JSON(map[string]interface{}{
+		"data":    response,
+		"message": "post validated successfully",
+		"status":  fiber.StatusOK,
+	})
+}
+
+// RemoveValidation removes the authenticated user's validation from a post.
+func (h *PostHandler) RemoveValidation(c *fiber.Ctx) error {
+	userID, ok := c.Locals("user_id").(string)
+	if !ok || userID == "" {
+		return domain.ErrUnauthorized
+	}
+
+	userObjID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return &domain.AppError{Code: "INVALID_USER_ID", Message: "Invalid user ID", HTTPStatus: fiber.StatusBadRequest}
+	}
+
+	postID := c.Params("id")
+	if postID == "" {
+		return &domain.AppError{Code: "POST_ID_REQUIRED", Message: "Post ID is required", HTTPStatus: fiber.StatusBadRequest}
+	}
+
+	postObjID, err := primitive.ObjectIDFromHex(postID)
+	if err != nil {
+		return &domain.AppError{Code: "INVALID_POST_ID", Message: "Invalid post ID", HTTPStatus: fiber.StatusBadRequest}
+	}
+
+	// Get post to verify room membership
+	post, err := h.svc.GetPost(c.Context(), postObjID)
+	if err != nil {
+		return err
+	}
+
+	// Verify user is member of the room
+	isMember, err := h.roomRepo.IsUserMember(c.Context(), post.RoomID, userObjID)
+	if err != nil {
+		return domain.ErrInternalServer
+	}
+	if !isMember {
+		return domain.ErrNotRoomMember
+	}
+
+	// Remove validation
+	if err := h.svc.RemoveValidation(c.Context(), postObjID, userObjID); err != nil {
+		return err
+	}
+
+	return c.Status(fiber.StatusOK).JSON(map[string]interface{}{
+		"data":    nil,
+		"message": "validation removed successfully",
+		"status":  fiber.StatusOK,
+	})
+}
+
+// RespectPost marks a post as respected by the authenticated user.
+func (h *PostHandler) RespectPost(c *fiber.Ctx) error {
+	userID, ok := c.Locals("user_id").(string)
+	if !ok || userID == "" {
+		return domain.ErrUnauthorized
+	}
+
+	userObjID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return &domain.AppError{Code: "INVALID_USER_ID", Message: "Invalid user ID", HTTPStatus: fiber.StatusBadRequest}
+	}
+
+	postID := c.Params("id")
+	if postID == "" {
+		return &domain.AppError{Code: "POST_ID_REQUIRED", Message: "Post ID is required", HTTPStatus: fiber.StatusBadRequest}
+	}
+
+	postObjID, err := primitive.ObjectIDFromHex(postID)
+	if err != nil {
+		return &domain.AppError{Code: "INVALID_POST_ID", Message: "Invalid post ID", HTTPStatus: fiber.StatusBadRequest}
+	}
+
+	// Get post to verify room membership
+	post, err := h.svc.GetPost(c.Context(), postObjID)
+	if err != nil {
+		return err
+	}
+
+	// Verify user is member of the room
+	isMember, err := h.roomRepo.IsUserMember(c.Context(), post.RoomID, userObjID)
+	if err != nil {
+		return domain.ErrInternalServer
+	}
+	if !isMember {
+		return domain.ErrNotRoomMember
+	}
+
+	// Add respect
+	updatedPost, err := h.svc.RespectPost(c.Context(), postObjID, userObjID)
+	if err != nil {
+		return err
+	}
+
+	// Look up user name for the response
+	postUser, err := h.userRepo.GetByID(c.Context(), updatedPost.UserID)
+	var userName string
+	if err == nil && postUser != nil {
+		userName = postUser.Name
+	}
+
+	room, err := h.roomRepo.GetByID(c.Context(), updatedPost.RoomID)
+	if err != nil {
+		return err
+	}
+
+	response := h.toPostResponse(updatedPost, room, userName)
+	return c.Status(fiber.StatusOK).JSON(map[string]interface{}{
+		"data":    response,
+		"message": "post respected successfully",
+		"status":  fiber.StatusOK,
+	})
+}
+
+// RemoveRespect removes the authenticated user's respect from a post.
+func (h *PostHandler) RemoveRespect(c *fiber.Ctx) error {
+	userID, ok := c.Locals("user_id").(string)
+	if !ok || userID == "" {
+		return domain.ErrUnauthorized
+	}
+
+	userObjID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return &domain.AppError{Code: "INVALID_USER_ID", Message: "Invalid user ID", HTTPStatus: fiber.StatusBadRequest}
+	}
+
+	postID := c.Params("id")
+	if postID == "" {
+		return &domain.AppError{Code: "POST_ID_REQUIRED", Message: "Post ID is required", HTTPStatus: fiber.StatusBadRequest}
+	}
+
+	postObjID, err := primitive.ObjectIDFromHex(postID)
+	if err != nil {
+		return &domain.AppError{Code: "INVALID_POST_ID", Message: "Invalid post ID", HTTPStatus: fiber.StatusBadRequest}
+	}
+
+	// Get post to verify room membership
+	post, err := h.svc.GetPost(c.Context(), postObjID)
+	if err != nil {
+		return err
+	}
+
+	// Verify user is member of the room
+	isMember, err := h.roomRepo.IsUserMember(c.Context(), post.RoomID, userObjID)
+	if err != nil {
+		return domain.ErrInternalServer
+	}
+	if !isMember {
+		return domain.ErrNotRoomMember
+	}
+
+	// Remove respect
+	if err := h.svc.RemoveRespect(c.Context(), postObjID, userObjID); err != nil {
+		return err
+	}
+
+	return c.Status(fiber.StatusOK).JSON(map[string]interface{}{
+		"data":    nil,
+		"message": "respect removed successfully",
+		"status":  fiber.StatusOK,
+	})
+}
+
 // handleError delegates to the global error handler.
 func (h *PostHandler) handleError(c *fiber.Ctx, err error) error {
 	return err
@@ -399,18 +625,20 @@ func (h *PostHandler) handleError(c *fiber.Ctx, err error) error {
 // toPostResponse converts a domain Post and Room to a PostResponse
 func (h *PostHandler) toPostResponse(post *domain.Post, room *domain.Room, userName string) *PostResponse {
 	return &PostResponse{
-		ID:        post.ID.Hex(),
-		RoomID:    post.RoomID.Hex(),
-		RoomCode:  room.Code,
-		RoomName:  room.Name,
-		UserID:    post.UserID.Hex(),
-		UserName:  userName,
-		Text:      post.Text,
-		Image:     post.Image,
-		Video:     post.Video,
-		Audio:     post.Audio,
-		CreatedAt: post.CreatedAt.Format("2006-01-02T15:04:05Z"),
-		UpdatedAt: post.UpdatedAt.Format("2006-01-02T15:04:05Z"),
+		ID:               post.ID.Hex(),
+		RoomID:           post.RoomID.Hex(),
+		RoomCode:         room.Code,
+		RoomName:         room.Name,
+		UserID:           post.UserID.Hex(),
+		UserName:         userName,
+		Text:             post.Text,
+		Image:            post.Image,
+		Video:            post.Video,
+		Audio:            post.Audio,
+		ValidationsCount: len(post.Validations),
+		RespectsCount:    len(post.Respects),
+		CreatedAt:        post.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		UpdatedAt:        post.UpdatedAt.Format("2006-01-02T15:04:05Z"),
 	}
 }
 

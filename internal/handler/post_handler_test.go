@@ -18,6 +18,10 @@ type MockPostService struct {
 	getPostFunc          func(ctx context.Context, id primitive.ObjectID) (*domain.Post, error)
 	getPostsByRoomIDFunc func(ctx context.Context, roomID primitive.ObjectID, page, limit int) ([]*domain.Post, int64, error)
 	deletePostFunc       func(ctx context.Context, id, userID primitive.ObjectID) error
+	validatePostFunc     func(ctx context.Context, postID, userID primitive.ObjectID) (*domain.Post, error)
+	removeValidationFunc func(ctx context.Context, postID, userID primitive.ObjectID) error
+	respectPostFunc      func(ctx context.Context, postID, userID primitive.ObjectID) (*domain.Post, error)
+	removeRespectFunc    func(ctx context.Context, postID, userID primitive.ObjectID) error
 }
 
 func (m *MockPostService) CreatePost(ctx context.Context, text string, userID, roomID primitive.ObjectID, imageURL, videoURL, audioURL *string) (*domain.Post, error) {
@@ -44,6 +48,34 @@ func (m *MockPostService) GetPostsByRoomID(ctx context.Context, roomID primitive
 func (m *MockPostService) DeletePost(ctx context.Context, id, userID primitive.ObjectID) error {
 	if m.deletePostFunc != nil {
 		return m.deletePostFunc(ctx, id, userID)
+	}
+	return nil
+}
+
+func (m *MockPostService) ValidatePost(ctx context.Context, postID, userID primitive.ObjectID) (*domain.Post, error) {
+	if m.validatePostFunc != nil {
+		return m.validatePostFunc(ctx, postID, userID)
+	}
+	return nil, nil
+}
+
+func (m *MockPostService) RemoveValidation(ctx context.Context, postID, userID primitive.ObjectID) error {
+	if m.removeValidationFunc != nil {
+		return m.removeValidationFunc(ctx, postID, userID)
+	}
+	return nil
+}
+
+func (m *MockPostService) RespectPost(ctx context.Context, postID, userID primitive.ObjectID) (*domain.Post, error) {
+	if m.respectPostFunc != nil {
+		return m.respectPostFunc(ctx, postID, userID)
+	}
+	return nil, nil
+}
+
+func (m *MockPostService) RemoveRespect(ctx context.Context, postID, userID primitive.ObjectID) error {
+	if m.removeRespectFunc != nil {
+		return m.removeRespectFunc(ctx, postID, userID)
 	}
 	return nil
 }
@@ -126,7 +158,7 @@ func TestPostResponse_Structure(t *testing.T) {
 func TestNewPostHandler(t *testing.T) {
 	mockService := &MockPostService{}
 	mockRoomRepo := &MockRoomRepository{}
-	handler := NewPostHandler(mockService, nil, mockRoomRepo)
+	handler := NewPostHandler(mockService, nil, mockRoomRepo, nil)
 
 	assert.NotNil(t, handler)
 	assert.NotNil(t, handler.CreatePost)
@@ -157,14 +189,14 @@ func TestCreatePost_Success(t *testing.T) {
 	}
 
 	mockRoomRepo := &MockRoomRepository{}
-	handler := NewPostHandler(mockService, nil, mockRoomRepo)
+	handler := NewPostHandler(mockService, nil, mockRoomRepo, nil)
 	assert.NotNil(t, handler.CreatePost)
 }
 
 func TestCreatePost_TextRequired(t *testing.T) {
 	mockService := &MockPostService{}
 	mockRoomRepo := &MockRoomRepository{}
-	handler := NewPostHandler(mockService, nil, mockRoomRepo)
+	handler := NewPostHandler(mockService, nil, mockRoomRepo, nil)
 	assert.NotNil(t, handler.CreatePost)
 }
 
@@ -191,7 +223,7 @@ func TestGetPost_Success(t *testing.T) {
 	}
 
 	mockRoomRepo := &MockRoomRepository{}
-	handler := NewPostHandler(mockService, nil, mockRoomRepo)
+	handler := NewPostHandler(mockService, nil, mockRoomRepo, nil)
 	assert.NotNil(t, handler.GetPost)
 }
 
@@ -203,7 +235,7 @@ func TestGetPost_NotFound(t *testing.T) {
 	}
 
 	mockRoomRepo := &MockRoomRepository{}
-	handler := NewPostHandler(mockService, nil, mockRoomRepo)
+	handler := NewPostHandler(mockService, nil, mockRoomRepo, nil)
 	assert.NotNil(t, handler.GetPost)
 }
 
@@ -221,7 +253,7 @@ func TestDeletePost_Success(t *testing.T) {
 	}
 
 	mockRoomRepo := &MockRoomRepository{}
-	handler := NewPostHandler(mockService, nil, mockRoomRepo)
+	handler := NewPostHandler(mockService, nil, mockRoomRepo, nil)
 	assert.NotNil(t, handler.DeletePost)
 }
 
@@ -238,7 +270,7 @@ func TestDeletePost_NotOwner(t *testing.T) {
 	}
 
 	mockRoomRepo := &MockRoomRepository{}
-	handler := NewPostHandler(mockService, nil, mockRoomRepo)
+	handler := NewPostHandler(mockService, nil, mockRoomRepo, nil)
 	assert.NotNil(t, handler.DeletePost)
 }
 
@@ -250,7 +282,7 @@ func TestDeletePost_NotFound(t *testing.T) {
 	}
 
 	mockRoomRepo := &MockRoomRepository{}
-	handler := NewPostHandler(mockService, nil, mockRoomRepo)
+	handler := NewPostHandler(mockService, nil, mockRoomRepo, nil)
 	assert.NotNil(t, handler.DeletePost)
 }
 
