@@ -209,15 +209,20 @@ curl -X GET http://localhost:3000/api/v1/posts/507f1f77bcf86cd799439013 \
 {
   "data": {
     "id": "507f1f77bcf86cd799439013",
+    "room_id": "507f1f77bcf86cd799439011",
+    "room_code": "MY_ROOM",
+    "room_name": "My Room",
     "user_id": "507f1f77bcf86cd799439012",
+    "user_name": "John Doe",
     "text": "This is my first post!",
     "image": null,
     "video": null,
     "audio": null,
+    "validations_count": 3,
+    "respects_count": 7,
     "created_at": "2024-06-28T21:30:00Z",
     "updated_at": "2024-06-28T21:30:00Z"
   },
-  "message": "post retrieved successfully",
   "status": 200
 }
 ```

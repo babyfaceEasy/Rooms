@@ -37,6 +37,10 @@
 | `POST` | `/posts` | ✅ | Create post (multipart with media) |
 | `GET` | `/posts/:id` | ✅ | Get post by ID |
 | `DELETE` | `/posts/:id` | ✅ | Delete post |
+| `POST` | `/posts/:id/validate` | ✅ | Validate a post |
+| `DELETE` | `/posts/:id/validate` | ✅ | Remove validation |
+| `POST` | `/posts/:id/respect` | ✅ | Respect a post |
+| `DELETE` | `/posts/:id/respect` | ✅ | Remove respect |
 | `GET` | `/posts/:id/download` | ✅ | Download post media |
 
 ### Items
@@ -183,6 +187,10 @@ Users can create and join rooms to collaborate. Posts are scoped to rooms.
 | `failed to upload image` | 500 | Create post |
 | `failed to upload video` | 500 | Create post |
 | `failed to upload audio` | 500 | Create post |
+| `ALREADY_VALIDATED` | 409 | Validate post (already validated) |
+| `NOT_VALIDATED` | 400 | Remove validation (not validated) |
+| `ALREADY_RESPECTED` | 409 | Respect post (already respected) |
+| `NOT_RESPECTED` | 400 | Remove respect (not respected) |
 
 ---
 
