@@ -53,9 +53,10 @@ func (m *MongoCommentRepository) GetByID(ctx context.Context, id primitive.Objec
 	return &comment, nil
 }
 
-// GetByPostID retrieves paginated comments for a post (excluding soft-deleted), oldest first.
+// GetByPostID retrieves paginated comments for a post (excluding soft-deleted).
+// sortOrder accepts "asc" (oldest first) or "desc" (newest first, default).
 // Returns the comments, total count matching the filter, and any error.
-func (m *MongoCommentRepository) GetByPostID(ctx context.Context, postID primitive.ObjectID, page, limit int) ([]*domain.Comment, int64, error) {
+func (m *MongoCommentRepository) GetByPostID(ctx context.Context, postID primitive.ObjectID, page, limit int, sortOrder string) ([]*domain.Comment, int64, error) {
 	filter := bson.M{
 		"post_id":    postID,
 		"deleted_at": nil,
@@ -66,9 +67,14 @@ func (m *MongoCommentRepository) GetByPostID(ctx context.Context, postID primiti
 		return nil, 0, err
 	}
 
+	sort := -1 // default: newest first
+	if sortOrder == "asc" {
+		sort = 1
+	}
+
 	skip := (page - 1) * limit
 	opts := options.Find().
-		SetSort(bson.M{"created_at": 1}).
+		SetSort(bson.M{"created_at": sort}).
 		SetSkip(int64(skip)).
 		SetLimit(int64(limit))
 
