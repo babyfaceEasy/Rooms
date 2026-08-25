@@ -12,7 +12,7 @@
 | POST | `/api/v1/posts/:id/respect` | Respect a post | Required |
 | DELETE | `/api/v1/posts/:id/respect` | Remove respect from a post | Required |
 | POST | `/api/v1/posts/:id/comments` | Create comment on post | Required |
-| GET | `/api/v1/posts/:id/comments` | Get paginated comments for post (?page=&limit=) | Required |
+| GET | `/api/v1/posts/:id/comments` | Get paginated comments for post (?page=&limit=&sort=) | Required |
 | DELETE | `/api/v1/comments/:id` | Delete comment (author only) | Required |
 
 ## Quick Examples

@@ -123,8 +123,14 @@ func (h *CommentHandler) GetCommentsByPostID(c *fiber.Ctx) error {
 		limit = 20
 	}
 
+	// Parse sort order (asc = oldest first, desc = newest first)
+	sortOrder := c.Query("sort", "desc")
+	if sortOrder != "asc" && sortOrder != "desc" {
+		sortOrder = "desc"
+	}
+
 	// Get paginated comments via service
-	comments, total, err := h.svc.GetCommentsByPostID(c.Context(), postObjID, page, limit)
+	comments, total, err := h.svc.GetCommentsByPostID(c.Context(), postObjID, page, limit, sortOrder)
 	if err != nil {
 		return err
 	}

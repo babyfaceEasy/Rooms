@@ -15,7 +15,7 @@ import (
 type CommentService interface {
 	CreateComment(ctx context.Context, postID, userID primitive.ObjectID, text string) (*domain.Comment, error)
 	GetComment(ctx context.Context, id primitive.ObjectID) (*domain.Comment, error)
-	GetCommentsByPostID(ctx context.Context, postID primitive.ObjectID, page, limit int) ([]*domain.Comment, int64, error)
+	GetCommentsByPostID(ctx context.Context, postID primitive.ObjectID, page, limit int, sortOrder string) ([]*domain.Comment, int64, error)
 	DeleteComment(ctx context.Context, id, userID primitive.ObjectID) error
 }
 
@@ -77,8 +77,8 @@ func (s *commentService) GetComment(ctx context.Context, id primitive.ObjectID) 
 }
 
 // GetCommentsByPostID retrieves paginated comments for a post
-func (s *commentService) GetCommentsByPostID(ctx context.Context, postID primitive.ObjectID, page, limit int) ([]*domain.Comment, int64, error) {
-	comments, total, err := s.commentRepo.GetByPostID(ctx, postID, page, limit)
+func (s *commentService) GetCommentsByPostID(ctx context.Context, postID primitive.ObjectID, page, limit int, sortOrder string) ([]*domain.Comment, int64, error) {
+	comments, total, err := s.commentRepo.GetByPostID(ctx, postID, page, limit, sortOrder)
 	if err != nil {
 		return nil, 0, err
 	}

@@ -195,6 +195,7 @@ Retrieves a post by ID.
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | id | string | Yes | Post ID (MongoDB ObjectID) |
+| sort | string | No | Sort order: `desc` (newest first, default) or `asc` (oldest first) |
 
 **Example Request:**
 
@@ -260,6 +261,7 @@ Deletes a post (soft delete). Only the post creator can delete their posts.
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | id | string | Yes | Post ID (MongoDB ObjectID) |
+| sort | string | No | Sort order: `desc` (newest first, default) or `asc` (oldest first) |
 
 **Example Request:**
 
@@ -501,6 +503,7 @@ Creates a new comment on a post.
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | id | string | Yes | Post ID (MongoDB ObjectID) |
+| sort | string | No | Sort order: `desc` (newest first, default) or `asc` (oldest first) |
 
 **Request Body:**
 
@@ -593,6 +596,7 @@ Retrieves all comments for a specific post.
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | id | string | Yes | Post ID (MongoDB ObjectID) |
+| sort | string | No | Sort order: `desc` (newest first, default) or `asc` (oldest first) |
 
 **Success Response (200 OK):**
 
