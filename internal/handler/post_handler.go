@@ -30,7 +30,9 @@ type PostResponse struct {
 	Video            *string `json:"video,omitempty"`
 	Audio            *string `json:"audio,omitempty"`
 	ValidationsCount int     `json:"validations_count"`
+	HasValidated     bool    `json:"has_validated"`
 	RespectsCount    int     `json:"respects_count"`
+	HasRespected     bool    `json:"has_respected"`
 	CreatedAt        string  `json:"created_at"`
 	UpdatedAt        string  `json:"updated_at"`
 }
@@ -182,7 +184,7 @@ func (h *PostHandler) CreatePost(c *fiber.Ctx) error {
 	}
 
 	// Convert domain Post to PostResponse using helper
-	response := h.toPostResponse(post, room, userName)
+	response := h.toPostResponse(post, room, userName, userObjID)
 
 	return c.Status(fiber.StatusCreated).JSON(map[string]interface{}{
 		"data":    response,
@@ -245,7 +247,7 @@ func (h *PostHandler) GetPost(c *fiber.Ctx) error {
 	}
 
 	// Convert domain Post to PostResponse using helper
-	response := h.toPostResponse(post, room, userName)
+	response := h.toPostResponse(post, room, userName, userObjID)
 
 	return c.Status(fiber.StatusOK).JSON(map[string]interface{}{
 		"data":   response,
@@ -327,7 +329,7 @@ func (h *PostHandler) GetPostsByRoomCode(c *fiber.Ctx) error {
 	// Convert domain Posts to PostResponses
 	var responses []*PostResponse
 	for _, post := range posts {
-		responses = append(responses, h.toPostResponse(post, room, userMap[post.UserID.Hex()]))
+		responses = append(responses, h.toPostResponse(post, room, userMap[post.UserID.Hex()], userObjID))
 	}
 
 	return c.Status(fiber.StatusOK).JSON(map[string]interface{}{
@@ -448,7 +450,7 @@ func (h *PostHandler) ValidatePost(c *fiber.Ctx) error {
 		return err
 	}
 
-	response := h.toPostResponse(updatedPost, room, userName)
+	response := h.toPostResponse(updatedPost, room, userName, userObjID)
 	return c.Status(fiber.StatusOK).JSON(map[string]interface{}{
 		"data":    response,
 		"message": "post validated successfully",
@@ -560,7 +562,7 @@ func (h *PostHandler) RespectPost(c *fiber.Ctx) error {
 		return err
 	}
 
-	response := h.toPostResponse(updatedPost, room, userName)
+	response := h.toPostResponse(updatedPost, room, userName, userObjID)
 	return c.Status(fiber.StatusOK).JSON(map[string]interface{}{
 		"data":    response,
 		"message": "post respected successfully",
@@ -623,7 +625,7 @@ func (h *PostHandler) handleError(c *fiber.Ctx, err error) error {
 }
 
 // toPostResponse converts a domain Post and Room to a PostResponse
-func (h *PostHandler) toPostResponse(post *domain.Post, room *domain.Room, userName string) *PostResponse {
+func (h *PostHandler) toPostResponse(post *domain.Post, room *domain.Room, userName string, currentUserID primitive.ObjectID) *PostResponse {
 	return &PostResponse{
 		ID:               post.ID.Hex(),
 		RoomID:           post.RoomID.Hex(),
@@ -636,10 +638,22 @@ func (h *PostHandler) toPostResponse(post *domain.Post, room *domain.Room, userN
 		Video:            post.Video,
 		Audio:            post.Audio,
 		ValidationsCount: len(post.Validations),
+		HasValidated:     containsObjectID(post.Validations, currentUserID),
 		RespectsCount:    len(post.Respects),
+		HasRespected:     containsObjectID(post.Respects, currentUserID),
 		CreatedAt:        post.CreatedAt.Format("2006-01-02T15:04:05Z"),
 		UpdatedAt:        post.UpdatedAt.Format("2006-01-02T15:04:05Z"),
 	}
+}
+
+// containsObjectID checks if a target ObjectID exists in a slice.
+func containsObjectID(slice []primitive.ObjectID, target primitive.ObjectID) bool {
+	for _, id := range slice {
+		if id == target {
+			return true
+		}
+	}
+	return false
 }
 
 // isValidImageType checks if the file is a valid image type
