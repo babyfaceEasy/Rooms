@@ -300,6 +300,114 @@ curl -X DELETE http://localhost:3000/api/v1/posts/507f1f77bcf86cd799439013 \
 
 ---
 
+### 4. Report Post
+
+Reports a post for inappropriate content. Users can report posts for various reasons including bullying, harmful content, spam, etc. Each user can report a post at most once per day per post.
+
+**Endpoint:** `POST /api/v1/posts/:id/report`
+
+**Authentication:** Required
+
+**Content-Type:** `application/json`
+
+**URL Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| id | string | Yes | Post ID (MongoDB ObjectID) |
+
+**Request Body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| reason | string | Yes | Report reason (must be one of valid reasons below) |
+| comment | string | No | Optional additional context (max 500 characters) |
+
+**Valid Report Reasons:**
+
+- `under_18` — Post involves minors inappropriately
+- `bullying_harassment` — Post contains bullying or harassment
+- `suicide_self_harm` — Post discusses suicide or self-harm
+- `violent_hateful` — Post contains violence or hate speech
+- `selling_restricted` — Post attempts to sell restricted items
+- `adult_content` — Post contains explicit adult content
+- `scam_fraud` — Post is spam, scam, or fraud
+- `intellectual_property` — Post violates intellectual property rights
+- `dont_want_to_see` — Generic dislike/don't want to see
+
+**Example Request:**
+
+```bash
+# Report post for bullying
+curl -X POST http://localhost:3000/api/v1/posts/507f1f77bcf86cd799439013/report \
+  -H "Authorization: Bearer <access_token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "reason": "bullying_harassment",
+    "comment": "This post contains personal attacks"
+  }'
+
+# Report post without comment
+curl -X POST http://localhost:3000/api/v1/posts/507f1f77bcf86cd799439013/report \
+  -H "Authorization: Bearer <access_token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "reason": "dont_want_to_see"
+  }'
+```
+
+**Success Response (200 OK):**
+
+```json
+{
+  "message": "post reported successfully",
+  "status": 200
+}
+```
+
+**Error Responses:**
+
+| Status | Error | Description |
+|--------|-------|-------------|
+| 400 | invalid input | Missing reason field or invalid request format |
+| 400 | invalid report reason | Reason is not a valid report type |
+| 400 | cannot report own post | User cannot report their own posts |
+| 401 | unauthorized | Missing or invalid JWT token |
+| 404 | post not found | Post does not exist or is soft-deleted |
+| 409 | report already exists | User has already reported this post |
+| 429 | report limit exceeded | User has exceeded their daily report limit (default: 10 per day) |
+| 500 | internal server error | Server error |
+
+**Example Error Response (409 - Already Reported):**
+
+```json
+{
+  "error": "report already exists",
+  "status": 409
+}
+```
+
+**Example Error Response (429 - Rate Limited):**
+
+```json
+{
+  "error": "report limit exceeded",
+  "status": 429
+}
+```
+
+**Auto-Moderation:**
+
+Posts that receive a configurable number of reports (default: 15) are automatically soft-deleted from the platform. The post creator is notified when their post receives a report via the notifications system.
+
+**Note on Privacy:**
+
+- Reporter identity is kept confidential and not shared with the post creator
+- Post creator is notified that their post was reported along with the reason, but not who reported it
+- Reports are stored permanently for moderation team review
+
+---
+
 ## Data Model
 
 ### Post

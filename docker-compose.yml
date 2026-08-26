@@ -64,8 +64,9 @@ services:
     restart: unless-stopped
     environment:
       APP_NAME: temp_backend
+      APP_ENV: development
       PORT: "8080"
-      LOG_LEVEL: info
+      LOG_LEVEL: debug
       MONGO_URI: mongodb://admin:secret@mongodb:27017/temp_backend?authSource=admin
       MONGO_DATABASE: temp_backend
       MONGO_CONNECT_TIMEOUT: 10s
@@ -76,6 +77,10 @@ services:
       S3_SECRET_KEY: minioadmin
       S3_USE_SSL: "false"
       S3_PRESIGNED_EXPIRY: 15m
+      S3_PUBLIC_URL: http://localhost:9000
+      JWT_SECRET: LKBSSPsjj3jZSQ3TuYuGVVAmiyu1CAB4OxouAW2fZRU
+      ACCESS_TOKEN_TTL: 1h
+      REFRESH_TOKEN_TTL: 168h
     ports:
       - "8080:8080"
     depends_on:

@@ -43,6 +43,7 @@
 | `POST` | `/posts/:id/respect` | ✅ | Respect a post |
 | `DELETE` | `/posts/:id/respect` | ✅ | Remove respect |
 | `GET` | `/posts/:id/download` | ✅ | Download post media |
+| `POST` | `/posts/:id/report` | ✅ | Report post for inappropriate content |
 
 ### Items
 | Method | Endpoint | Auth | Description |

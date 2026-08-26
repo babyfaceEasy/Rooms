@@ -30,6 +30,7 @@ type Post struct {
 	Audio       *string              `bson:"audio,omitempty"` // S3 URL
 	Validations []primitive.ObjectID `bson:"validations,omitempty"`
 	Respects    []primitive.ObjectID `bson:"respects,omitempty"`
+	ReportCount int                  `bson:"report_count,omitempty"` // Number of times this post has been reported
 	CreatedAt   time.Time            `bson:"created_at"`
 	UpdatedAt   time.Time            `bson:"updated_at"`
 	DeletedAt   *time.Time           `bson:"deleted_at,omitempty"` // Soft delete

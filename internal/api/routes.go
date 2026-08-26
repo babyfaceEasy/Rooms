@@ -8,7 +8,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
-func (s *Server) registerRoutes(itemHandler *handler.ItemHandler, userHandler *handler.UserHandler, authHandler *handler.AuthHandler, roomHandler *handler.RoomHandler, postHandler *handler.PostHandler, commentHandler *handler.CommentHandler, authService service.AuthService) {
+func (s *Server) registerRoutes(itemHandler *handler.ItemHandler, userHandler *handler.UserHandler, authHandler *handler.AuthHandler, roomHandler *handler.RoomHandler, postHandler *handler.PostHandler, commentHandler *handler.CommentHandler, reportHandler *handler.ReportHandler, authService service.AuthService) {
 	s.app.Get("/health", func(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusOK).JSON(fiber.Map{
 			"status": "ok",
@@ -75,6 +75,7 @@ func (s *Server) registerRoutes(itemHandler *handler.ItemHandler, userHandler *h
 	apiProtected.Delete("/posts/:id/validate", postHandler.RemoveValidation)
 	apiProtected.Post("/posts/:id/respect", postHandler.RespectPost)
 	apiProtected.Delete("/posts/:id/respect", postHandler.RemoveRespect)
+	apiProtected.Post("/posts/:id/report", reportHandler.ReportPost)
 
 	// Comment routes (protected)
 	apiProtected.Post("/posts/:id/comments", commentHandler.CreateComment)
