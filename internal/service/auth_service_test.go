@@ -9,18 +9,18 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/crypto/bcrypt"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"golang.org/x/crypto/bcrypt"
 	"temp_backend/config"
 	"temp_backend/internal/domain"
 )
 
 // MockRefreshTokenRepository is a mock implementation of RefreshTokenRepository for testing.
 type MockRefreshTokenRepository struct {
-	createFunc           func(ctx context.Context, token *domain.RefreshToken) error
-	getByTokenHashFunc   func(ctx context.Context, hash string) (*domain.RefreshToken, error)
-	deleteFunc           func(ctx context.Context, id primitive.ObjectID) error
-	deleteByUserIDFunc   func(ctx context.Context, userID primitive.ObjectID) error
+	createFunc         func(ctx context.Context, token *domain.RefreshToken) error
+	getByTokenHashFunc func(ctx context.Context, hash string) (*domain.RefreshToken, error)
+	deleteFunc         func(ctx context.Context, id primitive.ObjectID) error
+	deleteByUserIDFunc func(ctx context.Context, userID primitive.ObjectID) error
 }
 
 func (m *MockRefreshTokenRepository) Create(ctx context.Context, token *domain.RefreshToken) error {
@@ -66,10 +66,10 @@ func TestLogin_Success(t *testing.T) {
 	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("password123"), bcrypt.DefaultCost)
 
 	user := &domain.User{
-		ID:           userID,
-		Name:         "John Doe",
-		Email:        "john@example.com",
-		PasswordHash: string(hashedPassword),
+		ID:            userID,
+		Name:          "John Doe",
+		Email:         "john@example.com",
+		PasswordHash:  string(hashedPassword),
 		IsAgeVerified: true,
 	}
 
@@ -105,10 +105,10 @@ func TestLogin_InvalidPassword(t *testing.T) {
 	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("correct_password"), bcrypt.DefaultCost)
 
 	user := &domain.User{
-		ID:           userID,
-		Name:         "John Doe",
-		Email:        "john@example.com",
-		PasswordHash: string(hashedPassword),
+		ID:            userID,
+		Name:          "John Doe",
+		Email:         "john@example.com",
+		PasswordHash:  string(hashedPassword),
 		IsAgeVerified: true,
 	}
 
@@ -157,10 +157,10 @@ func TestLogin_GeneratesValidAccessToken(t *testing.T) {
 	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("password123"), bcrypt.DefaultCost)
 
 	user := &domain.User{
-		ID:           userID,
-		Name:         "John Doe",
-		Email:        "john@example.com",
-		PasswordHash: string(hashedPassword),
+		ID:            userID,
+		Name:          "John Doe",
+		Email:         "john@example.com",
+		PasswordHash:  string(hashedPassword),
 		IsAgeVerified: true,
 	}
 
@@ -401,10 +401,10 @@ func TestLogin_RefreshTokenIsStoredHashed(t *testing.T) {
 	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("password123"), bcrypt.DefaultCost)
 
 	user := &domain.User{
-		ID:           userID,
-		Name:         "John Doe",
-		Email:        "john@example.com",
-		PasswordHash: string(hashedPassword),
+		ID:            userID,
+		Name:          "John Doe",
+		Email:         "john@example.com",
+		PasswordHash:  string(hashedPassword),
 		IsAgeVerified: true,
 	}
 

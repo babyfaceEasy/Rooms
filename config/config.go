@@ -43,10 +43,14 @@ type Config struct {
 		PasswordResetTemplateID string
 	}
 	RateLimit struct {
-		GlobalMax   int
+		GlobalMax    int
 		GlobalWindow time.Duration
-		AuthMax     int
-		AuthWindow  time.Duration
+		AuthMax      int
+		AuthWindow   time.Duration
+	}
+	Reporting struct {
+		MaxReportsPerDay        int
+		AutoSoftDeleteThreshold int
 	}
 }
 
@@ -80,6 +84,9 @@ func Load() (Config, error) {
 	cfg.RateLimit.GlobalWindow = parseDuration(getEnv("RATE_LIMIT_GLOBAL_WINDOW", "1m"))
 	cfg.RateLimit.AuthMax = getInt("RATE_LIMIT_AUTH_MAX", 20)
 	cfg.RateLimit.AuthWindow = parseDuration(getEnv("RATE_LIMIT_AUTH_WINDOW", "1m"))
+
+	cfg.Reporting.MaxReportsPerDay = getInt("MAX_REPORTS_PER_DAY", 10)
+	cfg.Reporting.AutoSoftDeleteThreshold = getInt("AUTO_SOFT_DELETE_REPORT_THRESHOLD", 15)
 
 	cfg.SendGrid.APIKey = getEnv("SENDGRID_API_KEY", "")
 	cfg.SendGrid.SenderEmail = getEnv("SENDGRID_SENDER_EMAIL", "noreply@tempbackend.com")

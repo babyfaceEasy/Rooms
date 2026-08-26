@@ -126,7 +126,13 @@ func main() {
 	commentService := service.NewCommentService(commentRepo, postRepo)
 	commentHandler := handler.NewCommentHandler(commentService, userRepo)
 
-	server := api.NewServer(cfg, logger, itemHandler, userHandler, authHandler, roomHandler, postHandler, commentHandler, authService)
+	// Report repositories and service
+	reportRepo := repository.NewMongoReportRepository(mongoClient.Database(cfg.Mongo.Database))
+	notificationRepo := repository.NewMongoNotificationRepository(mongoClient.Database(cfg.Mongo.Database))
+	reportService := service.NewReportService(reportRepo, notificationRepo, postRepo, cfg.Reporting.AutoSoftDeleteThreshold, cfg.Reporting.MaxReportsPerDay)
+	reportHandler := handler.NewReportHandler(reportService, cfg.Reporting.MaxReportsPerDay)
+
+	server := api.NewServer(cfg, logger, itemHandler, userHandler, authHandler, roomHandler, postHandler, commentHandler, reportHandler, authService)
 
 	go func() {
 		if err := server.Start(); err != nil && !errors.Is(err, http.ErrServerClosed) {

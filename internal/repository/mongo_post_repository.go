@@ -197,3 +197,27 @@ func (m *MongoPostRepository) GetByRoomID(ctx context.Context, roomID primitive.
 
 	return posts, total, nil
 }
+
+// IncrementReportCount increments the report count for a post and returns the new count
+func (m *MongoPostRepository) IncrementReportCount(ctx context.Context, postID primitive.ObjectID) (int, error) {
+	result := m.collection.FindOneAndUpdate(
+		ctx,
+		bson.M{"_id": postID},
+		bson.M{
+			"$inc": bson.M{"report_count": 1},
+			"$set": bson.M{"updated_at": time.Now()},
+		},
+	)
+
+	if result.Err() != nil {
+		return 0, result.Err()
+	}
+
+	var post domain.Post
+	if err := result.Decode(&post); err != nil {
+		return 0, err
+	}
+
+	// The FindOneAndUpdate returns the document BEFORE the update, so we need to add 1
+	return post.ReportCount + 1, nil
+}

@@ -14,6 +14,7 @@
 | POST | `/api/v1/posts/:id/comments` | Create comment on post | Required |
 | GET | `/api/v1/posts/:id/comments` | Get paginated comments for post (?page=&limit=&sort=) | Required |
 | DELETE | `/api/v1/comments/:id` | Delete comment (author only) | Required |
+| POST | `/api/v1/posts/:id/report` | Report post for inappropriate content | Required |
 
 ## Quick Examples
 
@@ -72,6 +73,17 @@ curl -X DELETE http://localhost:3000/api/v1/comments/507f1f77bcf86cd799439020 \
   -H "Authorization: Bearer TOKEN"
 ```
 
+### Report Post
+```bash
+curl -X POST http://localhost:3000/api/v1/posts/507f1f77bcf86cd799439013/report \
+  -H "Authorization: Bearer TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "reason": "bullying_harassment",
+    "comment": "This post contains personal attacks"
+  }'
+```
+
 ## Validation Rules
 
 | Field | Rule |
@@ -87,11 +99,12 @@ curl -X DELETE http://localhost:3000/api/v1/comments/507f1f77bcf86cd799439020 \
 |------|---------|
 | 200 | Success (get/delete/validate/respect) |
 | 201 | Post created successfully |
-| 400 | Bad request (validation error, NOT_VALIDATED, NOT_RESPECTED) |
+| 400 | Bad request (validation error, NOT_VALIDATED, NOT_RESPECTED, invalid reason) |
 | 401 | Unauthorized (invalid token) |
 | 403 | Forbidden (not post owner, not room member) |
 | 404 | Post not found |
-| 409 | Conflict (ALREADY_VALIDATED, ALREADY_RESPECTED) |
+| 409 | Conflict (ALREADY_VALIDATED, ALREADY_RESPECTED, report already exists) |
+| 429 | Too Many Requests (daily report limit exceeded) |
 | 500 | Server error |
 
 ## S3 Storage Paths
