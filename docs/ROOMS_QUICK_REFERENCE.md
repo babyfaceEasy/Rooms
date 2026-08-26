@@ -6,6 +6,8 @@
 |--------|----------|-------------|------|---------|
 | **POST** | `/api/v1/rooms` | Create room | ✅ | Room object |
 | **POST** | `/api/v1/rooms/join` | Join room by code | ✅ | Room object |
+| **POST** | `/api/v1/rooms/add-member-by-code` | Add user to room by user code | ✅ | Room object |
+| **POST** | `/api/v1/rooms/remove-member-by-code` | Remove user from room by user code (owner only) | ✅ | Empty (null) |
 | **GET** | `/api/v1/rooms` | List user's rooms | ✅ | Array of rooms |
 | **GET** | `/api/v1/rooms/:code` | Get room details by code | ✅ | Room object |
 | **GET** | `/api/v1/rooms/by-id/:id` | Get room details by ID | ✅ | Room object |
@@ -78,6 +80,24 @@ curl http://localhost:3000/api/v1/rooms/MY_ROOM_001/users \
 ```bash
 curl http://localhost:3000/api/v1/rooms/MY_ROOM_001/posts \
   -H "Authorization: Bearer $TOKEN"
+```
+
+### Add User to Room by Code
+
+```bash
+curl -X POST http://localhost:3000/api/v1/rooms/add-member-by-code \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"room_code":"MY_ROOM_001","user_code":"12345678"}'
+```
+
+### Remove User from Room by Code
+
+```bash
+curl -X POST http://localhost:3000/api/v1/rooms/remove-member-by-code \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"room_code":"MY_ROOM_001","user_code":"12345678"}'
 ```
 
 ### Remove Member from Room
