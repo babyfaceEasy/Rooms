@@ -56,6 +56,7 @@ func (s *Server) registerRoutes(itemHandler *handler.ItemHandler, userHandler *h
 	apiProtected.Post("/rooms", roomHandler.CreateRoom)
 	apiProtected.Post("/rooms/join", roomHandler.AddUserToRoom)
 	apiProtected.Post("/rooms/add-member-by-code", roomHandler.AddUserToRoomByUserCode)
+	apiProtected.Post("/rooms/remove-member-by-code", roomHandler.RemoveUserFromRoomByUserCode)
 	apiProtected.Get("/rooms", roomHandler.ListUserRooms)
 	apiProtected.Get("/rooms/by-id/:id", roomHandler.GetRoomByID)
 	apiProtected.Get("/rooms/:code", roomHandler.GetRoom)

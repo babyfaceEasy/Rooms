@@ -272,7 +272,74 @@ Adds a specified user to a room using the user's unique customer code. This endp
 
 ---
 
-### 4. List User's Rooms
+### 4. Remove User from Room by User Code
+
+Removes a specified user from a room using the user's unique customer code. Only the room owner can remove users.
+
+**Endpoint:** `POST /api/v1/rooms/remove-member-by-code`
+
+**Authentication:** Required
+
+**Request Body:**
+
+```json
+{
+  "room_code": "CONF_A_001",
+  "user_code": "12345678"
+}
+```
+
+**Request Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| room_code | string | Yes | Unique room code |
+| user_code | string | Yes | Target user's 8-digit customer code |
+
+**Success Response (200 OK):**
+
+```json
+{
+  "data": null,
+  "message": "user removed from room successfully",
+  "status": 200
+}
+```
+
+**Error Responses:**
+
+| Status | Error | Description |
+|--------|-------|-------------|
+| 400 | invalid input | Missing room_code or user_code, or user is not a member of the room |
+| 401 | unauthorized | Missing or invalid JWT token |
+| 403 | forbidden | Requester is not the room owner |
+| 404 | user not found | User with the specified user_code doesn't exist |
+| 404 | room not found | Room with the specified room_code doesn't exist |
+| 500 | internal server error | Server error |
+
+**Example Error Response (403 - Not Owner):**
+
+```json
+{
+  "error": "access denied",
+  "code": "FORBIDDEN",
+  "status": 403
+}
+```
+
+**Example Error Response (400 - User Not Member):**
+
+```json
+{
+  "error": "The provided input is invalid",
+  "code": "INVALID_INPUT",
+  "status": 400
+}
+```
+
+---
+
+### 5. List User's Rooms
 
 Retrieves all rooms the authenticated user is part of (as owner or member).
 
@@ -334,7 +401,7 @@ Retrieves all rooms the authenticated user is part of (as owner or member).
 
 ---
 
-### 5. Get Room Details
+### 6. Get Room Details
 
 Retrieves details of a specific room. Only the room owner or members can access.
 
@@ -387,7 +454,7 @@ Retrieves details of a specific room. Only the room owner or members can access.
 
 ---
 
-### 6. Get Room Details by ID
+### 7. Get Room Details by ID
 
 Retrieves details of a specific room by its ID. Only the room owner or members can access.
 
@@ -451,7 +518,7 @@ Retrieves details of a specific room by its ID. Only the room owner or members c
 
 ---
 
-### 7. Get Room Members
+### 8. Get Room Members
 
 Lists all members of a room. Only the room owner or members can access.
 
@@ -495,7 +562,7 @@ Lists all members of a room. Only the room owner or members can access.
 
 ---
 
-### 8. Get Room Users
+### 9. Get Room Users
 
 Retrieves full user details for all members of a room. Only the room owner or members can access.
 
@@ -560,7 +627,7 @@ Retrieves full user details for all members of a room. Only the room owner or me
 
 ---
 
-### 9. Remove Member from Room
+### 10. Remove Member from Room
 
 Removes a member from a room. Only the room owner can perform this action.
 
@@ -628,7 +695,7 @@ Removes a member from a room. Only the room owner can perform this action.
 
 ---
 
-### 10. Leave Room
+### 11. Leave Room
 
 Removes the authenticated user from a room. Only members can leave a room; room owners/creators cannot use this endpoint.
 
@@ -684,9 +751,9 @@ Removes the authenticated user from a room. Only members can leave a room; room 
 
 ---
 
-### 11. Delete or Leave Room
+### 12. Delete or Leave Room
 
-**Deprecated**: Use `POST /api/v1/rooms/:code/leave` for members to leave a room (see Endpoint #10).
+**Deprecated**: Use `POST /api/v1/rooms/:code/leave` for members to leave a room (see Endpoint #11).
 
 This endpoint maintains backward compatibility and handles both delete (owner) and leave (member) operations.
 
@@ -739,7 +806,7 @@ This endpoint maintains backward compatibility and handles both delete (owner) a
 
 ---
 
-### 12. Get Posts by Room Code
+### 13. Get Posts by Room Code
 
 Retrieves all posts for a specific room. Only room members can retrieve posts from a room.
 

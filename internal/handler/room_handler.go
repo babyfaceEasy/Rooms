@@ -25,6 +25,12 @@ type AddUserToRoomByUserCodeRequest struct {
 	UserCode string `json:"user_code"`
 }
 
+// RemoveUserFromRoomByUserCodeRequest represents the request to remove a user by their customer code
+type RemoveUserFromRoomByUserCodeRequest struct {
+	RoomCode string `json:"room_code"`
+	UserCode string `json:"user_code"`
+}
+
 // RemoveMemberFromRoomRequest represents the request to remove a member from a room
 type RemoveMemberFromRoomRequest struct {
 	MemberID string `json:"member_id"`
@@ -588,6 +594,43 @@ func (h *RoomHandler) AddUserToRoomByUserCode(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(map[string]interface{}{
 		"data":    response,
 		"message": "user added to room successfully",
+		"status":  fiber.StatusOK,
+	})
+}
+
+// RemoveUserFromRoomByUserCode removes a user from a room using the user's customer code (only owner can remove)
+func (h *RoomHandler) RemoveUserFromRoomByUserCode(c *fiber.Ctx) error {
+	// Extract user ID from context (owner/requester)
+	userID, ok := c.Locals("user_id").(string)
+	if !ok || userID == "" {
+		return domain.ErrUnauthorized
+	}
+
+	// Convert user ID from string to ObjectID
+	ownerObjID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return &domain.AppError{Code: "INVALID_USER_ID", Message: "Invalid user ID", HTTPStatus: fiber.StatusBadRequest}
+	}
+
+	// Parse request body
+	var req RemoveUserFromRoomByUserCodeRequest
+	if err := c.BodyParser(&req); err != nil {
+		return domain.ErrInvalidInput
+	}
+
+	// Validate request fields
+	if req.RoomCode == "" || req.UserCode == "" {
+		return &domain.AppError{Code: "INVALID_INPUT", Message: "room_code and user_code are required", HTTPStatus: fiber.StatusBadRequest}
+	}
+
+	// Remove user from room via service
+	if err := h.svc.RemoveUserFromRoomByUserCode(c.Context(), req.RoomCode, req.UserCode, ownerObjID); err != nil {
+		return err
+	}
+
+	return c.Status(fiber.StatusOK).JSON(map[string]interface{}{
+		"data":    nil,
+		"message": "user removed from room successfully",
 		"status":  fiber.StatusOK,
 	})
 }
