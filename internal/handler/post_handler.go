@@ -39,19 +39,21 @@ type PostResponse struct {
 
 // PostHandler handles post-related endpoints
 type PostHandler struct {
-	svc      service.PostService
-	storage  repository.ObjectStorage
-	roomRepo repository.RoomRepository
-	userRepo repository.UserRepository
+	svc        service.PostService
+	storage    repository.ObjectStorage
+	roomRepo   repository.RoomRepository
+	userRepo   repository.UserRepository
+	sseManager *service.SSEManager
 }
 
 // NewPostHandler creates a new post handler
-func NewPostHandler(svc service.PostService, storage repository.ObjectStorage, roomRepo repository.RoomRepository, userRepo repository.UserRepository) *PostHandler {
+func NewPostHandler(svc service.PostService, storage repository.ObjectStorage, roomRepo repository.RoomRepository, userRepo repository.UserRepository, sseManager *service.SSEManager) *PostHandler {
 	return &PostHandler{
-		svc:      svc,
-		storage:  storage,
-		roomRepo: roomRepo,
-		userRepo: userRepo,
+		svc:        svc,
+		storage:    storage,
+		roomRepo:   roomRepo,
+		userRepo:   userRepo,
+		sseManager: sseManager,
 	}
 }
 
@@ -693,4 +695,66 @@ func isValidAudioType(filename string) bool {
 		".ogg":  true,
 	}
 	return validTypes[ext]
+}
+
+// StreamNewPosts streams new post events for a room using Server-Sent Events
+func (h *PostHandler) StreamNewPosts(c *fiber.Ctx) error {
+	// Extract user ID from context
+	userID, ok := c.Locals("user_id").(string)
+	if !ok || userID == "" {
+		return domain.ErrUnauthorized
+	}
+
+	// Convert user ID from string to ObjectID
+	userObjID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return &domain.AppError{Code: "INVALID_USER_ID", Message: "Invalid user ID", HTTPStatus: fiber.StatusBadRequest}
+	}
+
+	// Get room code from query parameter
+	roomCode := c.Query("room_code")
+	if roomCode == "" {
+		return &domain.AppError{Code: "ROOM_CODE_REQUIRED", Message: "room_code query parameter is required", HTTPStatus: fiber.StatusBadRequest}
+	}
+
+	// Get room by code
+	room, err := h.roomRepo.GetByCode(c.Context(), roomCode)
+	if err != nil {
+		return err
+	}
+
+	// Verify user is room member
+	isMember, err := h.roomRepo.IsUserMember(c.Context(), room.ID, userObjID)
+	if err != nil {
+		return domain.ErrInternalServer
+	}
+	if !isMember {
+		return domain.ErrNotRoomMember
+	}
+
+	// Set SSE headers
+	c.Set("Content-Type", "text/event-stream")
+	c.Set("Cache-Control", "no-cache")
+	c.Set("Connection", "keep-alive")
+	c.Set("X-Accel-Buffering", "no")
+
+	// Subscribe to events for this room
+	events, subID := h.sseManager.Subscribe(room.ID.Hex())
+	defer h.sseManager.Unsubscribe(room.ID.Hex(), subID)
+
+	// Stream events to client
+	for {
+		select {
+		case event, ok := <-events:
+			if !ok {
+				return nil
+			}
+			// Send event as SSE format
+			if err := c.JSON(event); err != nil {
+				return err
+			}
+		case <-c.Context().Done():
+			return nil
+		}
+	}
 }

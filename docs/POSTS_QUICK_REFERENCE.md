@@ -15,6 +15,7 @@
 | GET | `/api/v1/posts/:id/comments` | Get paginated comments for post (?page=&limit=&sort=) | Required |
 | DELETE | `/api/v1/comments/:id` | Delete comment (author only) | Required |
 | POST | `/api/v1/posts/:id/report` | Report post for inappropriate content | Required |
+| GET | `/api/v1/posts/stream/new` | Stream new posts (SSE) for a room (?room_code=) | Required |
 
 ## Quick Examples
 

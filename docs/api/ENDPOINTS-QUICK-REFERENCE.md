@@ -44,6 +44,7 @@
 | `DELETE` | `/posts/:id/respect` | ✅ | Remove respect |
 | `GET` | `/posts/:id/download` | ✅ | Download post media |
 | `POST` | `/posts/:id/report` | ✅ | Report post for inappropriate content |
+| `GET` | `/posts/stream/new` | ✅ | Stream new posts via SSE (?room_code=) |
 
 ### Items
 | Method | Endpoint | Auth | Description |
