@@ -18,4 +18,5 @@ type PostRepository interface {
 	RemoveValidation(ctx context.Context, postID, userID primitive.ObjectID) error
 	AddRespect(ctx context.Context, postID, userID primitive.ObjectID) error
 	RemoveRespect(ctx context.Context, postID, userID primitive.ObjectID) error
+	IncrementReportCount(ctx context.Context, postID primitive.ObjectID) (int, error)
 }

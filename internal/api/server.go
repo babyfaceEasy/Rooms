@@ -24,7 +24,7 @@ type Server struct {
 }
 
 // NewServer builds a configured Fiber server and wires all routes.
-func NewServer(cfg config.Config, logger *slog.Logger, itemHandler *handler.ItemHandler, userHandler *handler.UserHandler, authHandler *handler.AuthHandler, roomHandler *handler.RoomHandler, postHandler *handler.PostHandler, commentHandler *handler.CommentHandler, authService service.AuthService) *Server {
+func NewServer(cfg config.Config, logger *slog.Logger, itemHandler *handler.ItemHandler, userHandler *handler.UserHandler, authHandler *handler.AuthHandler, roomHandler *handler.RoomHandler, postHandler *handler.PostHandler, commentHandler *handler.CommentHandler, reportHandler *handler.ReportHandler, authService service.AuthService) *Server {
 	app := fiber.New(fiber.Config{
 		AppName:      cfg.App.Name,
 		ErrorHandler: middleware.NewErrorHandler(logger, cfg.App.Env == "development"),
@@ -46,7 +46,7 @@ func NewServer(cfg config.Config, logger *slog.Logger, itemHandler *handler.Item
 		cfg:    cfg,
 		logger: logger,
 	}
-	s.registerRoutes(itemHandler, userHandler, authHandler, roomHandler, postHandler, commentHandler, authService)
+	s.registerRoutes(itemHandler, userHandler, authHandler, roomHandler, postHandler, commentHandler, reportHandler, authService)
 	return s
 }
 
