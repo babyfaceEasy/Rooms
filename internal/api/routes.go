@@ -76,6 +76,7 @@ func (s *Server) registerRoutes(itemHandler *handler.ItemHandler, userHandler *h
 	apiProtected.Post("/posts/:id/respect", postHandler.RespectPost)
 	apiProtected.Delete("/posts/:id/respect", postHandler.RemoveRespect)
 	apiProtected.Post("/posts/:id/report", reportHandler.ReportPost)
+	apiProtected.Get("/posts/stream/new", postHandler.StreamNewPosts)
 
 	// Comment routes (protected)
 	apiProtected.Post("/posts/:id/comments", commentHandler.CreateComment)
