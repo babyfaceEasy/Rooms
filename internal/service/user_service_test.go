@@ -386,7 +386,7 @@ func TestUpdateProfile_Success(t *testing.T) {
 	refreshTokenRepoMock := &MockRefreshTokenRepository{}
 	svc := NewUserService(mock, refreshTokenRepoMock)
 
-	user, err := svc.UpdateProfile(context.Background(), userID.Hex(), "New Name")
+	user, err := svc.UpdateProfile(context.Background(), userID.Hex(), "New Name", "")
 
 	assert.NoError(t, err)
 	assert.NotNil(t, user)
@@ -401,7 +401,7 @@ func TestUpdateProfile_InvalidID(t *testing.T) {
 	refreshTokenRepoMock := &MockRefreshTokenRepository{}
 	svc := NewUserService(mock, refreshTokenRepoMock)
 
-	user, err := svc.UpdateProfile(context.Background(), "invalid", "New Name")
+	user, err := svc.UpdateProfile(context.Background(), "invalid", "New Name", "")
 
 	assert.Error(t, err)
 	assert.Nil(t, user)
@@ -417,7 +417,7 @@ func TestUpdateProfile_UserNotFound(t *testing.T) {
 	refreshTokenRepoMock := &MockRefreshTokenRepository{}
 	svc := NewUserService(mock, refreshTokenRepoMock)
 
-	user, err := svc.UpdateProfile(context.Background(), primitive.NewObjectID().Hex(), "New Name")
+	user, err := svc.UpdateProfile(context.Background(), primitive.NewObjectID().Hex(), "New Name", "")
 
 	assert.Error(t, err)
 	assert.Nil(t, user)
@@ -429,7 +429,7 @@ func TestUpdateProfile_InvalidName_Empty(t *testing.T) {
 	refreshTokenRepoMock := &MockRefreshTokenRepository{}
 	svc := NewUserService(mock, refreshTokenRepoMock)
 
-	user, err := svc.UpdateProfile(context.Background(), primitive.NewObjectID().Hex(), "")
+	user, err := svc.UpdateProfile(context.Background(), primitive.NewObjectID().Hex(), "", "")
 
 	assert.Error(t, err)
 	assert.Nil(t, user)
@@ -441,7 +441,7 @@ func TestUpdateProfile_InvalidName_TooShort(t *testing.T) {
 	refreshTokenRepoMock := &MockRefreshTokenRepository{}
 	svc := NewUserService(mock, refreshTokenRepoMock)
 
-	user, err := svc.UpdateProfile(context.Background(), primitive.NewObjectID().Hex(), "J")
+	user, err := svc.UpdateProfile(context.Background(), primitive.NewObjectID().Hex(), "J", "")
 
 	assert.Error(t, err)
 	assert.Nil(t, user)
@@ -458,7 +458,7 @@ func TestUpdateProfile_InvalidName_TooLong(t *testing.T) {
 		longName += "a"
 	}
 
-	user, err := svc.UpdateProfile(context.Background(), primitive.NewObjectID().Hex(), longName)
+	user, err := svc.UpdateProfile(context.Background(), primitive.NewObjectID().Hex(), longName, "")
 
 	assert.Error(t, err)
 	assert.Nil(t, user)

@@ -123,7 +123,7 @@ func setupAuthTestEnvironment(t *testing.T) (*fiber.App, *mongo.Client, func()) 
 
 	// Create handlers
 	emailService := &MockEmailService{}
-	userHandler := handler.NewUserHandler(userService, emailService)
+	userHandler := handler.NewUserHandler(userService, emailService, nil)
 	authHandler := handler.NewAuthHandler(authService)
 
 	// Create server (with nil for handlers not used in auth tests)
