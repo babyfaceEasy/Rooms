@@ -14,7 +14,7 @@
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
 | `GET` | `/profile` | ✅ | View current user profile |
-| `PATCH` | `/profile` | ✅ | Update profile (name) |
+| `PATCH` | `/profile` | ✅ | Update profile (name, optional profile_picture) |
 | `POST` | `/profile/change-password` | ✅ | Change password |
 | `DELETE` | `/profile` | ✅ | Delete account (soft delete) |
 
@@ -44,6 +44,7 @@
 | `DELETE` | `/posts/:id/respect` | ✅ | Remove respect |
 | `GET` | `/posts/:id/download` | ✅ | Download post media |
 | `POST` | `/posts/:id/report` | ✅ | Report post for inappropriate content |
+| `GET` | `/posts/stream/new` | ✅ | Stream new posts via SSE (?room_code=) |
 
 ### Items
 | Method | Endpoint | Auth | Description |

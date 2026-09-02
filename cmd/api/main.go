@@ -105,7 +105,7 @@ func main() {
 	)
 
 	userService := service.NewUserService(userRepo, refreshTokenRepo)
-	userHandler := handler.NewUserHandler(userService, emailService)
+	userHandler := handler.NewUserHandler(userService, emailService, storageRepo)
 
 	// Auth services
 	authService := service.NewAuthService(userRepo, refreshTokenRepo, cfg)
@@ -118,8 +118,12 @@ func main() {
 
 	// Post repositories and service
 	postRepo := repository.NewMongoPostRepository(mongoClient.Database(cfg.Mongo.Database))
-	postService := service.NewPostService(postRepo, roomRepo)
-	postHandler := handler.NewPostHandler(postService, storageRepo, roomRepo, userRepo)
+
+	// SSE Manager for real-time post updates
+	sseManager := service.NewSSEManager()
+
+	postService := service.NewPostService(postRepo, roomRepo, sseManager)
+	postHandler := handler.NewPostHandler(postService, storageRepo, roomRepo, userRepo, sseManager)
 
 	// Comment repositories and service
 	commentRepo := repository.NewMongoCommentRepository(mongoClient.Database(cfg.Mongo.Database).Collection("comments"))

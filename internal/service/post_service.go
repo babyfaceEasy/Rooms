@@ -23,13 +23,18 @@ type PostService interface {
 }
 
 type postService struct {
-	repo     repository.PostRepository
-	roomRepo repository.RoomRepository
+	repo       repository.PostRepository
+	roomRepo   repository.RoomRepository
+	sseManager *SSEManager
 }
 
 // NewPostService creates a new post service
-func NewPostService(repo repository.PostRepository, roomRepo repository.RoomRepository) PostService {
-	return &postService{repo: repo, roomRepo: roomRepo}
+func NewPostService(repo repository.PostRepository, roomRepo repository.RoomRepository, sseManager *SSEManager) PostService {
+	return &postService{
+		repo:       repo,
+		roomRepo:   roomRepo,
+		sseManager: sseManager,
+	}
 }
 
 // CreatePost creates a new post with validation
@@ -58,6 +63,16 @@ func (s *postService) CreatePost(ctx context.Context, text string, userID, roomI
 		return nil, err
 	}
 
+	// Publish SSE event for new post (only if SSEManager is configured)
+	if s.sseManager != nil {
+		s.sseManager.PublishNewPost(roomID.Hex(), post.ID.Hex(), map[string]interface{}{
+			"id":   post.ID.Hex(),
+			"text": post.Text,
+			"user": post.UserID.Hex(),
+			"room": roomID.Hex(),
+		})
+	}
+
 	return post, nil
 }
 
@@ -81,7 +96,7 @@ func (s *postService) GetPostsByRoomID(ctx context.Context, roomID primitive.Obj
 	return posts, total, nil
 }
 
-// DeletePost soft-deletes a post (only creator can delete)
+// DeletePost soft-deletes a post (post creator or room owner can delete)
 func (s *postService) DeletePost(ctx context.Context, id, userID primitive.ObjectID) error {
 	// Get post to verify ownership
 	post, err := s.repo.GetByID(ctx, id)
@@ -89,9 +104,18 @@ func (s *postService) DeletePost(ctx context.Context, id, userID primitive.Objec
 		return err
 	}
 
-	// Check if user is the creator
-	if post.UserID != userID {
-		return domain.ErrUnauthorizedPost
+	// Allow if the user is the post creator or the room owner
+	if post.UserID == userID {
+		// Post creator — proceed
+	} else {
+		// Check if user is the room owner
+		room, err := s.roomRepo.GetByID(ctx, post.RoomID)
+		if err != nil {
+			return err
+		}
+		if room.CreatedBy != userID {
+			return domain.ErrUnauthorizedPost
+		}
 	}
 
 	// Soft delete the post

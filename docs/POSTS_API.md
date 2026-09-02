@@ -763,7 +763,117 @@ curl http://localhost:3000/api/v1/posts/507f1f77bcf86cd799439013/comments \
 
 ---
 
-### 3. Delete Comment
+### 3. Stream New Posts (Server-Sent Events)
+
+Subscribe to real-time notifications for new posts in a room using Server-Sent Events (SSE). This endpoint opens a persistent connection and streams events whenever a new post is created in the specified room.
+
+**Endpoint:** `GET /api/v1/posts/stream/new`
+
+**Authentication:** Required
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| room_code | string | Yes | Room code to stream posts from |
+
+**Example Request (curl):**
+
+```bash
+curl -X GET "http://localhost:3000/api/v1/posts/stream/new?room_code=ABC123" \
+  -H "Authorization: Bearer <access_token>" \
+  -H "Accept: text/event-stream"
+```
+
+**Example Client (JavaScript - EventSource):**
+
+```javascript
+const token = '<access_token>';
+const roomCode = 'ABC123';
+
+const eventSource = new EventSource(
+  `/api/v1/posts/stream/new?room_code=${roomCode}`,
+  { headers: { 'Authorization': `Bearer ${token}` } }
+);
+
+eventSource.onmessage = (event) => {
+  const data = JSON.parse(event.data);
+  console.log('New post event:', data);
+  
+  if (data.type === 'new_post') {
+    console.log('Post ID:', data.post_id);
+    console.log('Post content:', data.data);
+    // Update UI with new post
+  }
+};
+
+eventSource.onerror = (error) => {
+  console.error('SSE connection error:', error);
+  eventSource.close();
+};
+
+// Clean up when done
+window.addEventListener('beforeunload', () => {
+  eventSource.close();
+});
+```
+
+**Event Response Format (streaming):**
+
+Events are streamed as JSON objects with the following structure:
+
+```json
+{
+  "type": "new_post",
+  "post_id": "507f1f77bcf86cd799439013",
+  "data": {
+    "id": "507f1f77bcf86cd799439013",
+    "text": "This is a new post!",
+    "user": "507f1f77bcf86cd799439012",
+    "room": "507f1f77bcf86cd799439011"
+  }
+}
+```
+
+**Response Headers:**
+
+```
+Content-Type: text/event-stream
+Cache-Control: no-cache
+Connection: keep-alive
+X-Accel-Buffering: no
+```
+
+**Error Responses:**
+
+| Status | Error | Description |
+|--------|-------|-------------|
+| 400 | room_code query parameter is required | Missing room_code |
+| 401 | unauthorized | Missing or invalid JWT token |
+| 403 | not a room member | User is not a member of the specified room |
+| 404 | room not found | Room code doesn't exist |
+| 500 | internal server error | Server error |
+
+**Example Error Response (400):**
+
+```json
+{
+  "error": "room_code query parameter is required",
+  "status": 400
+}
+```
+
+**Notes:**
+
+- The connection remains open and streams events in real-time as posts are created
+- Events are room-scoped: only posts from the specified room will be streamed
+- Connection may drop due to network issues or client timeout; implement reconnection logic on the client side
+- Each client connection consumes one subscription; connections are cleaned up when the client disconnects
+- The endpoint respects JWT authentication and verifies room membership before streaming events
+
+---
+
+### 4. Delete Comment
 
 Deletes a comment. Only the comment author can delete their own comment.
 

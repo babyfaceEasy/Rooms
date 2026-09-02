@@ -24,7 +24,7 @@ Complete authentication API reference with all endpoints, request/response examp
 3. `POST /auth/refresh` — Get new access token
 4. `POST /auth/logout` — Invalidate all tokens
 5. `GET /profile` — View current user profile
-6. `PATCH /profile` — Update profile (name)
+6. `PATCH /profile` — Update profile (name, optional profile_picture)
 7. `POST /profile/change-password` — Change password
 8. `DELETE /profile` — Delete account (soft delete)
 
@@ -211,7 +211,7 @@ MONGODB_DB=rooms
 
 ### 👤 Profile Management
 - `GET /profile` — View profile
-- `PATCH /profile` — Update profile
+- `PATCH /profile` — Update profile (name, optional profile_picture)
 - `POST /profile/change-password` — Change password
 - `DELETE /profile` — Delete account
 

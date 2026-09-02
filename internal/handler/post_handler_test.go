@@ -158,7 +158,7 @@ func TestPostResponse_Structure(t *testing.T) {
 func TestNewPostHandler(t *testing.T) {
 	mockService := &MockPostService{}
 	mockRoomRepo := &MockRoomRepository{}
-	handler := NewPostHandler(mockService, nil, mockRoomRepo, nil)
+	handler := NewPostHandler(mockService, nil, mockRoomRepo, nil, nil)
 
 	assert.NotNil(t, handler)
 	assert.NotNil(t, handler.CreatePost)
@@ -189,14 +189,14 @@ func TestCreatePost_Success(t *testing.T) {
 	}
 
 	mockRoomRepo := &MockRoomRepository{}
-	handler := NewPostHandler(mockService, nil, mockRoomRepo, nil)
+	handler := NewPostHandler(mockService, nil, mockRoomRepo, nil, nil)
 	assert.NotNil(t, handler.CreatePost)
 }
 
 func TestCreatePost_TextRequired(t *testing.T) {
 	mockService := &MockPostService{}
 	mockRoomRepo := &MockRoomRepository{}
-	handler := NewPostHandler(mockService, nil, mockRoomRepo, nil)
+	handler := NewPostHandler(mockService, nil, mockRoomRepo, nil, nil)
 	assert.NotNil(t, handler.CreatePost)
 }
 
@@ -223,7 +223,7 @@ func TestGetPost_Success(t *testing.T) {
 	}
 
 	mockRoomRepo := &MockRoomRepository{}
-	handler := NewPostHandler(mockService, nil, mockRoomRepo, nil)
+	handler := NewPostHandler(mockService, nil, mockRoomRepo, nil, nil)
 	assert.NotNil(t, handler.GetPost)
 }
 
@@ -235,7 +235,7 @@ func TestGetPost_NotFound(t *testing.T) {
 	}
 
 	mockRoomRepo := &MockRoomRepository{}
-	handler := NewPostHandler(mockService, nil, mockRoomRepo, nil)
+	handler := NewPostHandler(mockService, nil, mockRoomRepo, nil, nil)
 	assert.NotNil(t, handler.GetPost)
 }
 
@@ -253,7 +253,7 @@ func TestDeletePost_Success(t *testing.T) {
 	}
 
 	mockRoomRepo := &MockRoomRepository{}
-	handler := NewPostHandler(mockService, nil, mockRoomRepo, nil)
+	handler := NewPostHandler(mockService, nil, mockRoomRepo, nil, nil)
 	assert.NotNil(t, handler.DeletePost)
 }
 
@@ -270,7 +270,7 @@ func TestDeletePost_NotOwner(t *testing.T) {
 	}
 
 	mockRoomRepo := &MockRoomRepository{}
-	handler := NewPostHandler(mockService, nil, mockRoomRepo, nil)
+	handler := NewPostHandler(mockService, nil, mockRoomRepo, nil, nil)
 	assert.NotNil(t, handler.DeletePost)
 }
 
@@ -282,7 +282,7 @@ func TestDeletePost_NotFound(t *testing.T) {
 	}
 
 	mockRoomRepo := &MockRoomRepository{}
-	handler := NewPostHandler(mockService, nil, mockRoomRepo, nil)
+	handler := NewPostHandler(mockService, nil, mockRoomRepo, nil, nil)
 	assert.NotNil(t, handler.DeletePost)
 }
 

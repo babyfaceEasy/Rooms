@@ -64,6 +64,10 @@ func (m *MockPostRepository) RemoveRespect(ctx context.Context, postID, userID p
 	return nil
 }
 
+func (m *MockPostRepository) IncrementReportCount(ctx context.Context, postID primitive.ObjectID) (int, error) {
+	return 0, nil
+}
+
 func TestCreatePost_Success(t *testing.T) {
 	userID := primitive.NewObjectID()
 	roomID := primitive.NewObjectID()
@@ -76,7 +80,7 @@ func TestCreatePost_Success(t *testing.T) {
 		},
 	}
 
-	svc := NewPostService(repoMock, &MockRoomRepository{})
+	svc := NewPostService(repoMock, &MockRoomRepository{}, nil)
 	post, err := svc.CreatePost(context.Background(), text, userID, roomID, nil, nil, nil)
 
 	assert.NoError(t, err)
@@ -95,7 +99,7 @@ func TestCreatePost_EmptyText(t *testing.T) {
 
 	repoMock := &MockPostRepository{}
 
-	svc := NewPostService(repoMock, &MockRoomRepository{})
+	svc := NewPostService(repoMock, &MockRoomRepository{}, nil)
 	post, err := svc.CreatePost(context.Background(), "", userID, roomID, nil, nil, nil)
 
 	assert.Error(t, err)
@@ -113,7 +117,7 @@ func TestCreatePost_TextTooLong(t *testing.T) {
 
 	repoMock := &MockPostRepository{}
 
-	svc := NewPostService(repoMock, &MockRoomRepository{})
+	svc := NewPostService(repoMock, &MockRoomRepository{}, nil)
 	post, err := svc.CreatePost(context.Background(), longText, userID, roomID, nil, nil, nil)
 
 	assert.Error(t, err)
@@ -134,7 +138,7 @@ func TestCreatePost_WithImage(t *testing.T) {
 		},
 	}
 
-	svc := NewPostService(repoMock, &MockRoomRepository{})
+	svc := NewPostService(repoMock, &MockRoomRepository{}, nil)
 	post, err := svc.CreatePost(context.Background(), text, userID, roomID, &imageURL, nil, nil)
 
 	assert.NoError(t, err)
@@ -156,7 +160,7 @@ func TestCreatePost_WithVideo(t *testing.T) {
 		},
 	}
 
-	svc := NewPostService(repoMock, &MockRoomRepository{})
+	svc := NewPostService(repoMock, &MockRoomRepository{}, nil)
 	post, err := svc.CreatePost(context.Background(), text, userID, roomID, nil, &videoURL, nil)
 
 	assert.NoError(t, err)
@@ -176,7 +180,7 @@ func TestCreatePost_RepositoryError(t *testing.T) {
 		},
 	}
 
-	svc := NewPostService(repoMock, &MockRoomRepository{})
+	svc := NewPostService(repoMock, &MockRoomRepository{}, nil)
 	post, err := svc.CreatePost(context.Background(), text, userID, roomID, nil, nil, nil)
 
 	assert.Error(t, err)
@@ -203,7 +207,7 @@ func TestGetPost_Success(t *testing.T) {
 		},
 	}
 
-	svc := NewPostService(repoMock, &MockRoomRepository{})
+	svc := NewPostService(repoMock, &MockRoomRepository{}, nil)
 	retrievedPost, err := svc.GetPost(context.Background(), postID)
 
 	assert.NoError(t, err)
@@ -218,7 +222,7 @@ func TestGetPost_NotFound(t *testing.T) {
 		},
 	}
 
-	svc := NewPostService(repoMock, &MockRoomRepository{})
+	svc := NewPostService(repoMock, &MockRoomRepository{}, nil)
 	post, err := svc.GetPost(context.Background(), primitive.NewObjectID())
 
 	assert.Error(t, err)
@@ -249,7 +253,7 @@ func TestDeletePost_Success(t *testing.T) {
 		},
 	}
 
-	svc := NewPostService(repoMock, &MockRoomRepository{})
+	svc := NewPostService(repoMock, &MockRoomRepository{}, nil)
 	err := svc.DeletePost(context.Background(), postID, userID)
 
 	assert.NoError(t, err)
@@ -258,9 +262,15 @@ func TestDeletePost_Success(t *testing.T) {
 func TestDeletePost_NotOwner(t *testing.T) {
 	ownerID := primitive.NewObjectID()
 	otherUserID := primitive.NewObjectID()
+	roomID := primitive.NewObjectID()
 	postID := primitive.NewObjectID()
+	room := &domain.Room{
+		ID:        roomID,
+		CreatedBy: ownerID,
+	}
 	post := &domain.Post{
 		ID:        postID,
+		RoomID:    roomID,
 		UserID:    ownerID,
 		Text:      "Test post",
 		CreatedAt: time.Now(),
@@ -276,13 +286,64 @@ func TestDeletePost_NotOwner(t *testing.T) {
 		},
 	}
 
-	svc := NewPostService(repoMock, &MockRoomRepository{})
+	roomRepoMock := &MockRoomRepository{
+		getByIDFunc: func(ctx context.Context, id primitive.ObjectID) (*domain.Room, error) {
+			if id == roomID {
+				return room, nil
+			}
+			return nil, domain.ErrRoomNotFound
+		},
+	}
+
+	svc := NewPostService(repoMock, roomRepoMock, nil)
 	err := svc.DeletePost(context.Background(), postID, otherUserID)
 
 	assert.Error(t, err)
 	assert.Equal(t, domain.ErrUnauthorizedPost, err)
 }
 
+
+func TestDeletePost_RoomOwner(t *testing.T) {
+	roomOwnerID := primitive.NewObjectID()
+	postCreatorID := primitive.NewObjectID()
+	roomID := primitive.NewObjectID()
+	postID := primitive.NewObjectID()
+	room := &domain.Room{
+		ID:        roomID,
+		CreatedBy: roomOwnerID,
+	}
+	post := &domain.Post{
+		ID:        postID,
+		RoomID:    roomID,
+		UserID:    postCreatorID,
+		Text:      "Test post",
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+
+	repoMock := &MockPostRepository{
+		getByIDFunc: func(ctx context.Context, id primitive.ObjectID) (*domain.Post, error) {
+			if id == postID {
+				return post, nil
+			}
+			return nil, domain.ErrPostNotFound
+		},
+	}
+
+	roomRepoMock := &MockRoomRepository{
+		getByIDFunc: func(ctx context.Context, id primitive.ObjectID) (*domain.Room, error) {
+			if id == roomID {
+				return room, nil
+			}
+			return nil, domain.ErrRoomNotFound
+		},
+	}
+
+	svc := NewPostService(repoMock, roomRepoMock, nil)
+	err := svc.DeletePost(context.Background(), postID, roomOwnerID)
+
+	assert.NoError(t, err)
+}
 func TestDeletePost_NotFound(t *testing.T) {
 	repoMock := &MockPostRepository{
 		getByIDFunc: func(ctx context.Context, id primitive.ObjectID) (*domain.Post, error) {
@@ -290,7 +351,7 @@ func TestDeletePost_NotFound(t *testing.T) {
 		},
 	}
 
-	svc := NewPostService(repoMock, &MockRoomRepository{})
+	svc := NewPostService(repoMock, &MockRoomRepository{}, nil)
 	err := svc.DeletePost(context.Background(), primitive.NewObjectID(), primitive.NewObjectID())
 
 	assert.Error(t, err)

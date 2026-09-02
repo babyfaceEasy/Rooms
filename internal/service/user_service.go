@@ -20,7 +20,7 @@ import (
 type UserService interface {
 	Register(ctx context.Context, name, email, password string, ageVerified bool) (*domain.User, error)
 	GetUserByID(ctx context.Context, id string) (*domain.User, error)
-	UpdateProfile(ctx context.Context, id, name string) (*domain.User, error)
+	UpdateProfile(ctx context.Context, id, name, profilePictureURL string) (*domain.User, error)
 	ChangePassword(ctx context.Context, id, currentPassword, newPassword string) error
 	DeleteAccount(ctx context.Context, id string) error
 	DeleteUser(ctx context.Context, id string) error
@@ -141,8 +141,8 @@ func (s *userService) DeleteAccount(ctx context.Context, id string) error {
 	return nil
 }
 
-// UpdateProfile updates a user's profile name.
-func (s *userService) UpdateProfile(ctx context.Context, id, name string) (*domain.User, error) {
+// UpdateProfile updates a user's profile name and optionally the profile picture URL.
+func (s *userService) UpdateProfile(ctx context.Context, id, name, profilePictureURL string) (*domain.User, error) {
 	// Validate inputs
 	if err := validateName(name); err != nil {
 		return nil, err
@@ -160,9 +160,12 @@ func (s *userService) UpdateProfile(ctx context.Context, id, name string) (*doma
 		return nil, err
 	}
 
-	// Update only the name field
+	// Update fields
 	user.Name = strings.TrimSpace(name)
 	user.UpdatedAt = time.Now().UTC()
+	if profilePictureURL != "" {
+		user.ProfilePicture = profilePictureURL
+	}
 
 	// Persist changes
 	if err := s.userRepo.Update(ctx, user); err != nil {
