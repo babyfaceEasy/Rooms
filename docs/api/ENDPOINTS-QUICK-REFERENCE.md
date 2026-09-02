@@ -14,7 +14,7 @@
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
 | `GET` | `/profile` | ✅ | View current user profile |
-| `PATCH` | `/profile` | ✅ | Update profile (name) |
+| `PATCH` | `/profile` | ✅ | Update profile (name, optional profile_picture) |
 | `POST` | `/profile/change-password` | ✅ | Change password |
 | `DELETE` | `/profile` | ✅ | Delete account (soft delete) |
 

@@ -21,9 +21,10 @@ type MockRoomService struct {
 	getRoomByID             func(ctx context.Context, roomID primitive.ObjectID) (*domain.Room, error)
 	getRoomUsers            func(ctx context.Context, code string) ([]*domain.User, error)
 	leaveRoom               func(ctx context.Context, code string, userID primitive.ObjectID) error
-	removeMemberFromRoom    func(ctx context.Context, code string, ownerID, memberID primitive.ObjectID) error
-	deleteRoom              func(ctx context.Context, code string, userID primitive.ObjectID) error
-	listUserRooms           func(ctx context.Context, userID primitive.ObjectID) ([]*domain.Room, error)
+	removeMemberFromRoom          func(ctx context.Context, code string, ownerID, memberID primitive.ObjectID) error
+	deleteRoom                    func(ctx context.Context, code string, userID primitive.ObjectID) error
+	listUserRooms                 func(ctx context.Context, userID primitive.ObjectID) ([]*domain.Room, error)
+	removeUserFromRoomByUserCode  func(ctx context.Context, roomCode, userCode string, ownerID primitive.ObjectID) error
 }
 
 func (m *MockRoomService) CreateRoom(ctx context.Context, name, code string, userID primitive.ObjectID) (*domain.Room, error) {
@@ -85,6 +86,13 @@ func (m *MockRoomService) RemoveMemberFromRoom(ctx context.Context, code string,
 func (m *MockRoomService) DeleteRoom(ctx context.Context, code string, userID primitive.ObjectID) error {
 	if m.deleteRoom != nil {
 		return m.deleteRoom(ctx, code, userID)
+	}
+	return nil
+}
+
+func (m *MockRoomService) RemoveUserFromRoomByUserCode(ctx context.Context, roomCode, userCode string, ownerID primitive.ObjectID) error {
+	if m.removeUserFromRoomByUserCode != nil {
+		return m.removeUserFromRoomByUserCode(ctx, roomCode, userCode, ownerID)
 	}
 	return nil
 }

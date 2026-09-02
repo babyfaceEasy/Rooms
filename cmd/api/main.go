@@ -105,7 +105,7 @@ func main() {
 	)
 
 	userService := service.NewUserService(userRepo, refreshTokenRepo)
-	userHandler := handler.NewUserHandler(userService, emailService)
+	userHandler := handler.NewUserHandler(userService, emailService, storageRepo)
 
 	// Auth services
 	authService := service.NewAuthService(userRepo, refreshTokenRepo, cfg)

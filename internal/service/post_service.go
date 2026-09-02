@@ -96,7 +96,7 @@ func (s *postService) GetPostsByRoomID(ctx context.Context, roomID primitive.Obj
 	return posts, total, nil
 }
 
-// DeletePost soft-deletes a post (only creator can delete)
+// DeletePost soft-deletes a post (post creator or room owner can delete)
 func (s *postService) DeletePost(ctx context.Context, id, userID primitive.ObjectID) error {
 	// Get post to verify ownership
 	post, err := s.repo.GetByID(ctx, id)
@@ -104,9 +104,18 @@ func (s *postService) DeletePost(ctx context.Context, id, userID primitive.Objec
 		return err
 	}
 
-	// Check if user is the creator
-	if post.UserID != userID {
-		return domain.ErrUnauthorizedPost
+	// Allow if the user is the post creator or the room owner
+	if post.UserID == userID {
+		// Post creator — proceed
+	} else {
+		// Check if user is the room owner
+		room, err := s.roomRepo.GetByID(ctx, post.RoomID)
+		if err != nil {
+			return err
+		}
+		if room.CreatedBy != userID {
+			return domain.ErrUnauthorizedPost
+		}
 	}
 
 	// Soft delete the post
