@@ -28,7 +28,32 @@ Complete authentication API reference with all endpoints, request/response examp
 7. `POST /profile/change-password` — Change password
 8. `DELETE /profile` — Delete account (soft delete)
 
-### 🚀 [ENDPOINTS-QUICK-REFERENCE.md](./ENDPOINTS-QUICK-REFERENCE.md)
+### � [POSTS_API.md](../POSTS_API.md)
+Comprehensive Posts module documentation with full API reference and SSE streaming.
+
+**Includes:**
+- Create, retrieve, and delete posts
+- Media uploads (images, videos, audio)
+- Post validation and respect features
+- Post reporting with moderation
+- Real-time post streaming (SSE) for rooms
+- Comment creation, retrieval, and deletion
+- Real-time comment streaming (SSE) for posts
+- Error handling and examples
+
+### 💬 [COMMENTS_API.md](../COMMENTS_API.md)
+Complete Comments module documentation with real-time streaming.
+
+**Includes:**
+- Create comments on posts
+- Retrieve paginated comments with sorting
+- Delete comments (author only)
+- Real-time comment events via SSE
+- Multi-client streaming support
+- JavaScript/browser examples
+- Event format and architecture
+
+### �🚀 [ENDPOINTS-QUICK-REFERENCE.md](./ENDPOINTS-QUICK-REFERENCE.md)
 Quick lookup guide for all endpoints with summary tables, cURL examples, and common issues.
 
 **Includes:**
@@ -93,11 +118,15 @@ curl -X GET http://localhost:8080/api/v1/profile \
 | Question | Document |
 |----------|----------|
 | "What are all the endpoints?" | [ENDPOINTS-QUICK-REFERENCE.md](./ENDPOINTS-QUICK-REFERENCE.md) |
-| "How do I use endpoint X?" | [01-authentication.md](./01-authentication.md) |
-| "What's the full request/response for X?" | [01-authentication.md](./01-authentication.md) |
+| "How do I use authentication?" | [01-authentication.md](./01-authentication.md) |
+| "How do I create/manage posts?" | [POSTS_API.md](../POSTS_API.md) or [POSTS_QUICK_REFERENCE.md](../POSTS_QUICK_REFERENCE.md) |
+| "How do I create/manage comments?" | [COMMENTS_API.md](../COMMENTS_API.md) or [COMMENTS_QUICK_REFERENCE.md](../COMMENTS_QUICK_REFERENCE.md) |
+| "How do I stream posts in real-time?" | [POSTS_API.md](../POSTS_API.md) - Section: "Stream New Posts" |
+| "How do I stream comments in real-time?" | [COMMENTS_API.md](../COMMENTS_API.md) - Section: "Stream Comment Events (SSE)" |
+| "What's the full request/response for X?" | Relevant detailed API doc |
 | "How do I test the API?" | [TESTING.md](./TESTING.md) |
 | "How do I use Postman?" | [TESTING.md](./TESTING.md) |
-| "What error codes exist?" | [ENDPOINTS-QUICK-REFERENCE.md](./ENDPOINTS-QUICK-REFERENCE.md) or [01-authentication.md](./01-authentication.md) |
+| "What error codes exist?" | [ENDPOINTS-QUICK-REFERENCE.md](./ENDPOINTS-QUICK-REFERENCE.md) or relevant API doc |
 | "How do tokens work?" | [01-authentication.md](./01-authentication.md) |
 | "What are password requirements?" | [ENDPOINTS-QUICK-REFERENCE.md](./ENDPOINTS-QUICK-REFERENCE.md) or [01-authentication.md](./01-authentication.md) |
 

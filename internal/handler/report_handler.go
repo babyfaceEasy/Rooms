@@ -70,7 +70,7 @@ func (h *ReportHandler) ReportPost(c *fiber.Ctx) error {
 	// For now, we're delegating to the service
 
 	// Report the post
-	if err := h.reportSvc.ReportPost(c.Context(), postObjID, userObjID, req.Reason, req.Comment); err != nil {
+	if err := h.reportSvc.ReportPost(c.UserContext(), postObjID, userObjID, req.Reason, req.Comment); err != nil {
 		return err
 	}
 

@@ -1,6 +1,9 @@
 package handler
 
 import (
+	"bufio"
+	"encoding/json"
+	"fmt"
 	"mime/multipart"
 	"path/filepath"
 
@@ -120,7 +123,7 @@ func (h *PostHandler) CreatePost(c *fiber.Ctx) error {
 			}
 
 			// Upload to S3
-			url, err := h.storage.PutObject(c.Context(), "posts/images/"+userID+"/"+image.Filename, file, image.Size, image.Header.Get("Content-Type"))
+			url, err := h.storage.PutObject(c.UserContext(), "posts/images/"+userID+"/"+image.Filename, file, image.Size, image.Header.Get("Content-Type"))
 			if err != nil {
 				return &domain.AppError{Code: "MEDIA_UPLOAD_FAILED", Message: "Failed to upload image", HTTPStatus: fiber.StatusInternalServerError}
 			}
@@ -142,7 +145,7 @@ func (h *PostHandler) CreatePost(c *fiber.Ctx) error {
 			}
 
 			// Upload to S3
-			url, err := h.storage.PutObject(c.Context(), "posts/videos/"+userID+"/"+video.Filename, file, video.Size, video.Header.Get("Content-Type"))
+			url, err := h.storage.PutObject(c.UserContext(), "posts/videos/"+userID+"/"+video.Filename, file, video.Size, video.Header.Get("Content-Type"))
 			if err != nil {
 				return &domain.AppError{Code: "MEDIA_UPLOAD_FAILED", Message: "Failed to upload video", HTTPStatus: fiber.StatusInternalServerError}
 			}
@@ -164,7 +167,7 @@ func (h *PostHandler) CreatePost(c *fiber.Ctx) error {
 			}
 
 			// Upload to S3
-			url, err := h.storage.PutObject(c.Context(), "posts/audio/"+userID+"/"+audio.Filename, file, audio.Size, audio.Header.Get("Content-Type"))
+			url, err := h.storage.PutObject(c.UserContext(), "posts/audio/"+userID+"/"+audio.Filename, file, audio.Size, audio.Header.Get("Content-Type"))
 			if err != nil {
 				return &domain.AppError{Code: "MEDIA_UPLOAD_FAILED", Message: "Failed to upload audio", HTTPStatus: fiber.StatusInternalServerError}
 			}
@@ -173,13 +176,13 @@ func (h *PostHandler) CreatePost(c *fiber.Ctx) error {
 	}
 
 	// Create post via service with roomID
-	post, err := h.svc.CreatePost(c.Context(), text, userObjID, room.ID, imageURL, videoURL, audioURL)
+	post, err := h.svc.CreatePost(c.UserContext(), text, userObjID, room.ID, imageURL, videoURL, audioURL)
 	if err != nil {
 		return err
 	}
 
 	// Look up user name for the response
-	user, err := h.userRepo.GetByID(c.Context(), userObjID)
+	user, err := h.userRepo.GetByID(c.UserContext(), userObjID)
 	var userName string
 	if err == nil && user != nil {
 		userName = user.Name
@@ -224,7 +227,7 @@ func (h *PostHandler) GetPost(c *fiber.Ctx) error {
 	}
 
 	// Get post via service
-	post, err := h.svc.GetPost(c.Context(), postObjID)
+	post, err := h.svc.GetPost(c.UserContext(), postObjID)
 	if err != nil {
 		return err
 	}
@@ -239,13 +242,13 @@ func (h *PostHandler) GetPost(c *fiber.Ctx) error {
 	}
 
 	// Get room to enrich response
-	room, err := h.roomRepo.GetByID(c.Context(), post.RoomID)
+	room, err := h.roomRepo.GetByID(c.UserContext(), post.RoomID)
 	if err != nil {
 		return err
 	}
 
 	// Look up user name for the response
-	postUser, err := h.userRepo.GetByID(c.Context(), post.UserID)
+	postUser, err := h.userRepo.GetByID(c.UserContext(), post.UserID)
 	var userName string
 	if err == nil && postUser != nil {
 		userName = postUser.Name
@@ -291,13 +294,13 @@ func (h *PostHandler) GetPostsByRoomCode(c *fiber.Ctx) error {
 	}
 
 	// Get room by code to verify it exists and user is a member
-	room, err := h.roomRepo.GetByCode(c.Context(), roomCode)
+	room, err := h.roomRepo.GetByCode(c.UserContext(), roomCode)
 	if err != nil {
 		return err
 	}
 
 	// Verify user is room member
-	isMember, err := h.roomRepo.IsUserMember(c.Context(), room.ID, userObjID)
+	isMember, err := h.roomRepo.IsUserMember(c.UserContext(), room.ID, userObjID)
 	if err != nil {
 		return domain.ErrInternalServer
 	}
@@ -306,7 +309,7 @@ func (h *PostHandler) GetPostsByRoomCode(c *fiber.Ctx) error {
 	}
 
 	// Get paginated posts for the room via service
-	posts, total, err := h.svc.GetPostsByRoomID(c.Context(), room.ID, page, limit)
+	posts, total, err := h.svc.GetPostsByRoomID(c.UserContext(), room.ID, page, limit)
 	if err != nil {
 		return err
 	}
@@ -323,7 +326,7 @@ func (h *PostHandler) GetPostsByRoomCode(c *fiber.Ctx) error {
 	}
 	userMap := make(map[string]string)
 	if len(userIDs) > 0 {
-		users, err := h.userRepo.GetByIDs(c.Context(), userIDs)
+		users, err := h.userRepo.GetByIDs(c.UserContext(), userIDs)
 		if err == nil {
 			for _, u := range users {
 				userMap[u.ID.Hex()] = u.Name
@@ -374,13 +377,13 @@ func (h *PostHandler) DeletePost(c *fiber.Ctx) error {
 	}
 
 	// Get post to verify room membership
-	post, err := h.svc.GetPost(c.Context(), postObjID)
+	post, err := h.svc.GetPost(c.UserContext(), postObjID)
 	if err != nil {
 		return err
 	}
 
 	// Verify user is member of the room (final check)
-	isMember, err := h.roomRepo.IsUserMember(c.Context(), post.RoomID, userObjID)
+	isMember, err := h.roomRepo.IsUserMember(c.UserContext(), post.RoomID, userObjID)
 	if err != nil {
 		return domain.ErrInternalServer
 	}
@@ -389,7 +392,7 @@ func (h *PostHandler) DeletePost(c *fiber.Ctx) error {
 	}
 
 	// Delete post via service
-	if err := h.svc.DeletePost(c.Context(), postObjID, userObjID); err != nil {
+	if err := h.svc.DeletePost(c.UserContext(), postObjID, userObjID); err != nil {
 		return err
 	}
 
@@ -423,13 +426,13 @@ func (h *PostHandler) ValidatePost(c *fiber.Ctx) error {
 	}
 
 	// Get post to verify room membership
-	post, err := h.svc.GetPost(c.Context(), postObjID)
+	post, err := h.svc.GetPost(c.UserContext(), postObjID)
 	if err != nil {
 		return err
 	}
 
 	// Verify user is member of the room
-	isMember, err := h.roomRepo.IsUserMember(c.Context(), post.RoomID, userObjID)
+	isMember, err := h.roomRepo.IsUserMember(c.UserContext(), post.RoomID, userObjID)
 	if err != nil {
 		return domain.ErrInternalServer
 	}
@@ -438,19 +441,19 @@ func (h *PostHandler) ValidatePost(c *fiber.Ctx) error {
 	}
 
 	// Add validation
-	updatedPost, err := h.svc.ValidatePost(c.Context(), postObjID, userObjID)
+	updatedPost, err := h.svc.ValidatePost(c.UserContext(), postObjID, userObjID)
 	if err != nil {
 		return err
 	}
 
 	// Look up user name for the response
-	postUser, err := h.userRepo.GetByID(c.Context(), updatedPost.UserID)
+	postUser, err := h.userRepo.GetByID(c.UserContext(), updatedPost.UserID)
 	var userName string
 	if err == nil && postUser != nil {
 		userName = postUser.Name
 	}
 
-	room, err := h.roomRepo.GetByID(c.Context(), updatedPost.RoomID)
+	room, err := h.roomRepo.GetByID(c.UserContext(), updatedPost.RoomID)
 	if err != nil {
 		return err
 	}
@@ -486,13 +489,13 @@ func (h *PostHandler) RemoveValidation(c *fiber.Ctx) error {
 	}
 
 	// Get post to verify room membership
-	post, err := h.svc.GetPost(c.Context(), postObjID)
+	post, err := h.svc.GetPost(c.UserContext(), postObjID)
 	if err != nil {
 		return err
 	}
 
 	// Verify user is member of the room
-	isMember, err := h.roomRepo.IsUserMember(c.Context(), post.RoomID, userObjID)
+	isMember, err := h.roomRepo.IsUserMember(c.UserContext(), post.RoomID, userObjID)
 	if err != nil {
 		return domain.ErrInternalServer
 	}
@@ -501,7 +504,7 @@ func (h *PostHandler) RemoveValidation(c *fiber.Ctx) error {
 	}
 
 	// Remove validation
-	if err := h.svc.RemoveValidation(c.Context(), postObjID, userObjID); err != nil {
+	if err := h.svc.RemoveValidation(c.UserContext(), postObjID, userObjID); err != nil {
 		return err
 	}
 
@@ -535,13 +538,13 @@ func (h *PostHandler) RespectPost(c *fiber.Ctx) error {
 	}
 
 	// Get post to verify room membership
-	post, err := h.svc.GetPost(c.Context(), postObjID)
+	post, err := h.svc.GetPost(c.UserContext(), postObjID)
 	if err != nil {
 		return err
 	}
 
 	// Verify user is member of the room
-	isMember, err := h.roomRepo.IsUserMember(c.Context(), post.RoomID, userObjID)
+	isMember, err := h.roomRepo.IsUserMember(c.UserContext(), post.RoomID, userObjID)
 	if err != nil {
 		return domain.ErrInternalServer
 	}
@@ -550,19 +553,19 @@ func (h *PostHandler) RespectPost(c *fiber.Ctx) error {
 	}
 
 	// Add respect
-	updatedPost, err := h.svc.RespectPost(c.Context(), postObjID, userObjID)
+	updatedPost, err := h.svc.RespectPost(c.UserContext(), postObjID, userObjID)
 	if err != nil {
 		return err
 	}
 
 	// Look up user name for the response
-	postUser, err := h.userRepo.GetByID(c.Context(), updatedPost.UserID)
+	postUser, err := h.userRepo.GetByID(c.UserContext(), updatedPost.UserID)
 	var userName string
 	if err == nil && postUser != nil {
 		userName = postUser.Name
 	}
 
-	room, err := h.roomRepo.GetByID(c.Context(), updatedPost.RoomID)
+	room, err := h.roomRepo.GetByID(c.UserContext(), updatedPost.RoomID)
 	if err != nil {
 		return err
 	}
@@ -598,13 +601,13 @@ func (h *PostHandler) RemoveRespect(c *fiber.Ctx) error {
 	}
 
 	// Get post to verify room membership
-	post, err := h.svc.GetPost(c.Context(), postObjID)
+	post, err := h.svc.GetPost(c.UserContext(), postObjID)
 	if err != nil {
 		return err
 	}
 
 	// Verify user is member of the room
-	isMember, err := h.roomRepo.IsUserMember(c.Context(), post.RoomID, userObjID)
+	isMember, err := h.roomRepo.IsUserMember(c.UserContext(), post.RoomID, userObjID)
 	if err != nil {
 		return domain.ErrInternalServer
 	}
@@ -613,7 +616,7 @@ func (h *PostHandler) RemoveRespect(c *fiber.Ctx) error {
 	}
 
 	// Remove respect
-	if err := h.svc.RemoveRespect(c.Context(), postObjID, userObjID); err != nil {
+	if err := h.svc.RemoveRespect(c.UserContext(), postObjID, userObjID); err != nil {
 		return err
 	}
 
@@ -721,13 +724,13 @@ func (h *PostHandler) StreamNewPosts(c *fiber.Ctx) error {
 	}
 
 	// Get room by code
-	room, err := h.roomRepo.GetByCode(c.Context(), roomCode)
+	room, err := h.roomRepo.GetByCode(c.UserContext(), roomCode)
 	if err != nil {
 		return err
 	}
 
 	// Verify user is room member
-	isMember, err := h.roomRepo.IsUserMember(c.Context(), room.ID, userObjID)
+	isMember, err := h.roomRepo.IsUserMember(c.UserContext(), room.ID, userObjID)
 	if err != nil {
 		return domain.ErrInternalServer
 	}
@@ -743,21 +746,42 @@ func (h *PostHandler) StreamNewPosts(c *fiber.Ctx) error {
 
 	// Subscribe to events for this room
 	events, subID := h.sseManager.Subscribe(room.ID.Hex())
-	defer h.sseManager.Unsubscribe(room.ID.Hex(), subID)
 
-	// Stream events to client
-	for {
-		select {
-		case event, ok := <-events:
-			if !ok {
-				return nil
+	// Capture the disconnect context channel BEFORE moving into the stream writer
+	notifyDone := c.Context().Done()
+
+	// Execute streaming writer loop
+	c.Context().SetBodyStreamWriter(func(w *bufio.Writer) {
+		// Ensure cleanup happens when this streaming function finishes
+		defer h.sseManager.Unsubscribe(room.ID.Hex(), subID)
+
+		for {
+			select {
+			case event, ok := <-events:
+				if !ok {
+					return
+				}
+
+				eventJSON, err := json.Marshal(event)
+				if err != nil {
+					return
+				}
+
+				// Write to bufio.Writer
+				_, err = fmt.Fprintf(w, "data: %s\n\n", string(eventJSON))
+				if err != nil {
+					return
+				}
+
+				// CRITICAL: Force flush the data out over the network immediately
+				if err := w.Flush(); err != nil {
+					return
+				}
+
+			case <-notifyDone:
+				return
 			}
-			// Send event as SSE format
-			if err := c.JSON(event); err != nil {
-				return err
-			}
-		case <-c.Context().Done():
-			return nil
 		}
-	}
+	})
+	return nil
 }

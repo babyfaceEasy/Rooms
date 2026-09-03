@@ -36,20 +36,20 @@ type RegisterRequest struct {
 
 // UserResponse represents a user in HTTP responses (no password).
 type UserResponse struct {
-	ID            string `json:"id"`
-	Code          string `json:"code"`
-	Name          string `json:"name"`
-	Email         string `json:"email"`
+	ID             string `json:"id"`
+	Code           string `json:"code"`
+	Name           string `json:"name"`
+	Email          string `json:"email"`
 	ProfilePicture string `json:"profile_picture,omitempty"`
-	CreatedAt     string `json:"created_at"`
+	CreatedAt      string `json:"created_at"`
 }
 
 // ProfileResponse represents a user profile response (minimal data).
 type ProfileResponse struct {
-	ID            string `json:"id"`
-	Name          string `json:"name"`
-	Email         string `json:"email"`
-	Code          string `json:"code"`
+	ID             string `json:"id"`
+	Name           string `json:"name"`
+	Email          string `json:"email"`
+	Code           string `json:"code"`
 	ProfilePicture string `json:"profile_picture,omitempty"`
 }
 
@@ -88,12 +88,12 @@ func (h *UserHandler) Register(c *fiber.Ctx) error {
 	}()
 
 	response := UserResponse{
-		ID:            user.ID.Hex(),
-		Code:          user.Code,
-		Name:          user.Name,
-		Email:         user.Email,
+		ID:             user.ID.Hex(),
+		Code:           user.Code,
+		Name:           user.Name,
+		Email:          user.Email,
 		ProfilePicture: user.ProfilePicture,
-		CreatedAt:     user.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		CreatedAt:      user.CreatedAt.Format("2006-01-02T15:04:05Z"),
 	}
 
 	return c.Status(fiber.StatusCreated).JSON(response)
@@ -109,12 +109,12 @@ func (h *UserHandler) GetUser(c *fiber.Ctx) error {
 	}
 
 	response := UserResponse{
-		ID:            user.ID.Hex(),
-		Code:          user.Code,
-		Name:          user.Name,
-		Email:         user.Email,
+		ID:             user.ID.Hex(),
+		Code:           user.Code,
+		Name:           user.Name,
+		Email:          user.Email,
 		ProfilePicture: user.ProfilePicture,
-		CreatedAt:     user.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		CreatedAt:      user.CreatedAt.Format("2006-01-02T15:04:05Z"),
 	}
 
 	return c.Status(fiber.StatusOK).JSON(response)
@@ -210,7 +210,7 @@ func (h *UserHandler) UpdateProfile(c *fiber.Ctx) error {
 
 		// Upload to S3
 		key := "profile_pictures/" + userIDStr + "/" + file.Filename
-		url, err := h.storage.PutObject(c.Context(), key, src, file.Size, file.Header.Get("Content-Type"))
+		url, err := h.storage.PutObject(c.UserContext(), key, src, file.Size, file.Header.Get("Content-Type"))
 		if err != nil {
 			return &domain.AppError{Code: "MEDIA_UPLOAD_FAILED", Message: "Failed to upload profile picture", HTTPStatus: fiber.StatusInternalServerError}
 		}
