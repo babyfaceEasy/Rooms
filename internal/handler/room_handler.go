@@ -98,7 +98,7 @@ func (h *RoomHandler) CreateRoom(c *fiber.Ctx) error {
 	}
 
 	// Create room via service
-	room, err := h.svc.CreateRoom(c.Context(), req.Name, req.Code, userObjID)
+	room, err := h.svc.CreateRoom(c.UserContext(), req.Name, req.Code, userObjID)
 	if err != nil {
 		return err
 	}
@@ -141,7 +141,7 @@ func (h *RoomHandler) AddUserToRoom(c *fiber.Ctx) error {
 	}
 
 	// Get room first to check if user is the creator or already a member
-	room, err := h.svc.GetRoom(c.Context(), req.Code)
+	room, err := h.svc.GetRoom(c.UserContext(), req.Code)
 	if err != nil {
 		return err
 	}
@@ -186,7 +186,7 @@ func (h *RoomHandler) AddUserToRoom(c *fiber.Ctx) error {
 	}
 
 	// Add user to room via service
-	room, err = h.svc.AddUserToRoom(c.Context(), req.Code, userObjID)
+	room, err = h.svc.AddUserToRoom(c.UserContext(), req.Code, userObjID)
 	if err != nil {
 		return err
 	}
@@ -236,7 +236,7 @@ func (h *RoomHandler) GetRoom(c *fiber.Ctx) error {
 	}
 
 	// Get room via service
-	room, err := h.svc.GetRoom(c.Context(), roomCode)
+	room, err := h.svc.GetRoom(c.UserContext(), roomCode)
 	if err != nil {
 		return err
 	}
@@ -306,7 +306,7 @@ func (h *RoomHandler) GetRoomByID(c *fiber.Ctx) error {
 	}
 
 	// Get room via service
-	room, err := h.svc.GetRoomByID(c.Context(), roomID)
+	room, err := h.svc.GetRoomByID(c.UserContext(), roomID)
 	if err != nil {
 		return err
 	}
@@ -370,7 +370,7 @@ func (h *RoomHandler) GetRoomMembers(c *fiber.Ctx) error {
 	}
 
 	// Get room via service
-	room, err := h.svc.GetRoom(c.Context(), roomCode)
+	room, err := h.svc.GetRoom(c.UserContext(), roomCode)
 	if err != nil {
 		return err
 	}
@@ -433,7 +433,7 @@ func (h *RoomHandler) LeaveRoom(c *fiber.Ctx) error {
 	}
 
 	// Get room to provide context-specific error messages
-	room, err := h.svc.GetRoom(c.Context(), roomCode)
+	room, err := h.svc.GetRoom(c.UserContext(), roomCode)
 	if err != nil {
 		return err
 	}
@@ -444,7 +444,7 @@ func (h *RoomHandler) LeaveRoom(c *fiber.Ctx) error {
 	}
 
 	// Leave room via service
-	if err := h.svc.LeaveRoom(c.Context(), roomCode, userObjID); err != nil {
+	if err := h.svc.LeaveRoom(c.UserContext(), roomCode, userObjID); err != nil {
 		return err
 	}
 
@@ -488,7 +488,7 @@ func (h *RoomHandler) RemoveMemberFromRoom(c *fiber.Ctx) error {
 	}
 
 	// Remove member from room via service
-	if err := h.svc.RemoveMemberFromRoom(c.Context(), roomCode, ownerObjID, memberObjID); err != nil {
+	if err := h.svc.RemoveMemberFromRoom(c.UserContext(), roomCode, ownerObjID, memberObjID); err != nil {
 		return err
 	}
 

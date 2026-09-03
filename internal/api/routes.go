@@ -81,6 +81,7 @@ func (s *Server) registerRoutes(itemHandler *handler.ItemHandler, userHandler *h
 	// Comment routes (protected)
 	apiProtected.Post("/posts/:id/comments", commentHandler.CreateComment)
 	apiProtected.Get("/posts/:id/comments", commentHandler.GetCommentsByPostID)
+	apiProtected.Get("/posts/:id/stream/comments", commentHandler.StreamNewComments)
 	apiProtected.Delete("/comments/:id", commentHandler.DeleteComment)
 
 	// Item routes (protected)

@@ -13,6 +13,7 @@
 | DELETE | `/api/v1/posts/:id/respect` | Remove respect from a post | Required |
 | POST | `/api/v1/posts/:id/comments` | Create comment on post | Required |
 | GET | `/api/v1/posts/:id/comments` | Get paginated comments for post (?page=&limit=&sort=) | Required |
+| GET | `/api/v1/posts/:id/stream/comments` | Stream new comments (SSE) for a post | Required |
 | DELETE | `/api/v1/comments/:id` | Delete comment (author only) | Required |
 | POST | `/api/v1/posts/:id/report` | Report post for inappropriate content | Required |
 | GET | `/api/v1/posts/stream/new` | Stream new posts (SSE) for a room (?room_code=) | Required |
@@ -83,6 +84,39 @@ curl -X POST http://localhost:3000/api/v1/posts/507f1f77bcf86cd799439013/report 
     "reason": "bullying_harassment",
     "comment": "This post contains personal attacks"
   }'
+```
+
+### Stream New Comments for a Post (SSE)
+```bash
+# Use -N flag to disable buffering
+curl -N http://localhost:3000/api/v1/posts/507f1f77bcf86cd799439013/stream/comments \
+  -H "Authorization: Bearer TOKEN"
+```
+
+### Stream New Posts for a Room (SSE)
+```bash
+# Use -N flag to disable buffering
+curl -N "http://localhost:3000/api/v1/posts/stream/new?room_code=MY_ROOM" \
+  -H "Authorization: Bearer TOKEN"
+```
+
+### Stream Comments (JavaScript)
+```javascript
+const postId = '507f1f77bcf86cd799439013';
+const token = localStorage.getItem('access_token');
+
+const eventSource = new EventSource(
+  `http://localhost:3000/api/v1/posts/${postId}/stream/comments`,
+  { headers: { 'Authorization': `Bearer ${token}` } }
+);
+
+eventSource.addEventListener('new_comment', (e) => {
+  const event = JSON.parse(e.data);
+  console.log('New comment:', event.data);
+  // Update UI with new comment
+});
+
+eventSource.onerror = () => eventSource.close();
 ```
 
 ## Validation Rules

@@ -1,6 +1,10 @@
 package handler
 
 import (
+	"bufio"
+	"encoding/json"
+	"fmt"
+
 	"temp_backend/internal/domain"
 	"temp_backend/internal/repository"
 	"temp_backend/internal/service"
@@ -11,15 +15,19 @@ import (
 
 // CommentHandler handles HTTP requests for comments
 type CommentHandler struct {
-	svc      service.CommentService
-	userRepo repository.UserRepository
+	svc        service.CommentService
+	userRepo   repository.UserRepository
+	postRepo   repository.PostRepository
+	sseManager *service.SSEManager
 }
 
 // NewCommentHandler creates a new CommentHandler
-func NewCommentHandler(svc service.CommentService, userRepo repository.UserRepository) *CommentHandler {
+func NewCommentHandler(svc service.CommentService, userRepo repository.UserRepository, postRepo repository.PostRepository, sseManager *service.SSEManager) *CommentHandler {
 	return &CommentHandler{
-		svc:      svc,
-		userRepo: userRepo,
+		svc:        svc,
+		userRepo:   userRepo,
+		postRepo:   postRepo,
+		sseManager: sseManager,
 	}
 }
 
@@ -77,13 +85,13 @@ func (h *CommentHandler) CreateComment(c *fiber.Ctx) error {
 	}
 
 	// Create comment via service
-	comment, err := h.svc.CreateComment(c.Context(), postObjID, userObjID, req.Text)
+	comment, err := h.svc.CreateComment(c.UserContext(), postObjID, userObjID, req.Text)
 	if err != nil {
 		return err
 	}
 
 	// Look up user name for the response
-	commentUser, err := h.userRepo.GetByID(c.Context(), userObjID)
+	commentUser, err := h.userRepo.GetByID(c.UserContext(), userObjID)
 	var userName string
 	if err == nil && commentUser != nil {
 		userName = commentUser.Name
@@ -91,6 +99,9 @@ func (h *CommentHandler) CreateComment(c *fiber.Ctx) error {
 
 	// Convert to response
 	response := h.toCommentResponse(comment, userName)
+
+	// Publish SSE event to post subscribers
+	h.sseManager.PublishCommentCreated(postObjID.Hex(), comment.ID.Hex(), response)
 
 	return c.Status(fiber.StatusCreated).JSON(map[string]interface{}{
 		"data":    response,
@@ -130,7 +141,7 @@ func (h *CommentHandler) GetCommentsByPostID(c *fiber.Ctx) error {
 	}
 
 	// Get paginated comments via service
-	comments, total, err := h.svc.GetCommentsByPostID(c.Context(), postObjID, page, limit, sortOrder)
+	comments, total, err := h.svc.GetCommentsByPostID(c.UserContext(), postObjID, page, limit, sortOrder)
 	if err != nil {
 		return err
 	}
@@ -147,7 +158,7 @@ func (h *CommentHandler) GetCommentsByPostID(c *fiber.Ctx) error {
 	}
 	userMap := make(map[string]string)
 	if len(userIDs) > 0 {
-		users, err := h.userRepo.GetByIDs(c.Context(), userIDs)
+		users, err := h.userRepo.GetByIDs(c.UserContext(), userIDs)
 		if err == nil {
 			for _, u := range users {
 				userMap[u.ID.Hex()] = u.Name
@@ -199,7 +210,7 @@ func (h *CommentHandler) DeleteComment(c *fiber.Ctx) error {
 	}
 
 	// Delete comment via service
-	err = h.svc.DeleteComment(c.Context(), commentObjID, userObjID)
+	err = h.svc.DeleteComment(c.UserContext(), commentObjID, userObjID)
 	if err != nil {
 		return err
 	}
@@ -224,6 +235,84 @@ func (h *CommentHandler) toCommentResponse(comment *domain.Comment, userName str
 		CreatedAt: comment.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		UpdatedAt: comment.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
 	}
+}
+
+// StreamNewComments streams new comment events for a post using Server-Sent Events
+func (h *CommentHandler) StreamNewComments(c *fiber.Ctx) error {
+	// Extract user ID from context
+	userID, ok := c.Locals("user_id").(string)
+	if !ok || userID == "" {
+		return domain.ErrUnauthorized
+	}
+
+	// Get post ID from URL parameter
+	postID := c.Params("id")
+	if postID == "" {
+		return &domain.AppError{Code: "POST_ID_REQUIRED", Message: "Post ID is required", HTTPStatus: fiber.StatusBadRequest}
+	}
+
+	// Convert post ID from string to ObjectID
+	postObjID, err := primitive.ObjectIDFromHex(postID)
+	if err != nil {
+		return &domain.AppError{Code: "INVALID_POST_ID", Message: "Invalid post ID", HTTPStatus: fiber.StatusBadRequest}
+	}
+
+	// Get post to verify it exists
+	post, err := h.postRepo.GetByID(c.UserContext(), postObjID)
+	if err != nil {
+		return err
+	}
+
+	// Verify user is member of the room
+	// Note: We'll add roomRepo to CommentHandler later if needed for member verification
+	// For now, comment stream is open to anyone with post access
+
+	// Set SSE headers
+	c.Set("Content-Type", "text/event-stream")
+	c.Set("Cache-Control", "no-cache")
+	c.Set("Connection", "keep-alive")
+	c.Set("X-Accel-Buffering", "no")
+
+	// Subscribe to events for this post
+	events, subID := h.sseManager.SubscribeToPost(post.ID.Hex())
+
+	// Capture the disconnect context channel BEFORE moving into the stream writer
+	notifyDone := c.Context().Done()
+
+	// Execute streaming writer loop
+	c.Context().SetBodyStreamWriter(func(w *bufio.Writer) {
+		// Ensure cleanup happens when this streaming function finishes
+		defer h.sseManager.UnsubscribeFromPost(post.ID.Hex(), subID)
+
+		for {
+			select {
+			case event, ok := <-events:
+				if !ok {
+					return
+				}
+
+				eventJSON, err := json.Marshal(event)
+				if err != nil {
+					return
+				}
+
+				// Write to bufio.Writer
+				_, err = fmt.Fprintf(w, "data: %s\n\n", string(eventJSON))
+				if err != nil {
+					return
+				}
+
+				// CRITICAL: Force flush the data out over the network immediately
+				if err := w.Flush(); err != nil {
+					return
+				}
+
+			case <-notifyDone:
+				return
+			}
+		}
+	})
+	return nil
 }
 
 // handleCommentError delegates to the global error handler.
