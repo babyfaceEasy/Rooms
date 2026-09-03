@@ -188,6 +188,9 @@ func (h *PostHandler) CreatePost(c *fiber.Ctx) error {
 	// Convert domain Post to PostResponse using helper
 	response := h.toPostResponse(post, room, userName, userObjID)
 
+	// Publish SSE event to room subscribers
+	h.sseManager.PublishNewPost(room.ID.Hex(), post.ID.Hex(), response)
+
 	return c.Status(fiber.StatusCreated).JSON(map[string]interface{}{
 		"data":    response,
 		"message": "post created successfully",
