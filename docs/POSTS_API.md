@@ -926,6 +926,116 @@ curl -X DELETE http://localhost:3000/api/v1/comments/507f1f77bcf86cd799439020 \
 
 ---
 
+### 5. Stream Comment Events (SSE)
+
+Streams real-time comment events for a specific post using Server-Sent Events. This endpoint emits a `new_comment` event each time a comment is created on the post.
+
+**Endpoint:** `GET /api/v1/posts/:id/stream/comments`
+
+**Authentication:** Required
+
+**URL Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| id | string | Yes | Post ID (MongoDB ObjectID) |
+
+**Response Headers:**
+
+```
+Content-Type: text/event-stream
+Cache-Control: no-cache
+Connection: keep-alive
+X-Accel-Buffering: no
+```
+
+**HTTP Status:** 200 OK (streaming response)
+
+**Example Request (curl):**
+
+```bash
+# Stream comment events in real-time (use -N flag to disable buffering)
+curl -N "http://localhost:3000/api/v1/posts/507f1f77bcf86cd799439013/stream/comments" \
+  -H "Authorization: Bearer <access_token>"
+```
+
+**JavaScript/Browser Example:**
+
+```javascript
+const postId = '507f1f77bcf86cd799439013';
+const token = localStorage.getItem('access_token');
+
+const eventSource = new EventSource(
+  `http://localhost:3000/api/v1/posts/${postId}/stream/comments`,
+  {
+    headers: {
+      'Authorization': `Bearer ${token}`
+    }
+  }
+);
+
+eventSource.addEventListener('new_comment', (event) => {
+  const data = JSON.parse(event.data);
+  console.log('New comment event:', data);
+  
+  if (data.type === 'new_comment') {
+    console.log('Comment ID:', data.post_id);
+    console.log('Comment data:', data.data);
+    // Update UI with new comment
+  }
+});
+
+eventSource.onerror = (error) => {
+  console.error('SSE connection error:', error);
+  eventSource.close();
+};
+
+// Clean up when done
+window.addEventListener('beforeunload', () => {
+  eventSource.close();
+});
+```
+
+**Event Response Format (streaming):**
+
+Events are streamed as JSON objects with the following structure:
+
+```json
+{
+  "type": "new_comment",
+  "post_id": "507f1f77bcf86cd799439020",
+  "data": {
+    "id": "507f1f77bcf86cd799439020",
+    "post_id": "507f1f77bcf86cd799439013",
+    "user_id": "507f1f77bcf86cd799439012",
+    "user_name": "Jane Doe",
+    "text": "Great post! I totally agree with this.",
+    "created_at": "2024-07-15T14:30:00Z",
+    "updated_at": "2024-07-15T14:30:00Z"
+  }
+}
+```
+
+**Error Responses:**
+
+| Status | Error | Description |
+|--------|-------|-------------|
+| 400 | invalid post id | Invalid MongoDB ObjectID format |
+| 401 | unauthorized | Missing or invalid JWT token |
+| 404 | post not found | Post does not exist or is soft-deleted |
+| 500 | internal server error | Server error |
+
+**Notes:**
+
+- The connection remains open and streams events in real-time as comments are created on the post
+- Multiple clients can stream comments for the same post simultaneously and all receive the same events
+- Connection may drop due to network issues; implement reconnection logic on the client side
+- Each client connection consumes one subscription; connections are cleaned up automatically when the client disconnects
+- Events are delivered with minimal latency (typically < 100ms)
+- For comprehensive documentation of the Comments module, see [COMMENTS_API.md](COMMENTS_API.md)
+
+---
+
 ## HTTP Status Codes
 
 | Code | Meaning | Usage |

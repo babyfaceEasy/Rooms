@@ -79,13 +79,34 @@ func (m *SSEManager) PublishNewPost(roomID string, postID string, data interface
 	m.publish(roomID, event)
 }
 
-// publish sends an event to all clients subscribed to a room
-func (m *SSEManager) publish(roomID string, event SSEEvent) {
+// SubscribeToPost subscribes a client to events for a specific post
+// Returns a channel that will receive SSEEvent messages and a subscription ID for cleanup
+func (m *SSEManager) SubscribeToPost(postID string) (<-chan SSEEvent, string) {
+	return m.Subscribe(postID) // Reuse room subscription logic with post ID
+}
+
+// UnsubscribeFromPost removes a client channel from a post
+func (m *SSEManager) UnsubscribeFromPost(postID string, subID string) {
+	m.Unsubscribe(postID, subID) // Reuse room unsubscription logic with post ID
+}
+
+// PublishCommentCreated publishes a new comment event to all subscribers of a post
+func (m *SSEManager) PublishCommentCreated(postID string, commentID string, data interface{}) {
+	event := SSEEvent{
+		Type:   "new_comment",
+		PostID: commentID,
+		Data:   data,
+	}
+	m.publish(postID, event)
+}
+
+// publish sends an event to all clients subscribed to a resource (room or post)
+func (m *SSEManager) publish(resourceID string, event SSEEvent) {
 	m.mu.RLock()
-	roomClients := m.clients[roomID]
+	subscribers := m.clients[resourceID]
 	m.mu.RUnlock()
 
-	for _, sub := range roomClients {
+	for _, sub := range subscribers {
 		select {
 		case sub.ch <- event:
 		default:
