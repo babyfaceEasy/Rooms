@@ -63,16 +63,6 @@ func (s *postService) CreatePost(ctx context.Context, text string, userID, roomI
 		return nil, err
 	}
 
-	// Publish SSE event for new post (only if SSEManager is configured)
-	if s.sseManager != nil {
-		s.sseManager.PublishNewPost(roomID.Hex(), post.ID.Hex(), map[string]interface{}{
-			"id":   post.ID.Hex(),
-			"text": post.Text,
-			"user": post.UserID.Hex(),
-			"room": roomID.Hex(),
-		})
-	}
-
 	return post, nil
 }
 
