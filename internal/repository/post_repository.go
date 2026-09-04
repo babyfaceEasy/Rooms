@@ -19,4 +19,5 @@ type PostRepository interface {
 	AddRespect(ctx context.Context, postID, userID primitive.ObjectID) error
 	RemoveRespect(ctx context.Context, postID, userID primitive.ObjectID) error
 	IncrementReportCount(ctx context.Context, postID primitive.ObjectID) (int, error)
+	DeleteByUserAndRoom(ctx context.Context, userID, roomID primitive.ObjectID) error
 }
