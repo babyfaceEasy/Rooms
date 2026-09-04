@@ -22,13 +22,15 @@ type CommentService interface {
 type commentService struct {
 	commentRepo repository.CommentRepository
 	postRepo    repository.PostRepository
+	roomRepo    repository.RoomRepository
 }
 
 // NewCommentService creates a new CommentService
-func NewCommentService(commentRepo repository.CommentRepository, postRepo repository.PostRepository) CommentService {
+func NewCommentService(commentRepo repository.CommentRepository, postRepo repository.PostRepository, roomRepo repository.RoomRepository) CommentService {
 	return &commentService{
 		commentRepo: commentRepo,
 		postRepo:    postRepo,
+		roomRepo:    roomRepo,
 	}
 }
 
@@ -86,15 +88,31 @@ func (s *commentService) GetCommentsByPostID(ctx context.Context, postID primiti
 	return comments, total, nil
 }
 
-// DeleteComment deletes a comment (owner only)
+// DeleteComment deletes a comment (owner or room owner)
 func (s *commentService) DeleteComment(ctx context.Context, id, userID primitive.ObjectID) error {
-	// Verify user is the comment owner
+	// Verify user is the comment owner or room owner
 	comment, err := s.commentRepo.GetByID(ctx, id)
 	if err != nil {
 		return err
 	}
 
-	if comment.UserID != userID {
+	// Check if user is the comment owner
+	if comment.UserID == userID {
+		return s.commentRepo.DeleteComment(ctx, id)
+	}
+
+	// Check if user is the room owner
+	post, err := s.postRepo.GetByID(ctx, comment.PostID)
+	if err != nil {
+		return err
+	}
+
+	room, err := s.roomRepo.GetByID(ctx, post.RoomID)
+	if err != nil {
+		return err
+	}
+
+	if room.CreatedBy != userID {
 		return domain.ErrUnauthorizedComment
 	}
 

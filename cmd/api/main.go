@@ -127,7 +127,7 @@ func main() {
 
 	// Comment repositories and service
 	commentRepo := repository.NewMongoCommentRepository(mongoClient.Database(cfg.Mongo.Database).Collection("comments"))
-	commentService := service.NewCommentService(commentRepo, postRepo)
+	commentService := service.NewCommentService(commentRepo, postRepo, roomRepo)
 	commentHandler := handler.NewCommentHandler(commentService, userRepo, postRepo, sseManager)
 
 	// Report repositories and service
