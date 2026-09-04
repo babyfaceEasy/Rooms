@@ -14,4 +14,5 @@ type CommentRepository interface {
 	GetByID(ctx context.Context, id primitive.ObjectID) (*domain.Comment, error)
 	GetByPostID(ctx context.Context, postID primitive.ObjectID, page, limit int, sortOrder string) ([]*domain.Comment, int64, error)
 	DeleteComment(ctx context.Context, id primitive.ObjectID) error
+	DeleteByUserAndRoom(ctx context.Context, userID, roomID primitive.ObjectID) error
 }

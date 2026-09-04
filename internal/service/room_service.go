@@ -26,15 +26,19 @@ type RoomService interface {
 }
 
 type roomService struct {
-	repo     repository.RoomRepository
-	userRepo repository.UserRepository
+	repo        repository.RoomRepository
+	userRepo    repository.UserRepository
+	postRepo    repository.PostRepository
+	commentRepo repository.CommentRepository
 }
 
 // NewRoomService creates a new room service
-func NewRoomService(repo repository.RoomRepository, userRepo repository.UserRepository) RoomService {
+func NewRoomService(repo repository.RoomRepository, userRepo repository.UserRepository, postRepo repository.PostRepository, commentRepo repository.CommentRepository) RoomService {
 	return &roomService{
-		repo:     repo,
-		userRepo: userRepo,
+		repo:        repo,
+		userRepo:    userRepo,
+		postRepo:    postRepo,
+		commentRepo: commentRepo,
 	}
 }
 
@@ -163,6 +167,16 @@ func (s *roomService) LeaveRoom(ctx context.Context, code string, userID primiti
 		return domain.ErrInvalidInput
 	}
 
+	// Delete all posts by the user in this room
+	if err := s.postRepo.DeleteByUserAndRoom(ctx, userID, room.ID); err != nil {
+		return err
+	}
+
+	// Delete all comments by the user in this room
+	if err := s.commentRepo.DeleteByUserAndRoom(ctx, userID, room.ID); err != nil {
+		return err
+	}
+
 	// Remove user from room members
 	if err := s.repo.RemoveUserFromRoom(ctx, room.ID, userID); err != nil {
 		return err
@@ -195,6 +209,16 @@ func (s *roomService) RemoveMemberFromRoom(ctx context.Context, code string, own
 
 	if !isMember {
 		return domain.ErrInvalidInput
+	}
+
+	// Delete all posts by the member in this room
+	if err := s.postRepo.DeleteByUserAndRoom(ctx, memberID, room.ID); err != nil {
+		return err
+	}
+
+	// Delete all comments by the member in this room
+	if err := s.commentRepo.DeleteByUserAndRoom(ctx, memberID, room.ID); err != nil {
+		return err
 	}
 
 	// Remove member from room

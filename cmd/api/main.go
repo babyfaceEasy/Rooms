@@ -111,10 +111,8 @@ func main() {
 	authService := service.NewAuthService(userRepo, refreshTokenRepo, cfg)
 	authHandler := handler.NewAuthHandler(authService)
 
-	// Room repositories and service
+	// Room repositories (without service yet, created later after repos are ready)
 	roomRepo := repository.NewMongoRoomRepository(mongoClient.Database(cfg.Mongo.Database))
-	roomService := service.NewRoomService(roomRepo, userRepo)
-	roomHandler := handler.NewRoomHandler(roomService)
 
 	// Post repositories and service
 	postRepo := repository.NewMongoPostRepository(mongoClient.Database(cfg.Mongo.Database))
@@ -126,9 +124,13 @@ func main() {
 	postHandler := handler.NewPostHandler(postService, storageRepo, roomRepo, userRepo, sseManager)
 
 	// Comment repositories and service
-	commentRepo := repository.NewMongoCommentRepository(mongoClient.Database(cfg.Mongo.Database).Collection("comments"))
+	commentRepo := repository.NewMongoCommentRepository(mongoClient.Database(cfg.Mongo.Database).Collection("comments"), postRepo)
 	commentService := service.NewCommentService(commentRepo, postRepo, roomRepo)
 	commentHandler := handler.NewCommentHandler(commentService, userRepo, postRepo, sseManager)
+
+	// Room service (now that postRepo and commentRepo are ready)
+	roomService := service.NewRoomService(roomRepo, userRepo, postRepo, commentRepo)
+	roomHandler := handler.NewRoomHandler(roomService)
 
 	// Report repositories and service
 	reportRepo := repository.NewMongoReportRepository(mongoClient.Database(cfg.Mongo.Database))
