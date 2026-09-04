@@ -221,3 +221,22 @@ func (m *MongoPostRepository) IncrementReportCount(ctx context.Context, postID p
 	// The FindOneAndUpdate returns the document BEFORE the update, so we need to add 1
 	return post.ReportCount + 1, nil
 }
+
+// DeleteByUserAndRoom soft-deletes all posts by a user in a specific room
+func (m *MongoPostRepository) DeleteByUserAndRoom(ctx context.Context, userID, roomID primitive.ObjectID) error {
+	now := time.Now()
+	_, err := m.collection.UpdateMany(
+		ctx,
+		bson.M{
+			"user_id": userID,
+			"room_id": roomID,
+		},
+		bson.M{
+			"$set": bson.M{
+				"deleted_at": now,
+				"updated_at": now,
+			},
+		},
+	)
+	return err
+}

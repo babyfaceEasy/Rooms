@@ -15,12 +15,14 @@ import (
 // MongoCommentRepository implements CommentRepository using MongoDB
 type MongoCommentRepository struct {
 	collection *mongo.Collection
+	postRepo   PostRepository
 }
 
 // NewMongoCommentRepository creates a new MongoCommentRepository
-func NewMongoCommentRepository(collection *mongo.Collection) CommentRepository {
+func NewMongoCommentRepository(collection *mongo.Collection, postRepo PostRepository) CommentRepository {
 	return &MongoCommentRepository{
 		collection: collection,
+		postRepo:   postRepo,
 	}
 }
 
@@ -109,4 +111,52 @@ func (m *MongoCommentRepository) DeleteComment(ctx context.Context, id primitive
 	}
 
 	return nil
+}
+
+// DeleteByUserAndRoom soft-deletes all comments by a user in a specific room
+// This finds all posts in the room and deletes comments by the user on those posts
+func (m *MongoCommentRepository) DeleteByUserAndRoom(ctx context.Context, userID, roomID primitive.ObjectID) error {
+	// Get all posts in the room (including soft-deleted ones)
+	// We need to query the posts collection directly to find posts in the room
+	postsCollection := m.collection.Database().Collection("posts")
+
+	filter := bson.M{
+		"room_id": roomID,
+	}
+
+	cursor, err := postsCollection.Find(ctx, filter)
+	if err != nil {
+		return err
+	}
+	defer cursor.Close(ctx)
+
+	var posts []domain.Post
+	if err = cursor.All(ctx, &posts); err != nil {
+		return err
+	}
+
+	// Extract post IDs
+	postIDs := make([]primitive.ObjectID, len(posts))
+	for i, post := range posts {
+		postIDs[i] = post.ID
+	}
+
+	// If no posts, nothing to do
+	if len(postIDs) == 0 {
+		return nil
+	}
+
+	// Delete all comments by this user on these posts
+	now := time.Now().UTC()
+	_, err = m.collection.UpdateMany(
+		ctx,
+		bson.M{
+			"user_id": userID,
+			"post_id": bson.M{"$in": postIDs},
+		},
+		bson.M{
+			"$set": bson.M{"deleted_at": &now},
+		},
+	)
+	return err
 }
