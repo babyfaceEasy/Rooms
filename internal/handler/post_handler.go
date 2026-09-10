@@ -22,22 +22,23 @@ type CreatePostRequest struct {
 
 // PostResponse represents a post in the response
 type PostResponse struct {
-	ID               string  `json:"id"`
-	RoomID           string  `json:"room_id"`
-	RoomCode         string  `json:"room_code"`
-	RoomName         string  `json:"room_name"`
-	UserID           string  `json:"user_id"`
-	UserName         string  `json:"user_name"`
-	Text             string  `json:"text"`
-	Image            *string `json:"image,omitempty"`
-	Video            *string `json:"video,omitempty"`
-	Audio            *string `json:"audio,omitempty"`
-	ValidationsCount int     `json:"validations_count"`
-	HasValidated     bool    `json:"has_validated"`
-	RespectsCount    int     `json:"respects_count"`
-	HasRespected     bool    `json:"has_respected"`
-	CreatedAt        string  `json:"created_at"`
-	UpdatedAt        string  `json:"updated_at"`
+	ID                 string  `json:"id"`
+	RoomID             string  `json:"room_id"`
+	RoomCode           string  `json:"room_code"`
+	RoomName           string  `json:"room_name"`
+	UserID             string  `json:"user_id"`
+	UserName           string  `json:"user_name"`
+	UserProfilePicture string  `json:"user_profile_picture,omitempty"`
+	Text               string  `json:"text"`
+	Image              *string `json:"image,omitempty"`
+	Video              *string `json:"video,omitempty"`
+	Audio              *string `json:"audio,omitempty"`
+	ValidationsCount   int     `json:"validations_count"`
+	HasValidated       bool    `json:"has_validated"`
+	RespectsCount      int     `json:"respects_count"`
+	HasRespected       bool    `json:"has_respected"`
+	CreatedAt          string  `json:"created_at"`
+	UpdatedAt          string  `json:"updated_at"`
 }
 
 // PostHandler handles post-related endpoints
@@ -181,15 +182,17 @@ func (h *PostHandler) CreatePost(c *fiber.Ctx) error {
 		return err
 	}
 
-	// Look up user name for the response
+	// Look up user name and profile picture for the response
 	user, err := h.userRepo.GetByID(c.UserContext(), userObjID)
 	var userName string
+	var userProfilePicture string
 	if err == nil && user != nil {
 		userName = user.Name
+		userProfilePicture = user.ProfilePicture
 	}
 
 	// Convert domain Post to PostResponse using helper
-	response := h.toPostResponse(post, room, userName, userObjID)
+	response := h.toPostResponse(post, room, userName, userProfilePicture, userObjID)
 
 	// Publish SSE event to room subscribers
 	h.sseManager.PublishNewPost(room.ID.Hex(), post.ID.Hex(), response)
@@ -247,15 +250,17 @@ func (h *PostHandler) GetPost(c *fiber.Ctx) error {
 		return err
 	}
 
-	// Look up user name for the response
+	// Look up user name and profile picture for the response
 	postUser, err := h.userRepo.GetByID(c.UserContext(), post.UserID)
 	var userName string
+	var userProfilePicture string
 	if err == nil && postUser != nil {
 		userName = postUser.Name
+		userProfilePicture = postUser.ProfilePicture
 	}
 
 	// Convert domain Post to PostResponse using helper
-	response := h.toPostResponse(post, room, userName, userObjID)
+	response := h.toPostResponse(post, room, userName, userProfilePicture, userObjID)
 
 	return c.Status(fiber.StatusOK).JSON(map[string]interface{}{
 		"data":   response,
@@ -314,7 +319,7 @@ func (h *PostHandler) GetPostsByRoomCode(c *fiber.Ctx) error {
 		return err
 	}
 
-	// Batch fetch user names for all posts
+	// Batch fetch user names and profile pictures for all posts
 	var userIDs []primitive.ObjectID
 	seen := make(map[string]bool)
 	for _, post := range posts {
@@ -324,12 +329,19 @@ func (h *PostHandler) GetPostsByRoomCode(c *fiber.Ctx) error {
 			userIDs = append(userIDs, post.UserID)
 		}
 	}
-	userMap := make(map[string]string)
+	type userInfo struct {
+		name           string
+		profilePicture string
+	}
+	userMap := make(map[string]userInfo)
 	if len(userIDs) > 0 {
 		users, err := h.userRepo.GetByIDs(c.UserContext(), userIDs)
 		if err == nil {
 			for _, u := range users {
-				userMap[u.ID.Hex()] = u.Name
+				userMap[u.ID.Hex()] = userInfo{
+					name:           u.Name,
+					profilePicture: u.ProfilePicture,
+				}
 			}
 		}
 	}
@@ -337,7 +349,8 @@ func (h *PostHandler) GetPostsByRoomCode(c *fiber.Ctx) error {
 	// Convert domain Posts to PostResponses
 	var responses []*PostResponse
 	for _, post := range posts {
-		responses = append(responses, h.toPostResponse(post, room, userMap[post.UserID.Hex()], userObjID))
+		info := userMap[post.UserID.Hex()]
+		responses = append(responses, h.toPostResponse(post, room, info.name, info.profilePicture, userObjID))
 	}
 
 	return c.Status(fiber.StatusOK).JSON(map[string]interface{}{
@@ -446,11 +459,13 @@ func (h *PostHandler) ValidatePost(c *fiber.Ctx) error {
 		return err
 	}
 
-	// Look up user name for the response
+	// Look up user name and profile picture for the response
 	postUser, err := h.userRepo.GetByID(c.UserContext(), updatedPost.UserID)
 	var userName string
+	var userProfilePicture string
 	if err == nil && postUser != nil {
 		userName = postUser.Name
+		userProfilePicture = postUser.ProfilePicture
 	}
 
 	room, err := h.roomRepo.GetByID(c.UserContext(), updatedPost.RoomID)
@@ -458,7 +473,7 @@ func (h *PostHandler) ValidatePost(c *fiber.Ctx) error {
 		return err
 	}
 
-	response := h.toPostResponse(updatedPost, room, userName, userObjID)
+	response := h.toPostResponse(updatedPost, room, userName, userProfilePicture, userObjID)
 	return c.Status(fiber.StatusOK).JSON(map[string]interface{}{
 		"data":    response,
 		"message": "post validated successfully",
@@ -558,11 +573,13 @@ func (h *PostHandler) RespectPost(c *fiber.Ctx) error {
 		return err
 	}
 
-	// Look up user name for the response
+	// Look up user name and profile picture for the response
 	postUser, err := h.userRepo.GetByID(c.UserContext(), updatedPost.UserID)
 	var userName string
+	var userProfilePicture string
 	if err == nil && postUser != nil {
 		userName = postUser.Name
+		userProfilePicture = postUser.ProfilePicture
 	}
 
 	room, err := h.roomRepo.GetByID(c.UserContext(), updatedPost.RoomID)
@@ -570,7 +587,7 @@ func (h *PostHandler) RespectPost(c *fiber.Ctx) error {
 		return err
 	}
 
-	response := h.toPostResponse(updatedPost, room, userName, userObjID)
+	response := h.toPostResponse(updatedPost, room, userName, userProfilePicture, userObjID)
 	return c.Status(fiber.StatusOK).JSON(map[string]interface{}{
 		"data":    response,
 		"message": "post respected successfully",
@@ -633,24 +650,25 @@ func (h *PostHandler) handleError(c *fiber.Ctx, err error) error {
 }
 
 // toPostResponse converts a domain Post and Room to a PostResponse
-func (h *PostHandler) toPostResponse(post *domain.Post, room *domain.Room, userName string, currentUserID primitive.ObjectID) *PostResponse {
+func (h *PostHandler) toPostResponse(post *domain.Post, room *domain.Room, userName, userProfilePicture string, currentUserID primitive.ObjectID) *PostResponse {
 	return &PostResponse{
-		ID:               post.ID.Hex(),
-		RoomID:           post.RoomID.Hex(),
-		RoomCode:         room.Code,
-		RoomName:         room.Name,
-		UserID:           post.UserID.Hex(),
-		UserName:         userName,
-		Text:             post.Text,
-		Image:            post.Image,
-		Video:            post.Video,
-		Audio:            post.Audio,
-		ValidationsCount: len(post.Validations),
-		HasValidated:     containsObjectID(post.Validations, currentUserID),
-		RespectsCount:    len(post.Respects),
-		HasRespected:     containsObjectID(post.Respects, currentUserID),
-		CreatedAt:        post.CreatedAt.Format("2006-01-02T15:04:05Z"),
-		UpdatedAt:        post.UpdatedAt.Format("2006-01-02T15:04:05Z"),
+		ID:                 post.ID.Hex(),
+		RoomID:             post.RoomID.Hex(),
+		RoomCode:           room.Code,
+		RoomName:           room.Name,
+		UserID:             post.UserID.Hex(),
+		UserName:           userName,
+		UserProfilePicture: userProfilePicture,
+		Text:               post.Text,
+		Image:              post.Image,
+		Video:              post.Video,
+		Audio:              post.Audio,
+		ValidationsCount:   len(post.Validations),
+		HasValidated:       containsObjectID(post.Validations, currentUserID),
+		RespectsCount:      len(post.Respects),
+		HasRespected:       containsObjectID(post.Respects, currentUserID),
+		CreatedAt:          post.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		UpdatedAt:          post.UpdatedAt.Format("2006-01-02T15:04:05Z"),
 	}
 }
 
