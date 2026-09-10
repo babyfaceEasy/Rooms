@@ -50,7 +50,7 @@ type ProfileResponse struct {
 	Name           string `json:"name"`
 	Email          string `json:"email"`
 	Code           string `json:"code"`
-	ProfilePicture string `json:"profile_picture,omitempty"`
+	ProfilePicture string `json:"profile_picture"`
 }
 
 // ChangePasswordRequest represents the request payload for changing password.

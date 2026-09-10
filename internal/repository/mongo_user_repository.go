@@ -159,6 +159,7 @@ func (r *MongoUserRepository) Update(ctx context.Context, user *domain.User) err
 				"email":           strings.ToLower(user.Email),
 				"password_hash":   user.PasswordHash,
 				"is_age_verified": user.IsAgeVerified,
+				"profile_picture": user.ProfilePicture,
 				"updated_at":      user.UpdatedAt,
 			},
 		},
