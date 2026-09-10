@@ -42,6 +42,9 @@ func NewReportService(
 
 // ReportPost reports a post with the specified reason and optional comment
 func (s *reportService) ReportPost(ctx context.Context, postID, userID primitive.ObjectID, reason string, comment *string) error {
+	// Normalize the reason (convert shorthand to canonical form)
+	reason = domain.NormalizeReportReason(reason)
+
 	// Validate report reason
 	if !domain.IsValidReason(reason) {
 		return domain.ErrInvalidReportReason
