@@ -18,15 +18,18 @@ Complete authentication API reference with all endpoints, request/response examp
 - Security considerations
 - Common use cases
 
-**All 8 endpoints documented:**
+**All 11 endpoints documented:**
 1. `POST /auth/register` — Create new account
 2. `POST /auth/login` — Authenticate and get tokens
 3. `POST /auth/refresh` — Get new access token
-4. `POST /auth/logout` — Invalidate all tokens
-5. `GET /profile` — View current user profile
-6. `PATCH /profile` — Update profile (name, optional profile_picture)
-7. `POST /profile/change-password` — Change password
-8. `DELETE /profile` — Delete account (soft delete)
+4. `POST /auth/verify-email` — Verify email with token
+5. `POST /auth/forgot-password` — Request password reset
+6. `POST /auth/reset-password` — Reset password with token
+7. `POST /auth/logout` — Invalidate all tokens
+8. `GET /profile` — View current user profile
+9. `PATCH /profile` — Update profile (name, optional profile_picture)
+10. `POST /profile/change-password` — Change password
+11. `DELETE /profile` — Delete account (soft delete)
 
 ### � [POSTS_API.md](../POSTS_API.md)
 Comprehensive Posts module documentation with full API reference and SSE streaming.
@@ -236,6 +239,9 @@ MONGODB_DB=rooms
 - `POST /auth/register` — Create account
 - `POST /auth/login` — Login
 - `POST /auth/refresh` — Refresh token
+- `POST /auth/verify-email` — Verify email with token
+- `POST /auth/forgot-password` — Request password reset
+- `POST /auth/reset-password` — Reset password with token
 - `POST /auth/logout` — Logout
 
 ### 👤 Profile Management

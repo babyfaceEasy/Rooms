@@ -52,6 +52,11 @@ func (s *authService) Login(ctx context.Context, email, password string) (string
 		return "", "", fmt.Errorf("login failed: %w", domain.ErrInvalidCredentials)
 	}
 
+	// Check if email is verified
+	if !user.IsEmailVerified {
+		return "", "", domain.ErrEmailNotVerified
+	}
+
 	// Generate access token
 	accessToken, err := s.generateAccessToken(user)
 	if err != nil {

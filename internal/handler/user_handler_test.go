@@ -14,19 +14,22 @@ import (
 
 // MockUserService is a mock implementation of UserService for testing.
 type MockUserService struct {
-	registerFunc       func(ctx context.Context, name, email, password string, ageVerified bool) (*domain.User, error)
-	getUserByIDFunc    func(ctx context.Context, id string) (*domain.User, error)
-	updateProfileFunc  func(ctx context.Context, id, name, profilePictureURL string) (*domain.User, error)
-	changePasswordFunc func(ctx context.Context, id, currentPassword, newPassword string) error
-	deleteUserFunc     func(ctx context.Context, id string) error
-	deleteAccountFunc  func(ctx context.Context, id string) error
+	registerFunc        func(ctx context.Context, name, email, password string, ageVerified bool) (*domain.User, string, error)
+	getUserByIDFunc     func(ctx context.Context, id string) (*domain.User, error)
+	updateProfileFunc   func(ctx context.Context, id, name, profilePictureURL string) (*domain.User, error)
+	changePasswordFunc  func(ctx context.Context, id, currentPassword, newPassword string) error
+	deleteUserFunc      func(ctx context.Context, id string) error
+	deleteAccountFunc   func(ctx context.Context, id string) error
+	verifyEmailFunc     func(ctx context.Context, token string) error
+	forgotPasswordFunc  func(ctx context.Context, email string) (string, primitive.ObjectID, error)
+	resetPasswordFunc   func(ctx context.Context, token, newPassword string) error
 }
 
-func (m *MockUserService) Register(ctx context.Context, name, email, password string, ageVerified bool) (*domain.User, error) {
+func (m *MockUserService) Register(ctx context.Context, name, email, password string, ageVerified bool) (*domain.User, string, error) {
 	if m.registerFunc != nil {
 		return m.registerFunc(ctx, name, email, password, ageVerified)
 	}
-	return nil, nil
+	return nil, "", nil
 }
 
 func (m *MockUserService) GetUserByID(ctx context.Context, id string) (*domain.User, error) {
@@ -60,6 +63,27 @@ func (m *MockUserService) DeleteUser(ctx context.Context, id string) error {
 func (m *MockUserService) DeleteAccount(ctx context.Context, id string) error {
 	if m.deleteAccountFunc != nil {
 		return m.deleteAccountFunc(ctx, id)
+	}
+	return nil
+}
+
+func (m *MockUserService) VerifyEmail(ctx context.Context, token string) error {
+	if m.verifyEmailFunc != nil {
+		return m.verifyEmailFunc(ctx, token)
+	}
+	return nil
+}
+
+func (m *MockUserService) ForgotPassword(ctx context.Context, email string) (string, primitive.ObjectID, error) {
+	if m.forgotPasswordFunc != nil {
+		return m.forgotPasswordFunc(ctx, email)
+	}
+	return "", primitive.ObjectID{}, nil
+}
+
+func (m *MockUserService) ResetPassword(ctx context.Context, token, newPassword string) error {
+	if m.resetPasswordFunc != nil {
+		return m.resetPasswordFunc(ctx, token, newPassword)
 	}
 	return nil
 }
@@ -137,13 +161,13 @@ func TestViewProfile_UserNotFound(t *testing.T) {
 func TestUserHandler_CreatesWithValidService(t *testing.T) {
 	userID := primitive.NewObjectID()
 	mock := &MockUserService{
-		registerFunc: func(ctx context.Context, name, email, password string, ageVerified bool) (*domain.User, error) {
+		registerFunc: func(ctx context.Context, name, email, password string, ageVerified bool) (*domain.User, string, error) {
 			return &domain.User{
 				ID:            userID,
 				Name:          name,
 				Email:         email,
 				IsAgeVerified: true,
-			}, nil
+			}, "test-token", nil
 		},
 	}
 

@@ -72,7 +72,7 @@ func (h *UserHandler) Register(c *fiber.Ctx) error {
 		return fmt.Errorf("parse register request: %w", err)
 	}
 
-	user, err := h.svc.Register(c.UserContext(), req.Name, req.Email, req.Password, req.AgeVerified)
+	user, verificationToken, err := h.svc.Register(c.UserContext(), req.Name, req.Email, req.Password, req.AgeVerified)
 	if err != nil {
 		// Map domain errors to HTTP status codes
 		return err
@@ -81,8 +81,10 @@ func (h *UserHandler) Register(c *fiber.Ctx) error {
 	// Send verification email asynchronously (gracefully degrade if it fails)
 	go func() {
 		dynamicData := map[string]string{
-			"user_name":  user.Name,
-			"user_email": user.Email,
+			"user_name":       user.Name,
+			"user_email":      user.Email,
+			"verification_url": "https://tempbackend.com/verify-email?token=" + verificationToken,
+				"verification_token": verificationToken,
 		}
 		_ = h.emailService.SendVerificationEmail(context.Background(), user.ID, user.Email, dynamicData)
 	}()
@@ -97,6 +99,102 @@ func (h *UserHandler) Register(c *fiber.Ctx) error {
 	}
 
 	return c.Status(fiber.StatusCreated).JSON(response)
+}
+
+// VerifyEmailRequest represents the request payload for email verification.
+type VerifyEmailRequest struct {
+	Token string `json:"token"`
+}
+
+// VerifyEmail handles POST /api/v1/auth/verify-email requests.
+func (h *UserHandler) VerifyEmail(c *fiber.Ctx) error {
+	var req VerifyEmailRequest
+
+	if err := c.BodyParser(&req); err != nil {
+		return fmt.Errorf("parse verify email request: %w", err)
+	}
+
+	if req.Token == "" {
+		return &domain.AppError{Code: "INVALID_INPUT", Message: "Verification token is required", HTTPStatus: fiber.StatusBadRequest}
+	}
+
+	if err := h.svc.VerifyEmail(c.UserContext(), req.Token); err != nil {
+		return err
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Email verified successfully",
+	})
+}
+
+// ForgotPasswordRequest represents the request payload for password reset initiation.
+type ForgotPasswordRequest struct {
+	Email string `json:"email"`
+}
+
+// ForgotPassword handles POST /api/v1/auth/forgot-password requests.
+func (h *UserHandler) ForgotPassword(c *fiber.Ctx) error {
+	var req ForgotPasswordRequest
+
+	if err := c.BodyParser(&req); err != nil {
+		return fmt.Errorf("parse forgot password request: %w", err)
+	}
+
+	if req.Email == "" {
+		return &domain.AppError{Code: "INVALID_INPUT", Message: "Email is required", HTTPStatus: fiber.StatusBadRequest}
+	}
+
+	resetToken, userID, err := h.svc.ForgotPassword(c.UserContext(), req.Email)
+	if err != nil {
+		return err
+	}
+
+	// Only send email if a token was actually generated (user exists)
+	if resetToken != "" {
+		// Send password reset email asynchronously (gracefully degrade if it fails)
+		go func() {
+			dynamicData := map[string]string{
+				"reset_url":   "https://tempbackend.com/reset-password?token=" + resetToken,
+				"reset_token": resetToken,
+			}
+			_ = h.emailService.SendPasswordResetEmail(context.Background(), userID, req.Email, dynamicData)
+		}()
+	}
+
+	// Always return success to prevent email enumeration
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "If an account with this email exists, a password reset link has been sent.",
+	})
+}
+
+// ResetPasswordRequest represents the request payload for password reset.
+type ResetPasswordRequest struct {
+	Token       string `json:"token"`
+	NewPassword string `json:"new_password"`
+}
+
+// ResetPassword handles POST /api/v1/auth/reset-password requests.
+func (h *UserHandler) ResetPassword(c *fiber.Ctx) error {
+	var req ResetPasswordRequest
+
+	if err := c.BodyParser(&req); err != nil {
+		return fmt.Errorf("parse reset password request: %w", err)
+	}
+
+	if req.Token == "" {
+		return &domain.AppError{Code: "INVALID_INPUT", Message: "Reset token is required", HTTPStatus: fiber.StatusBadRequest}
+	}
+	if req.NewPassword == "" {
+		return &domain.AppError{Code: "INVALID_INPUT", Message: "New password is required", HTTPStatus: fiber.StatusBadRequest}
+	}
+
+	if err := h.svc.ResetPassword(c.UserContext(), req.Token, req.NewPassword); err != nil {
+		return err
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Password has been reset successfully. Please log in with your new password.",
+	})
 }
 
 // GetUser handles GET /api/v1/users/:id requests.

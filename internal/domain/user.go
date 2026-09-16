@@ -13,8 +13,9 @@ type User struct {
 	Name           string             `json:"name" bson:"name"`
 	Email          string             `json:"email" bson:"email"`
 	PasswordHash   string             `json:"-" bson:"password_hash"`
-	IsAgeVerified  bool               `json:"is_age_verified" bson:"is_age_verified"`
-	ProfilePicture string             `json:"profile_picture,omitempty" bson:"profile_picture,omitempty"`
+	IsAgeVerified    bool               `json:"is_age_verified" bson:"is_age_verified"`
+	IsEmailVerified  bool               `json:"is_email_verified" bson:"is_email_verified"`
+	ProfilePicture   string             `json:"profile_picture,omitempty" bson:"profile_picture,omitempty"`
 	CreatedAt      time.Time          `json:"created_at" bson:"created_at"`
 	UpdatedAt      time.Time          `json:"updated_at" bson:"updated_at"`
 	DeletedAt      *time.Time         `json:"deleted_at,omitempty" bson:"deleted_at,omitempty"`

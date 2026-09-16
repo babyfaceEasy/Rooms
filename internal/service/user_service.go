@@ -2,8 +2,10 @@ package service
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
-	"math/rand"
+	mathrand "math/rand"
 	"regexp"
 	"strings"
 	"time"
@@ -18,24 +20,31 @@ import (
 
 // UserService defines user management operations.
 type UserService interface {
-	Register(ctx context.Context, name, email, password string, ageVerified bool) (*domain.User, error)
+	Register(ctx context.Context, name, email, password string, ageVerified bool) (*domain.User, string, error)
 	GetUserByID(ctx context.Context, id string) (*domain.User, error)
 	UpdateProfile(ctx context.Context, id, name, profilePictureURL string) (*domain.User, error)
 	ChangePassword(ctx context.Context, id, currentPassword, newPassword string) error
 	DeleteAccount(ctx context.Context, id string) error
 	DeleteUser(ctx context.Context, id string) error
+	VerifyEmail(ctx context.Context, token string) error
+	ForgotPassword(ctx context.Context, email string) (string, primitive.ObjectID, error)
+	ResetPassword(ctx context.Context, token, newPassword string) error
 }
 
 type userService struct {
 	userRepo         repository.UserRepository
 	refreshTokenRepo repository.RefreshTokenRepository
+	verificationRepo repository.VerificationTokenRepository
+	passwordResetRepo repository.PasswordResetTokenRepository
 }
 
 // NewUserService creates a new UserService.
-func NewUserService(userRepo repository.UserRepository, refreshTokenRepo repository.RefreshTokenRepository) UserService {
+func NewUserService(userRepo repository.UserRepository, refreshTokenRepo repository.RefreshTokenRepository, verificationRepo repository.VerificationTokenRepository, passwordResetRepo repository.PasswordResetTokenRepository) UserService {
 	return &userService{
-		userRepo:         userRepo,
-		refreshTokenRepo: refreshTokenRepo,
+		userRepo:          userRepo,
+		refreshTokenRepo:  refreshTokenRepo,
+		verificationRepo:  verificationRepo,
+		passwordResetRepo: passwordResetRepo,
 	}
 }
 
@@ -46,32 +55,32 @@ func generateUniqueCode() string {
 	const digits = "0123456789"
 	code := make([]byte, 8)
 	for i := range code {
-		code[i] = digits[rand.Intn(len(digits))]
+		code[i] = digits[mathrand.Intn(len(digits))]
 	}
 	return string(code)
 }
 
-func (s *userService) Register(ctx context.Context, name, email, password string, ageVerified bool) (*domain.User, error) {
+func (s *userService) Register(ctx context.Context, name, email, password string, ageVerified bool) (*domain.User, string, error) {
 	// Validate age verification
 	if !ageVerified {
-		return nil, fmt.Errorf("age verification required: %w", domain.ErrAgeVerificationRequired)
+		return nil, "", fmt.Errorf("age verification required: %w", domain.ErrAgeVerificationRequired)
 	}
 
 	// Validate inputs
 	if err := validateName(name); err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	if err := validateEmail(email); err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	if err := validatePassword(password); err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	// Hash password
 	passwordHash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
-		return nil, fmt.Errorf("failed to hash password: %w", err)
+		return nil, "", fmt.Errorf("failed to hash password: %w", err)
 	}
 
 	// Generate unique customer code (8-digit numeric)
@@ -90,10 +99,27 @@ func (s *userService) Register(ctx context.Context, name, email, password string
 
 	// Persist to repository
 	if err := s.userRepo.Create(ctx, user); err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
-	return user, nil
+	// Generate email verification token (16 bytes = 32 hex chars, valid for 24 hours)
+	tokenBytes := make([]byte, 16)
+	if _, err := rand.Read(tokenBytes); err != nil {
+		return nil, "", fmt.Errorf("failed to generate verification token: %w", err)
+	}
+	verificationToken := hex.EncodeToString(tokenBytes)
+
+	vt := &domain.EmailVerificationToken{
+		UserID:    user.ID,
+		Token:     verificationToken,
+		ExpiresAt: time.Now().UTC().Add(24 * time.Hour),
+	}
+
+	if err := s.verificationRepo.Create(ctx, vt); err != nil {
+		return nil, "", fmt.Errorf("failed to store verification token: %w", err)
+	}
+
+	return user, verificationToken, nil
 }
 
 // GetUserByID retrieves a user by ID string.
@@ -103,6 +129,46 @@ func (s *userService) GetUserByID(ctx context.Context, id string) (*domain.User,
 		return nil, fmt.Errorf("invalid id %q: %w", id, domain.ErrInvalidInput)
 	}
 	return s.userRepo.GetByID(ctx, oid)
+}
+
+// VerifyEmail verifies a user's email using a verification token.
+func (s *userService) VerifyEmail(ctx context.Context, token string) error {
+	// Look up the token
+	vt, err := s.verificationRepo.GetByToken(ctx, token)
+	if err != nil {
+		return err
+	}
+
+	// Check if token has already been used
+	if vt.UsedAt != nil {
+		return fmt.Errorf("verification token has already been used: %w", domain.ErrInvalidInput)
+	}
+
+	// Check if token has expired
+	if time.Now().UTC().After(vt.ExpiresAt) {
+		return fmt.Errorf("verification token has expired: %w", domain.ErrInvalidInput)
+	}
+
+	// Fetch the user
+	user, err := s.userRepo.GetByID(ctx, vt.UserID)
+	if err != nil {
+		return err
+	}
+
+	// Mark email as verified
+	user.IsEmailVerified = true
+	user.UpdatedAt = time.Now().UTC()
+
+	if err := s.userRepo.Update(ctx, user); err != nil {
+		return err
+	}
+
+	// Mark token as used
+	if err := s.verificationRepo.MarkUsed(ctx, vt.ID); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // DeleteUser removes a user by ID string.
@@ -136,6 +202,91 @@ func (s *userService) DeleteAccount(ctx context.Context, id string) error {
 	// Invalidate all refresh tokens for this user (logs out all devices)
 	if err := s.refreshTokenRepo.DeleteByUserID(ctx, oid); err != nil {
 		return fmt.Errorf("failed to invalidate refresh tokens: %w", err)
+	}
+
+	return nil
+}
+
+// ForgotPassword generates a password reset token and returns it for email delivery.
+func (s *userService) ForgotPassword(ctx context.Context, email string) (string, primitive.ObjectID, error) {
+	// Find user by email
+	user, err := s.userRepo.GetByEmail(ctx, email)
+	if err != nil {
+		// Don't reveal whether the email exists — return generic success
+		return "", primitive.ObjectID{}, nil
+	}
+
+	// Generate a crypto-random token (16 bytes = 32 hex chars, valid for 1 hour)
+	tokenBytes := make([]byte, 16)
+	if _, err := rand.Read(tokenBytes); err != nil {
+		return "", primitive.ObjectID{}, fmt.Errorf("failed to generate password reset token: %w", err)
+	}
+	resetToken := hex.EncodeToString(tokenBytes)
+
+	rt := &domain.PasswordResetToken{
+		UserID:    user.ID,
+		Token:     resetToken,
+		ExpiresAt: time.Now().UTC().Add(1 * time.Hour),
+	}
+
+	if err := s.passwordResetRepo.Create(ctx, rt); err != nil {
+		return "", primitive.ObjectID{}, fmt.Errorf("failed to store password reset token: %w", err)
+	}
+
+	return resetToken, user.ID, nil
+}
+
+// ResetPassword resets a user's password using a valid reset token.
+func (s *userService) ResetPassword(ctx context.Context, token, newPassword string) error {
+	// Look up the token
+	rt, err := s.passwordResetRepo.GetByToken(ctx, token)
+	if err != nil {
+		return err
+	}
+
+	// Check if token has already been used
+	if rt.UsedAt != nil {
+		return fmt.Errorf("password reset token has already been used: %w", domain.ErrInvalidInput)
+	}
+
+	// Check if token has expired
+	if time.Now().UTC().After(rt.ExpiresAt) {
+		return fmt.Errorf("password reset token has expired: %w", domain.ErrInvalidInput)
+	}
+
+	// Validate new password
+	if err := validatePassword(newPassword); err != nil {
+		return err
+	}
+
+	// Fetch the user
+	user, err := s.userRepo.GetByID(ctx, rt.UserID)
+	if err != nil {
+		return err
+	}
+
+	// Hash new password
+	newPasswordHash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("failed to hash password: %w", err)
+	}
+
+	// Update password
+	user.PasswordHash = string(newPasswordHash)
+	user.UpdatedAt = time.Now().UTC()
+
+	if err := s.userRepo.Update(ctx, user); err != nil {
+		return err
+	}
+
+	// Invalidate all refresh tokens (logs out all devices)
+	if err := s.refreshTokenRepo.DeleteByUserID(ctx, user.ID); err != nil {
+		return fmt.Errorf("failed to invalidate refresh tokens: %w", err)
+	}
+
+	// Mark token as used
+	if err := s.passwordResetRepo.MarkUsed(ctx, rt.ID); err != nil {
+		return err
 	}
 
 	return nil
