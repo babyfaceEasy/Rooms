@@ -5,6 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"strconv"
+	"strings"
+	"time"
 
 	"temp_backend/internal/domain"
 	"temp_backend/internal/repository"
@@ -80,11 +83,18 @@ func (h *UserHandler) Register(c *fiber.Ctx) error {
 
 	// Send verification email asynchronously (gracefully degrade if it fails)
 	go func() {
+		// Extract first word from name for personalization
+		firstName := strings.Fields(user.Name)
+		userFirstName := user.Name
+		if len(firstName) > 0 {
+			userFirstName = firstName[0]
+		}
 		dynamicData := map[string]string{
-			"user_name":       user.Name,
-			"user_email":      user.Email,
-			"verification_url": "https://tempbackend.com/verify-email?token=" + verificationToken,
-				"verification_token": verificationToken,
+			"user_name":          userFirstName,
+			"user_email":         user.Email,
+			"verification_url":   "https://tempbackend.com/verify-email?token=" + verificationToken,
+			"verification_token": verificationToken,
+			"year":               strconv.Itoa(time.Now().Year()),
 		}
 		_ = h.emailService.SendVerificationEmail(context.Background(), user.ID, user.Email, dynamicData)
 	}()
@@ -156,6 +166,7 @@ func (h *UserHandler) ForgotPassword(c *fiber.Ctx) error {
 			dynamicData := map[string]string{
 				"reset_url":   "https://tempbackend.com/reset-password?token=" + resetToken,
 				"reset_token": resetToken,
+				"year":        strconv.Itoa(time.Now().Year()),
 			}
 			_ = h.emailService.SendPasswordResetEmail(context.Background(), userID, req.Email, dynamicData)
 		}()
