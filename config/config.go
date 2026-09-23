@@ -91,8 +91,8 @@ func Load() (Config, error) {
 	cfg.SendGrid.APIKey = getEnv("SENDGRID_API_KEY", "")
 	cfg.SendGrid.SenderEmail = getEnv("SENDGRID_SENDER_EMAIL", "noreply@tempbackend.com")
 	cfg.SendGrid.Enabled = parseBool(getEnv("SENDGRID_ENABLED", "true"))
-	cfg.SendGrid.VerificationTemplateID = getEnv("SENDGRID_VERIFICATION_TEMPLATE_ID", "")
-	cfg.SendGrid.PasswordResetTemplateID = getEnv("SENDGRID_PASSWORD_RESET_TEMPLATE_ID", "")
+	cfg.SendGrid.VerificationTemplateID = getEnv("SENDGRID_VERIFICATION_TEMPLATE_ID", "d-9b0fa24f3c0a4edbb7d5873654942ec0")
+	cfg.SendGrid.PasswordResetTemplateID = getEnv("SENDGRID_PASSWORD_RESET_TEMPLATE_ID", "d-24abe7a851db4a169f750ee1ad0d1597")
 
 	if cfg.Mongo.URI == "" {
 		return cfg, fmt.Errorf("MONGO_URI is required")
