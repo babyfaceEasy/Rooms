@@ -85,6 +85,11 @@ func (s *roomService) AddUserToRoom(ctx context.Context, code string, userID pri
 		return nil, err
 	}
 
+	// Enforce room capacity limit (max 10 members, including the creator)
+	if len(room.Members) >= 10 {
+		return nil, domain.ErrRoomFull
+	}
+
 	// Add user to room members
 	if err := s.repo.AddUserToRoom(ctx, room.ID, userID); err != nil {
 		return nil, err

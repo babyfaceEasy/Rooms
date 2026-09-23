@@ -45,6 +45,8 @@ var (
 	ErrNotRoomMember           = &AppError{Code: "NOT_ROOM_MEMBER", Message: "You are not a member of this room", HTTPStatus: http.StatusForbidden}
 	ErrCannotJoinOwnRoom       = &AppError{Code: "CANNOT_JOIN_OWN_ROOM", Message: "You are the creator of this room and are already a member", HTTPStatus: http.StatusBadRequest}
 	ErrOwnerCannotLeaveRoom    = &AppError{Code: "OWNER_CANNOT_LEAVE", Message: "Room owners cannot leave their own room. Delete the room instead.", HTTPStatus: http.StatusForbidden}
+	ErrRoomFull                = &AppError{Code: "ROOM_FULL", Message: "This room is full. Maximum capacity is 10 members.", HTTPStatus: http.StatusBadRequest}
+	ErrEmailNotVerified        = &AppError{Code: "EMAIL_NOT_VERIFIED", Message: "Please verify your email address before logging in", HTTPStatus: http.StatusForbidden}
 
 	// 5xx errors
 	ErrInternalServer  = &AppError{Code: "INTERNAL_ERROR", Message: "Something went wrong. Please try again later.", HTTPStatus: http.StatusInternalServerError}

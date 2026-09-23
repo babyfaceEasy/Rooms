@@ -37,6 +37,9 @@ func (s *Server) registerRoutes(itemHandler *handler.ItemHandler, userHandler *h
 	authGroup.Post("/register", userHandler.Register)
 	authGroup.Post("/login", authHandler.Login)
 	authGroup.Post("/refresh", authHandler.RefreshAccessToken)
+	authGroup.Post("/verify-email", userHandler.VerifyEmail)
+	authGroup.Post("/forgot-password", userHandler.ForgotPassword)
+	authGroup.Post("/reset-password", userHandler.ResetPassword)
 
 	api := s.app.Group("/api/v1")
 
