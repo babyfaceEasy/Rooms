@@ -2,8 +2,6 @@ package service
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"fmt"
 	mathrand "math/rand"
 	"regexp"
@@ -32,9 +30,9 @@ type UserService interface {
 }
 
 type userService struct {
-	userRepo         repository.UserRepository
-	refreshTokenRepo repository.RefreshTokenRepository
-	verificationRepo repository.VerificationTokenRepository
+	userRepo          repository.UserRepository
+	refreshTokenRepo  repository.RefreshTokenRepository
+	verificationRepo  repository.VerificationTokenRepository
 	passwordResetRepo repository.PasswordResetTokenRepository
 }
 
@@ -58,6 +56,16 @@ func generateUniqueCode() string {
 		code[i] = digits[mathrand.Intn(len(digits))]
 	}
 	return string(code)
+}
+
+// generateToken generates a random 6-character code (uppercase letters and numbers) for email verification and password reset.
+func generateToken() string {
+	const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	token := make([]byte, 6)
+	for i := range token {
+		token[i] = chars[mathrand.Intn(len(chars))]
+	}
+	return string(token)
 }
 
 func (s *userService) Register(ctx context.Context, name, email, password string, ageVerified bool) (*domain.User, string, error) {
@@ -102,12 +110,8 @@ func (s *userService) Register(ctx context.Context, name, email, password string
 		return nil, "", err
 	}
 
-	// Generate email verification token (16 bytes = 32 hex chars, valid for 24 hours)
-	tokenBytes := make([]byte, 16)
-	if _, err := rand.Read(tokenBytes); err != nil {
-		return nil, "", fmt.Errorf("failed to generate verification token: %w", err)
-	}
-	verificationToken := hex.EncodeToString(tokenBytes)
+	// Generate email verification token (6 digits, valid for 24 hours)
+	verificationToken := generateToken()
 
 	vt := &domain.EmailVerificationToken{
 		UserID:    user.ID,
@@ -216,12 +220,8 @@ func (s *userService) ForgotPassword(ctx context.Context, email string) (string,
 		return "", primitive.ObjectID{}, nil
 	}
 
-	// Generate a crypto-random token (16 bytes = 32 hex chars, valid for 1 hour)
-	tokenBytes := make([]byte, 16)
-	if _, err := rand.Read(tokenBytes); err != nil {
-		return "", primitive.ObjectID{}, fmt.Errorf("failed to generate password reset token: %w", err)
-	}
-	resetToken := hex.EncodeToString(tokenBytes)
+	// Generate a 6-digit numeric token (valid for 1 hour)
+	resetToken := generateToken()
 
 	rt := &domain.PasswordResetToken{
 		UserID:    user.ID,
