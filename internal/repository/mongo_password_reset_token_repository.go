@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"time"
 
+	"temp_backend/internal/domain"
+
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
-	"temp_backend/internal/domain"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // MongoPasswordResetTokenRepository implements PasswordResetTokenRepository for MongoDB.
@@ -66,6 +68,26 @@ func (r *MongoPasswordResetTokenRepository) GetByToken(ctx context.Context, toke
 	if err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
 			return nil, fmt.Errorf("password reset token not found: %w", domain.ErrInvalidInput)
+		}
+		return nil, fmt.Errorf("failed to query password reset token: %w", err)
+	}
+	return &rt, nil
+}
+
+// GetByUserID retrieves the most recent unused password reset token for a user.
+func (r *MongoPasswordResetTokenRepository) GetByUserID(ctx context.Context, userID primitive.ObjectID) (*domain.PasswordResetToken, error) {
+	var rt domain.PasswordResetToken
+	err := r.collection.FindOne(
+		ctx,
+		bson.M{
+			"user_id": userID,
+			"used_at": bson.M{"$eq": nil},
+		},
+		options.FindOne().SetSort(bson.M{"created_at": -1}),
+	).Decode(&rt)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return nil, nil // No token found is not an error
 		}
 		return nil, fmt.Errorf("failed to query password reset token: %w", err)
 	}

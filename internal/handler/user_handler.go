@@ -182,6 +182,47 @@ func (h *UserHandler) ResendVerificationEmail(c *fiber.Ctx) error {
 	})
 }
 
+// ResendPasswordResetEmailRequest represents the request payload for resending password reset email.
+type ResendPasswordResetEmailRequest struct {
+	Email string `json:"email"`
+}
+
+// ResendPasswordResetEmail handles POST /api/v1/auth/resend-password-reset-email requests.
+func (h *UserHandler) ResendPasswordResetEmail(c *fiber.Ctx) error {
+	var req ResendPasswordResetEmailRequest
+
+	if err := c.BodyParser(&req); err != nil {
+		return fmt.Errorf("parse resend password reset email request: %w", err)
+	}
+
+	if req.Email == "" {
+		return &domain.AppError{Code: "INVALID_INPUT", Message: "Email is required", HTTPStatus: fiber.StatusBadRequest}
+	}
+
+	resetToken, err := h.svc.ResendPasswordResetEmail(c.UserContext(), req.Email)
+	if err != nil {
+		return err
+	}
+
+	// Send password reset email asynchronously (gracefully degrade if it fails)
+	if resetToken != "" {
+		go func() {
+			dynamicData := map[string]string{
+				"reset_url":   "https://tempbackend.com/reset-password?token=" + resetToken,
+				"reset_token": resetToken,
+				"year":        strconv.Itoa(time.Now().Year()),
+			}
+			_, _ = h.emailService.SendPasswordResetEmail(context.Background(), primitive.ObjectID{}, req.Email, dynamicData)
+			// Email service logs internally, so we just ignore the result here for async send
+		}()
+	}
+
+	// Always return success to prevent email enumeration
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "If an account with this email exists, a password reset email has been sent.",
+	})
+}
+
 // ForgotPasswordRequest represents the request payload for password reset initiation.
 type ForgotPasswordRequest struct {
 	Email string `json:"email"`
