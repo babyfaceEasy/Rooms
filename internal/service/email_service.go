@@ -16,10 +16,12 @@ import (
 // EmailService defines methods for sending emails.
 type EmailService interface {
 	// SendVerificationEmail sends a verification email to the user.
-	SendVerificationEmail(ctx context.Context, userID primitive.ObjectID, recipientEmail string, dynamicData map[string]string) error
+	// Returns EmailSendResult with details about the send attempt, or error if critical operation failed.
+	SendVerificationEmail(ctx context.Context, userID primitive.ObjectID, recipientEmail string, dynamicData map[string]string) (*domain.EmailSendResult, error)
 
 	// SendPasswordResetEmail sends a password reset email to the user.
-	SendPasswordResetEmail(ctx context.Context, userID primitive.ObjectID, recipientEmail string, dynamicData map[string]string) error
+	// Returns EmailSendResult with details about the send attempt, or error if critical operation failed.
+	SendPasswordResetEmail(ctx context.Context, userID primitive.ObjectID, recipientEmail string, dynamicData map[string]string) (*domain.EmailSendResult, error)
 }
 
 // emailService implements EmailService.
@@ -55,12 +57,16 @@ func NewEmailService(
 }
 
 // SendVerificationEmail sends a verification email to the user.
-func (s *emailService) SendVerificationEmail(ctx context.Context, userID primitive.ObjectID, recipientEmail string, dynamicData map[string]string) error {
+func (s *emailService) SendVerificationEmail(ctx context.Context, userID primitive.ObjectID, recipientEmail string, dynamicData map[string]string) (*domain.EmailSendResult, error) {
 	if !s.enabled {
 		if s.logger != nil {
 			s.logger.InfoContext(ctx, "email sending is disabled", "user_id", userID.Hex(), "recipient", recipientEmail)
 		}
-		return nil
+		return &domain.EmailSendResult{
+			Success:      false,
+			Status:       domain.EmailStatusFailed,
+			ErrorMessage: "email sending is disabled",
+		}, nil
 	}
 
 	// Create email log
@@ -77,7 +83,7 @@ func (s *emailService) SendVerificationEmail(ctx context.Context, userID primiti
 		if s.logger != nil {
 			s.logger.ErrorContext(ctx, "failed to save email log", "user_id", userID.Hex(), "error", err)
 		}
-		return nil // Gracefully degrade - don't fail if logging fails
+		return nil, fmt.Errorf("failed to save email log: %w", err)
 	}
 
 	// Send email via SendGrid
@@ -92,7 +98,12 @@ func (s *emailService) SendVerificationEmail(ctx context.Context, userID primiti
 		if s.logger != nil {
 			s.logger.ErrorContext(ctx, "failed to send verification email", "user_id", userID.Hex(), "error", err)
 		}
-		return nil // Gracefully degrade - don't fail the parent operation
+		return &domain.EmailSendResult{
+			Success:      false,
+			EmailID:      savedEmail.ID.Hex(),
+			Status:       domain.EmailStatusFailed,
+			ErrorMessage: err.Error(),
+		}, nil
 	}
 
 	// Update status to sent in database
@@ -101,27 +112,29 @@ func (s *emailService) SendVerificationEmail(ctx context.Context, userID primiti
 		s.logger.ErrorContext(ctx, "failed to update email status to sent", "email_id", savedEmail.ID.Hex(), "error", updateErr)
 	}
 
-	// Store sendgrid message ID if available
-	if msgID != "" {
-		updateErr := s.emailRepo.UpdateEmailStatus(ctx, savedEmail.ID.Hex(), domain.EmailStatusSent, nil)
-		if updateErr != nil && s.logger != nil {
-			s.logger.ErrorContext(ctx, "failed to update sendgrid message id", "email_id", savedEmail.ID.Hex(), "error", updateErr)
-		}
+	if s.logger != nil {
+		s.logger.InfoContext(ctx, "verification email sent", "user_id", userID.Hex(), "recipient", recipientEmail, "message_id", msgID)
 	}
 
-	if s.logger != nil {
-		s.logger.InfoContext(ctx, "verification email sent", "user_id", userID.Hex(), "recipient", recipientEmail)
-	}
-	return nil
+	return &domain.EmailSendResult{
+		Success:   true,
+		EmailID:   savedEmail.ID.Hex(),
+		MessageID: msgID,
+		Status:    domain.EmailStatusSent,
+	}, nil
 }
 
 // SendPasswordResetEmail sends a password reset email to the user.
-func (s *emailService) SendPasswordResetEmail(ctx context.Context, userID primitive.ObjectID, recipientEmail string, dynamicData map[string]string) error {
+func (s *emailService) SendPasswordResetEmail(ctx context.Context, userID primitive.ObjectID, recipientEmail string, dynamicData map[string]string) (*domain.EmailSendResult, error) {
 	if !s.enabled {
 		if s.logger != nil {
 			s.logger.InfoContext(ctx, "email sending is disabled", "user_id", userID.Hex(), "recipient", recipientEmail)
 		}
-		return nil
+		return &domain.EmailSendResult{
+			Success:      false,
+			Status:       domain.EmailStatusFailed,
+			ErrorMessage: "email sending is disabled",
+		}, nil
 	}
 
 	// Create email log
@@ -138,7 +151,7 @@ func (s *emailService) SendPasswordResetEmail(ctx context.Context, userID primit
 		if s.logger != nil {
 			s.logger.ErrorContext(ctx, "failed to save email log", "user_id", userID.Hex(), "error", err)
 		}
-		return nil // Gracefully degrade - don't fail if logging fails
+		return nil, fmt.Errorf("failed to save email log: %w", err)
 	}
 
 	// Send email via SendGrid
@@ -153,7 +166,12 @@ func (s *emailService) SendPasswordResetEmail(ctx context.Context, userID primit
 		if s.logger != nil {
 			s.logger.ErrorContext(ctx, "failed to send password reset email", "user_id", userID.Hex(), "error", err)
 		}
-		return nil // Gracefully degrade - don't fail the parent operation
+		return &domain.EmailSendResult{
+			Success:      false,
+			EmailID:      savedEmail.ID.Hex(),
+			Status:       domain.EmailStatusFailed,
+			ErrorMessage: err.Error(),
+		}, nil
 	}
 
 	// Update status to sent in database
@@ -162,18 +180,16 @@ func (s *emailService) SendPasswordResetEmail(ctx context.Context, userID primit
 		s.logger.ErrorContext(ctx, "failed to update email status to sent", "email_id", savedEmail.ID.Hex(), "error", updateErr)
 	}
 
-	// Store sendgrid message ID if available
-	if msgID != "" {
-		updateErr := s.emailRepo.UpdateEmailStatus(ctx, savedEmail.ID.Hex(), domain.EmailStatusSent, nil)
-		if updateErr != nil && s.logger != nil {
-			s.logger.ErrorContext(ctx, "failed to update sendgrid message id", "email_id", savedEmail.ID.Hex(), "error", updateErr)
-		}
+	if s.logger != nil {
+		s.logger.InfoContext(ctx, "password reset email sent", "user_id", userID.Hex(), "recipient", recipientEmail, "message_id", msgID)
 	}
 
-	if s.logger != nil {
-		s.logger.InfoContext(ctx, "password reset email sent", "user_id", userID.Hex(), "recipient", recipientEmail)
-	}
-	return nil
+	return &domain.EmailSendResult{
+		Success:   true,
+		EmailID:   savedEmail.ID.Hex(),
+		MessageID: msgID,
+		Status:    domain.EmailStatusSent,
+	}, nil
 }
 
 // sendEmail is a helper that sends an email via SendGrid using dynamic templates.
