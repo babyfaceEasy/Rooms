@@ -52,10 +52,13 @@ func TestSendVerificationEmail_Disabled(t *testing.T) {
 	svc := NewEmailService(mockRepo, nil, "noreply@test.com", false, "tmpl_1", "tmpl_2", nil)
 
 	userID := primitive.NewObjectID()
-	err := svc.SendVerificationEmail(context.Background(), userID, "test@example.com", map[string]string{})
+	result, err := svc.SendVerificationEmail(context.Background(), userID, "test@example.com", map[string]string{})
 
-	// When disabled, should return nil without error
+	// When disabled, should return result indicating disabled
 	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.False(t, result.Success)
+	assert.Equal(t, domain.EmailStatusFailed, result.Status)
 }
 
 func TestSendVerificationEmail_LogsEmail(t *testing.T) {
@@ -81,11 +84,13 @@ func TestSendVerificationEmail_LogsEmail(t *testing.T) {
 	dynamicData := map[string]string{"user_name": "John"}
 
 	// This will attempt to send via SendGrid (which will fail), but we're just testing that
-	// the email is logged and handled gracefully
-	err := svc.SendVerificationEmail(context.Background(), userID, "test@example.com", dynamicData)
+	// the email is logged and returns a result
+	result, err := svc.SendVerificationEmail(context.Background(), userID, "test@example.com", dynamicData)
 
-	// Should gracefully degrade - no error even if SendGrid fails
+	// Should return error result from SendGrid but no Go error
 	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, savedEmail.ID.Hex(), result.EmailID)
 }
 
 func TestSendPasswordResetEmail_Disabled(t *testing.T) {
@@ -93,10 +98,13 @@ func TestSendPasswordResetEmail_Disabled(t *testing.T) {
 	svc := NewEmailService(mockRepo, nil, "noreply@test.com", false, "tmpl_1", "tmpl_2", nil)
 
 	userID := primitive.NewObjectID()
-	err := svc.SendPasswordResetEmail(context.Background(), userID, "test@example.com", map[string]string{})
+	result, err := svc.SendPasswordResetEmail(context.Background(), userID, "test@example.com", map[string]string{})
 
-	// When disabled, should return nil without error
+	// When disabled, should return result indicating disabled
 	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.False(t, result.Success)
+	assert.Equal(t, domain.EmailStatusFailed, result.Status)
 }
 
 func TestSendPasswordResetEmail_LogsEmail(t *testing.T) {
@@ -119,8 +127,10 @@ func TestSendPasswordResetEmail_LogsEmail(t *testing.T) {
 	userID := primitive.NewObjectID()
 	dynamicData := map[string]string{"reset_code": "ABC123"}
 
-	err := svc.SendPasswordResetEmail(context.Background(), userID, "test@example.com", dynamicData)
+	result, err := svc.SendPasswordResetEmail(context.Background(), userID, "test@example.com", dynamicData)
 
-	// Should gracefully degrade - no error even if SendGrid fails
+	// Should return error result from SendGrid but no Go error
 	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, savedEmail.ID.Hex(), result.EmailID)
 }

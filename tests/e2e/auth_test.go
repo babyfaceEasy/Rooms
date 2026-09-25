@@ -11,6 +11,7 @@ import (
 
 	"temp_backend/config"
 	"temp_backend/internal/api"
+	"temp_backend/internal/domain"
 	"temp_backend/internal/handler"
 	"temp_backend/internal/repository"
 	"temp_backend/internal/service"
@@ -50,12 +51,12 @@ type RefreshResponse struct {
 // MockEmailService is a mock implementation for testing
 type MockEmailService struct{}
 
-func (m *MockEmailService) SendVerificationEmail(ctx context.Context, userID primitive.ObjectID, recipientEmail string, dynamicData map[string]string) error {
-	return nil
+func (m *MockEmailService) SendVerificationEmail(ctx context.Context, userID primitive.ObjectID, recipientEmail string, dynamicData map[string]string) (*domain.EmailSendResult, error) {
+	return &domain.EmailSendResult{Success: true, Status: domain.EmailStatusSent}, nil
 }
 
-func (m *MockEmailService) SendPasswordResetEmail(ctx context.Context, userID primitive.ObjectID, recipientEmail string, dynamicData map[string]string) error {
-	return nil
+func (m *MockEmailService) SendPasswordResetEmail(ctx context.Context, userID primitive.ObjectID, recipientEmail string, dynamicData map[string]string) (*domain.EmailSendResult, error) {
+	return &domain.EmailSendResult{Success: true, Status: domain.EmailStatusSent}, nil
 }
 
 type RegisterRequest struct {
