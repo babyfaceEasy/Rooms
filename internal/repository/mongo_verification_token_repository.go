@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"time"
 
+	"temp_backend/internal/domain"
+
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
-	"temp_backend/internal/domain"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // MongoVerificationTokenRepository implements VerificationTokenRepository for MongoDB.
@@ -68,6 +70,21 @@ func (r *MongoVerificationTokenRepository) GetByToken(ctx context.Context, token
 			return nil, fmt.Errorf("verification token not found: %w", domain.ErrInvalidInput)
 		}
 		return nil, fmt.Errorf("failed to query verification token: %w", err)
+	}
+	return &vt, nil
+}
+
+// GetByUserID retrieves the most recent verification token for a user (if exists).
+func (r *MongoVerificationTokenRepository) GetByUserID(ctx context.Context, userID primitive.ObjectID) (*domain.EmailVerificationToken, error) {
+	var vt domain.EmailVerificationToken
+	opts := options.FindOne().SetSort(bson.M{"created_at": -1})
+
+	err := r.collection.FindOne(ctx, bson.M{"user_id": userID}, opts).Decode(&vt)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return nil, nil // No token found; this is not an error
+		}
+		return nil, fmt.Errorf("failed to query verification token by user_id: %w", err)
 	}
 	return &vt, nil
 }
