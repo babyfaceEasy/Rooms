@@ -15,6 +15,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/valyala/fasthttp"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // UserHandler exposes HTTP endpoints for user management.
@@ -134,6 +135,48 @@ func (h *UserHandler) VerifyEmail(c *fiber.Ctx) error {
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"message": "Email verified successfully",
+	})
+}
+
+// ResendVerificationEmailRequest represents the request payload for resending verification email.
+type ResendVerificationEmailRequest struct {
+	Email string `json:"email"`
+}
+
+// ResendVerificationEmail handles POST /api/v1/auth/resend-verification-email requests.
+func (h *UserHandler) ResendVerificationEmail(c *fiber.Ctx) error {
+	var req ResendVerificationEmailRequest
+
+	if err := c.BodyParser(&req); err != nil {
+		return fmt.Errorf("parse resend verification email request: %w", err)
+	}
+
+	if req.Email == "" {
+		return &domain.AppError{Code: "INVALID_INPUT", Message: "Email is required", HTTPStatus: fiber.StatusBadRequest}
+	}
+
+	verificationToken, err := h.svc.ResendVerificationEmail(c.UserContext(), req.Email)
+	if err != nil {
+		return err
+	}
+
+	// Send verification email asynchronously (gracefully degrade if it fails)
+	if verificationToken != "" {
+		go func() {
+			dynamicData := map[string]string{
+				"user_name":          "", // We could fetch user here, but keeping it generic for resend
+				"user_email":         req.Email,
+				"verification_url":   "https://tempbackend.com/verify-email?token=" + verificationToken,
+				"verification_token": verificationToken,
+				"year":               strconv.Itoa(time.Now().Year()),
+			}
+			_ = h.emailService.SendVerificationEmail(context.Background(), primitive.ObjectID{}, req.Email, dynamicData)
+		}()
+	}
+
+	// Always return success to prevent email enumeration
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "If an account with this email exists and is not verified, a verification email has been sent.",
 	})
 }
 

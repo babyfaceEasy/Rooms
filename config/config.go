@@ -47,6 +47,11 @@ type Config struct {
 		GlobalWindow time.Duration
 		AuthMax      int
 		AuthWindow   time.Duration
+		EmailMax     int
+		EmailWindow  time.Duration
+	}
+	Token struct {
+		ResendCooldown time.Duration
 	}
 	Reporting struct {
 		MaxReportsPerDay        int
@@ -84,6 +89,8 @@ func Load() (Config, error) {
 	cfg.RateLimit.GlobalWindow = parseDuration(getEnv("RATE_LIMIT_GLOBAL_WINDOW", "1m"))
 	cfg.RateLimit.AuthMax = getInt("RATE_LIMIT_AUTH_MAX", 20)
 	cfg.RateLimit.AuthWindow = parseDuration(getEnv("RATE_LIMIT_AUTH_WINDOW", "1m"))
+	cfg.RateLimit.EmailMax = getInt("RATE_LIMIT_EMAIL_MAX", 5)
+	cfg.RateLimit.EmailWindow = parseDuration(getEnv("RATE_LIMIT_EMAIL_WINDOW", "1h"))
 
 	cfg.Reporting.MaxReportsPerDay = getInt("MAX_REPORTS_PER_DAY", 10)
 	cfg.Reporting.AutoSoftDeleteThreshold = getInt("AUTO_SOFT_DELETE_REPORT_THRESHOLD", 15)
@@ -93,6 +100,8 @@ func Load() (Config, error) {
 	cfg.SendGrid.Enabled = parseBool(getEnv("SENDGRID_ENABLED", "true"))
 	cfg.SendGrid.VerificationTemplateID = getEnv("SENDGRID_VERIFICATION_TEMPLATE_ID", "d-9b0fa24f3c0a4edbb7d5873654942ec0")
 	cfg.SendGrid.PasswordResetTemplateID = getEnv("SENDGRID_PASSWORD_RESET_TEMPLATE_ID", "d-24abe7a851db4a169f750ee1ad0d1597")
+
+	cfg.Token.ResendCooldown = parseDuration(getEnv("TOKEN_RESEND_COOLDOWN", "2m"))
 
 	if cfg.Mongo.URI == "" {
 		return cfg, fmt.Errorf("MONGO_URI is required")
