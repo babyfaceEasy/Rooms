@@ -11,6 +11,7 @@
 | `POST` | `/auth/verify-email` | ❌ | Verify email address with token |
 | `POST` | `/auth/resend-verification-email` | ❌ | Resend verification email (2 min cooldown) |
 | `POST` | `/auth/forgot-password` | ❌ | Request password reset email |
+| `POST` | `/auth/resend-password-reset-email` | ❌ | Resend password reset email (2 min cooldown) |
 | `POST` | `/auth/reset-password` | ❌ | Reset password with token |
 | `POST` | `/auth/logout` | ✅ | Logout and invalidate tokens |
 
@@ -271,6 +272,17 @@ curl -X POST http://localhost:8080/api/v1/auth/verify-email \
   }'
 ```
 
+#### Resend Verification Email
+```bash
+curl -X POST http://localhost:8080/api/v1/auth/resend-verification-email \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "john@example.com"
+  }'
+```
+
+**Note:** Limited to 1 resend per 2 minutes per email address.
+
 #### Forgot Password
 ```bash
 curl -X POST http://localhost:8080/api/v1/auth/forgot-password \
@@ -279,6 +291,17 @@ curl -X POST http://localhost:8080/api/v1/auth/forgot-password \
     "email": "john@example.com"
   }'
 ```
+
+#### Resend Password Reset Email
+```bash
+curl -X POST http://localhost:8080/api/v1/auth/resend-password-reset-email \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "john@example.com"
+  }'
+```
+
+**Note:** Limited to 1 resend per 2 minutes per email address.
 
 #### Reset Password
 ```bash

@@ -554,6 +554,77 @@ curl -X POST http://localhost:8080/api/v1/auth/forgot-password \
 
 ---
 
+## 6.5. Resend Password Reset Email
+
+### Endpoint
+```
+POST /auth/resend-password-reset-email
+```
+
+### Description
+Resend a password reset email if the user didn't receive the initial email or the token expired. Enforces a 2-minute cooldown between resend attempts to prevent abuse. Returns the same response regardless of whether the email exists (prevents email enumeration).
+
+### Request Headers
+```
+Content-Type: application/json
+```
+
+### Request Body
+```json
+{
+  "email": "john@example.com"
+}
+```
+
+### Request Body Schema
+| Field | Type | Required |
+|-------|------|----------|
+| `email` | string | Yes |
+
+### Response (200 OK)
+```json
+{
+  "message": "If an account with this email exists, a password reset email has been sent."
+}
+```
+
+### Error Responses
+
+**400 Bad Request - Missing Email**
+```json
+{
+  "error": "invalid input",
+  "status": 400
+}
+```
+
+**400 Bad Request - Resend Too Soon**
+```json
+{
+  "error": "invalid input",
+  "status": 400,
+  "message": "password reset email resend too soon, try again in 1m45s"
+}
+```
+
+### Example cURL
+```bash
+curl -X POST http://localhost:8080/api/v1/auth/resend-password-reset-email \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "john@example.com"
+  }'
+```
+
+### Notes
+- Always returns 200 to prevent email enumeration
+- Per-user cooldown: users must wait 2 minutes (default, configurable) between resend requests
+- Reset token expires after 1 hour
+- Generates a new reset token, invalidating any previous tokens for the user
+- Sends email with `reset_url` and `reset_token` in dynamic template data
+
+---
+
 ## 7. Reset Password
 
 ### Endpoint

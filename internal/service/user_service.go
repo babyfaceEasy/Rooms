@@ -28,6 +28,7 @@ type UserService interface {
 	VerifyEmail(ctx context.Context, token string) error
 	ResendVerificationEmail(ctx context.Context, email string) (string, error)
 	ForgotPassword(ctx context.Context, email string) (string, primitive.ObjectID, error)
+	ResendPasswordResetEmail(ctx context.Context, email string) (string, error)
 	ResetPassword(ctx context.Context, token, newPassword string) error
 }
 
@@ -234,6 +235,61 @@ func (s *userService) ResendVerificationEmail(ctx context.Context, email string)
 
 	if err := s.verificationRepo.Create(ctx, vt); err != nil {
 		return "", fmt.Errorf("failed to create verification token: %w", err)
+	}
+
+	return newToken, nil
+}
+
+// ResendPasswordResetEmail generates and returns a new password reset token for a user.
+// Only allows resend if the last token was created more than 2 minutes ago.
+func (s *userService) ResendPasswordResetEmail(ctx context.Context, email string) (string, error) {
+	// Find user by email
+	user, err := s.userRepo.GetByEmail(ctx, email)
+	if err != nil {
+		// Don't reveal whether the email exists
+		return "", nil
+	}
+
+	if user == nil {
+		// Don't reveal whether the email exists
+		return "", nil
+	}
+
+	// Get existing password reset token (if any)
+	existingToken, err := s.passwordResetRepo.GetByUserID(ctx, user.ID)
+	if err != nil {
+		return "", fmt.Errorf("failed to get existing password reset token: %w", err)
+	}
+
+	// Check if token was created less than cooldown duration ago
+	if existingToken != nil && existingToken.UsedAt == nil {
+		elapsedTime := time.Now().UTC().Sub(existingToken.CreatedAt)
+		minResendTime := s.cfg.Token.ResendCooldown
+
+		if elapsedTime < minResendTime {
+			remainingTime := minResendTime - elapsedTime
+			return "", fmt.Errorf("password reset email resend too soon, try again in %v: %w", remainingTime, domain.ErrInvalidInput)
+		}
+	}
+
+	// Delete old token if it exists
+	if existingToken != nil {
+		if err := s.passwordResetRepo.DeleteByUserID(ctx, user.ID); err != nil {
+			return "", fmt.Errorf("failed to delete old password reset token: %w", err)
+		}
+	}
+
+	// Generate new token (6 digits: numeric)
+	newToken := generateToken()
+
+	rt := &domain.PasswordResetToken{
+		UserID:    user.ID,
+		Token:     newToken,
+		ExpiresAt: time.Now().UTC().Add(1 * time.Hour),
+	}
+
+	if err := s.passwordResetRepo.Create(ctx, rt); err != nil {
+		return "", fmt.Errorf("failed to create password reset token: %w", err)
 	}
 
 	return newToken, nil
