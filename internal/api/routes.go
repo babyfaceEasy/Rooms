@@ -8,7 +8,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
-func (s *Server) registerRoutes(itemHandler *handler.ItemHandler, userHandler *handler.UserHandler, authHandler *handler.AuthHandler, roomHandler *handler.RoomHandler, postHandler *handler.PostHandler, commentHandler *handler.CommentHandler, reportHandler *handler.ReportHandler, authService service.AuthService) {
+func (s *Server) registerRoutes(itemHandler *handler.ItemHandler, userHandler *handler.UserHandler, authHandler *handler.AuthHandler, roomHandler *handler.RoomHandler, postHandler *handler.PostHandler, commentHandler *handler.CommentHandler, reportHandler *handler.ReportHandler, authService service.AuthService, emailRateLimiter fiber.Handler) {
 	s.app.Get("/health", func(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusOK).JSON(fiber.Map{
 			"status": "ok",
@@ -37,9 +37,10 @@ func (s *Server) registerRoutes(itemHandler *handler.ItemHandler, userHandler *h
 	authGroup.Post("/register", userHandler.Register)
 	authGroup.Post("/login", authHandler.Login)
 	authGroup.Post("/refresh", authHandler.RefreshAccessToken)
-	authGroup.Post("/verify-email", userHandler.VerifyEmail)
-	authGroup.Post("/forgot-password", userHandler.ForgotPassword)
-	authGroup.Post("/reset-password", userHandler.ResetPassword)
+	authGroup.Post("/verify-email", emailRateLimiter, userHandler.VerifyEmail)
+	authGroup.Post("/resend-verification-email", emailRateLimiter, userHandler.ResendVerificationEmail)
+	authGroup.Post("/forgot-password", emailRateLimiter, userHandler.ForgotPassword)
+	authGroup.Post("/reset-password", emailRateLimiter, userHandler.ResetPassword)
 
 	api := s.app.Group("/api/v1")
 

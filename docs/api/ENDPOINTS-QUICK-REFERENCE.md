@@ -9,6 +9,7 @@
 | `POST` | `/auth/login` | ❌ | Login and get tokens |
 | `POST` | `/auth/refresh` | ❌ | Get new access token |
 | `POST` | `/auth/verify-email` | ❌ | Verify email address with token |
+| `POST` | `/auth/resend-verification-email` | ❌ | Resend verification email (2 min cooldown) |
 | `POST` | `/auth/forgot-password` | ❌ | Request password reset email |
 | `POST` | `/auth/reset-password` | ❌ | Reset password with token |
 | `POST` | `/auth/logout` | ✅ | Logout and invalidate tokens |

@@ -412,7 +412,89 @@ curl -X POST http://localhost:8080/api/v1/auth/verify-email \
 
 ---
 
-## 5. Forgot Password
+## 5. Resend Verification Email
+
+### Endpoint
+```
+POST /auth/resend-verification-email
+```
+
+### Description
+Request a new verification email if the original one was not delivered or the user needs a fresh verification code. A new 6-character verification token is generated and sent to the user's email. Returns the same response regardless of whether the email exists (prevents email enumeration).
+
+**Rate Limiting:** Limited to 5 requests per IP per 1 hour. Per-user cooldown: 2 minutes between resend requests (configurable via `TOKEN_RESEND_COOLDOWN`).
+
+### Request Headers
+```
+Content-Type: application/json
+```
+
+### Request Body
+```json
+{
+  "email": "john@example.com"
+}
+```
+
+### Request Body Schema
+| Field | Type | Required |
+|-------|------|----------|
+| `email` | string | Yes |
+
+### Response (200 OK)
+```json
+{
+  "message": "If an account with this email exists and is not verified, a verification email has been sent."
+}
+```
+
+### Error Responses
+
+**400 Bad Request - Missing Email**
+```json
+{
+  "error": "invalid input",
+  "status": 400
+}
+```
+
+**400 Bad Request - Resend Too Soon**
+```json
+{
+  "error": "invalid input",
+  "status": 400
+}
+```
+
+**429 Too Many Requests - Rate Limited**
+```json
+{
+  "error": "rate limited",
+  "code": "RATE_LIMITED",
+  "status": 429
+}
+```
+
+### Example cURL
+```bash
+curl -X POST http://localhost:8080/api/v1/auth/resend-verification-email \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "john@example.com"
+  }'
+```
+
+### Notes
+- Always returns 200 to prevent email enumeration
+- New verification token expires after 24 hours
+- Token is one-time use only
+- Per-user cooldown: users must wait 2 minutes (default, configurable) between resend requests
+- Global rate limit: 5 requests per IP per 1 hour
+- Sends email with `verification_url` and `verification_token` (6-char code) in dynamic template data
+
+---
+
+## 6. Forgot Password
 
 ### Endpoint
 ```
@@ -472,7 +554,7 @@ curl -X POST http://localhost:8080/api/v1/auth/forgot-password \
 
 ---
 
-## 6. Reset Password
+## 7. Reset Password
 
 ### Endpoint
 ```
@@ -565,7 +647,7 @@ curl -X POST http://localhost:8080/api/v1/auth/reset-password \
 
 ---
 
-## 7. Logout
+## 8. Logout
 
 ### Endpoint
 ```
@@ -616,7 +698,7 @@ curl -X POST http://localhost:8080/api/v1/auth/logout \
 
 ---
 
-## 8. View Profile
+## 9. View Profile
 
 ### Endpoint
 ```

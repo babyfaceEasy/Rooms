@@ -118,7 +118,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	userService := service.NewUserService(userRepo, refreshTokenRepo, verificationTokenRepo, passwordResetTokenRepo)
+	userService := service.NewUserService(userRepo, refreshTokenRepo, verificationTokenRepo, passwordResetTokenRepo, cfg)
 	userHandler := handler.NewUserHandler(userService, emailService, storageRepo)
 
 	// Auth services

@@ -2,8 +2,6 @@ package service
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"fmt"
 	mathrand "math/rand"
 	"regexp"
@@ -11,6 +9,7 @@ import (
 	"time"
 	"unicode"
 
+	"temp_backend/config"
 	"temp_backend/internal/domain"
 	"temp_backend/internal/repository"
 
@@ -27,24 +26,27 @@ type UserService interface {
 	DeleteAccount(ctx context.Context, id string) error
 	DeleteUser(ctx context.Context, id string) error
 	VerifyEmail(ctx context.Context, token string) error
+	ResendVerificationEmail(ctx context.Context, email string) (string, error)
 	ForgotPassword(ctx context.Context, email string) (string, primitive.ObjectID, error)
 	ResetPassword(ctx context.Context, token, newPassword string) error
 }
 
 type userService struct {
-	userRepo         repository.UserRepository
-	refreshTokenRepo repository.RefreshTokenRepository
-	verificationRepo repository.VerificationTokenRepository
+	userRepo          repository.UserRepository
+	refreshTokenRepo  repository.RefreshTokenRepository
+	verificationRepo  repository.VerificationTokenRepository
 	passwordResetRepo repository.PasswordResetTokenRepository
+	cfg               config.Config
 }
 
 // NewUserService creates a new UserService.
-func NewUserService(userRepo repository.UserRepository, refreshTokenRepo repository.RefreshTokenRepository, verificationRepo repository.VerificationTokenRepository, passwordResetRepo repository.PasswordResetTokenRepository) UserService {
+func NewUserService(userRepo repository.UserRepository, refreshTokenRepo repository.RefreshTokenRepository, verificationRepo repository.VerificationTokenRepository, passwordResetRepo repository.PasswordResetTokenRepository, cfg config.Config) UserService {
 	return &userService{
 		userRepo:          userRepo,
 		refreshTokenRepo:  refreshTokenRepo,
 		verificationRepo:  verificationRepo,
 		passwordResetRepo: passwordResetRepo,
+		cfg:               cfg,
 	}
 }
 
@@ -58,6 +60,16 @@ func generateUniqueCode() string {
 		code[i] = digits[mathrand.Intn(len(digits))]
 	}
 	return string(code)
+}
+
+// generateToken generates a random 6-character code (uppercase letters and numbers) for email verification and password reset.
+func generateToken() string {
+	const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	token := make([]byte, 6)
+	for i := range token {
+		token[i] = chars[mathrand.Intn(len(chars))]
+	}
+	return string(token)
 }
 
 func (s *userService) Register(ctx context.Context, name, email, password string, ageVerified bool) (*domain.User, string, error) {
@@ -102,12 +114,8 @@ func (s *userService) Register(ctx context.Context, name, email, password string
 		return nil, "", err
 	}
 
-	// Generate email verification token (16 bytes = 32 hex chars, valid for 24 hours)
-	tokenBytes := make([]byte, 16)
-	if _, err := rand.Read(tokenBytes); err != nil {
-		return nil, "", fmt.Errorf("failed to generate verification token: %w", err)
-	}
-	verificationToken := hex.EncodeToString(tokenBytes)
+	// Generate email verification token (6 digits, valid for 24 hours)
+	verificationToken := generateToken()
 
 	vt := &domain.EmailVerificationToken{
 		UserID:    user.ID,
@@ -171,6 +179,66 @@ func (s *userService) VerifyEmail(ctx context.Context, token string) error {
 	return nil
 }
 
+// ResendVerificationEmail generates and returns a new verification token for a user.
+// Only allows resend if the last token was created more than 2 minutes ago.
+func (s *userService) ResendVerificationEmail(ctx context.Context, email string) (string, error) {
+	// Find user by email
+	user, err := s.userRepo.GetByEmail(ctx, email)
+	if err != nil {
+		// Don't reveal whether the email exists
+		return "", nil
+	}
+
+	if user == nil {
+		// Don't reveal whether the email exists
+		return "", nil
+	}
+
+	// Check if user is already verified
+	if user.IsEmailVerified {
+		return "", fmt.Errorf("email already verified: %w", domain.ErrInvalidInput)
+	}
+
+	// Get existing verification token (if any)
+	existingToken, err := s.verificationRepo.GetByUserID(ctx, user.ID)
+	if err != nil {
+		return "", fmt.Errorf("failed to get existing verification token: %w", err)
+	}
+
+	// Check if token was created less than cooldown duration ago
+	if existingToken != nil && existingToken.UsedAt == nil {
+		elapsedTime := time.Now().UTC().Sub(existingToken.CreatedAt)
+		minResendTime := s.cfg.Token.ResendCooldown
+
+		if elapsedTime < minResendTime {
+			remainingTime := minResendTime - elapsedTime
+			return "", fmt.Errorf("verification email resend too soon, try again in %v: %w", remainingTime, domain.ErrInvalidInput)
+		}
+	}
+
+	// Delete old token if it exists
+	if existingToken != nil {
+		if err := s.verificationRepo.DeleteByUserID(ctx, user.ID); err != nil {
+			return "", fmt.Errorf("failed to delete old verification token: %w", err)
+		}
+	}
+
+	// Generate new token (6 characters: uppercase letters and numbers)
+	newToken := generateToken()
+
+	vt := &domain.EmailVerificationToken{
+		UserID:    user.ID,
+		Token:     newToken,
+		ExpiresAt: time.Now().UTC().Add(24 * time.Hour),
+	}
+
+	if err := s.verificationRepo.Create(ctx, vt); err != nil {
+		return "", fmt.Errorf("failed to create verification token: %w", err)
+	}
+
+	return newToken, nil
+}
+
 // DeleteUser removes a user by ID string.
 func (s *userService) DeleteUser(ctx context.Context, id string) error {
 	oid, err := primitive.ObjectIDFromHex(id)
@@ -216,12 +284,8 @@ func (s *userService) ForgotPassword(ctx context.Context, email string) (string,
 		return "", primitive.ObjectID{}, nil
 	}
 
-	// Generate a crypto-random token (16 bytes = 32 hex chars, valid for 1 hour)
-	tokenBytes := make([]byte, 16)
-	if _, err := rand.Read(tokenBytes); err != nil {
-		return "", primitive.ObjectID{}, fmt.Errorf("failed to generate password reset token: %w", err)
-	}
-	resetToken := hex.EncodeToString(tokenBytes)
+	// Generate a 6-digit numeric token (valid for 1 hour)
+	resetToken := generateToken()
 
 	rt := &domain.PasswordResetToken{
 		UserID:    user.ID,

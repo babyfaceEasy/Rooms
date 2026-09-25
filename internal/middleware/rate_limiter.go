@@ -54,3 +54,26 @@ func NewAuthRateLimiter(cfg config.Config, log *slog.Logger) fiber.Handler {
 		},
 	})
 }
+
+// NewEmailRateLimiter returns a very strict middleware for email endpoints to prevent abuse.
+func NewEmailRateLimiter(cfg config.Config, log *slog.Logger) fiber.Handler {
+	return limiter.New(limiter.Config{
+		Max:        cfg.RateLimit.EmailMax,
+		Expiration: cfg.RateLimit.EmailWindow,
+		KeyGenerator: func(c *fiber.Ctx) string {
+			return c.IP()
+		},
+		LimitReached: func(c *fiber.Ctx) error {
+			log.Warn("email rate limit hit",
+				slog.String("ip", c.IP()),
+				slog.String("path", c.Path()),
+				slog.String("method", c.Method()),
+			)
+			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
+				"error":  "Too many email requests. Please try again later.",
+				"code":   "RATE_LIMITED",
+				"status": fiber.StatusTooManyRequests,
+			})
+		},
+	})
+}
