@@ -42,6 +42,7 @@ func (s *Server) registerRoutes(itemHandler *handler.ItemHandler, userHandler *h
 	authGroup.Post("/verify-email", emailRateLimiter, userHandler.VerifyEmail)
 	authGroup.Post("/resend-verification-email", emailRateLimiter, userHandler.ResendVerificationEmail)
 	authGroup.Post("/forgot-password", emailRateLimiter, userHandler.ForgotPassword)
+	authGroup.Post("/resend-password-reset-email", emailRateLimiter, userHandler.ResendPasswordResetEmail)
 	authGroup.Post("/reset-password", emailRateLimiter, userHandler.ResetPassword)
 
 	api := s.app.Group("/api/v1")
