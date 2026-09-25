@@ -26,3 +26,12 @@ const (
 	EmailStatusSent    = "sent"
 	EmailStatusFailed  = "failed"
 )
+
+// EmailSendResult represents the result of an email sending attempt.
+type EmailSendResult struct {
+	Success      bool   `json:"success"`                 // Whether the email was sent successfully
+	EmailID      string `json:"email_id"`                // ID of the email log record
+	MessageID    string `json:"message_id,omitempty"`    // SendGrid message ID for tracking
+	ErrorMessage string `json:"error_message,omitempty"` // Error message if send failed
+	Status       string `json:"status"`                  // "sent" or "failed"
+}

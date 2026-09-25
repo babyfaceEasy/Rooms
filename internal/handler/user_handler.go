@@ -97,7 +97,8 @@ func (h *UserHandler) Register(c *fiber.Ctx) error {
 			"verification_token": verificationToken,
 			"year":               strconv.Itoa(time.Now().Year()),
 		}
-		_ = h.emailService.SendVerificationEmail(context.Background(), user.ID, user.Email, dynamicData)
+		_, _ = h.emailService.SendVerificationEmail(context.Background(), user.ID, user.Email, dynamicData)
+		// Email service logs internally, so we just ignore the result here for async send
 	}()
 
 	response := UserResponse{
@@ -170,7 +171,8 @@ func (h *UserHandler) ResendVerificationEmail(c *fiber.Ctx) error {
 				"verification_token": verificationToken,
 				"year":               strconv.Itoa(time.Now().Year()),
 			}
-			_ = h.emailService.SendVerificationEmail(context.Background(), primitive.ObjectID{}, req.Email, dynamicData)
+			_, _ = h.emailService.SendVerificationEmail(context.Background(), primitive.ObjectID{}, req.Email, dynamicData)
+			// Email service logs internally, so we just ignore the result here for async send
 		}()
 	}
 
@@ -211,7 +213,8 @@ func (h *UserHandler) ForgotPassword(c *fiber.Ctx) error {
 				"reset_token": resetToken,
 				"year":        strconv.Itoa(time.Now().Year()),
 			}
-			_ = h.emailService.SendPasswordResetEmail(context.Background(), userID, req.Email, dynamicData)
+			_, _ = h.emailService.SendPasswordResetEmail(context.Background(), userID, req.Email, dynamicData)
+			// Email service logs internally, so we just ignore the result here for async send
 		}()
 	}
 
