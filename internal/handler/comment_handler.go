@@ -42,6 +42,7 @@ type CommentResponse struct {
 	ID        string `json:"id"`
 	PostID    string `json:"post_id"`
 	UserID    string `json:"user_id"`
+	UserPhoto string `json:"user_photo"`
 	UserName  string `json:"user_name"`
 	Text      string `json:"text"`
 	CreatedAt string `json:"created_at"`
@@ -93,12 +94,14 @@ func (h *CommentHandler) CreateComment(c *fiber.Ctx) error {
 	// Look up user name for the response
 	commentUser, err := h.userRepo.GetByID(c.UserContext(), userObjID)
 	var userName string
+	var userPhoto string
 	if err == nil && commentUser != nil {
 		userName = commentUser.Name
+		userPhoto = commentUser.ProfilePicture
 	}
 
 	// Convert to response
-	response := h.toCommentResponse(comment, userName)
+	response := h.toCommentResponse(comment, userName, userPhoto)
 
 	// Publish SSE event to post subscribers
 	h.sseManager.PublishCommentCreated(postObjID.Hex(), comment.ID.Hex(), response)
@@ -156,12 +159,22 @@ func (h *CommentHandler) GetCommentsByPostID(c *fiber.Ctx) error {
 			userIDs = append(userIDs, comment.UserID)
 		}
 	}
-	userMap := make(map[string]string)
+
+	// define a small struct to hold user information
+	type userInfo struct {
+		Name  string
+		Photo string
+	}
+	userMap := make(map[string]userInfo)
+
 	if len(userIDs) > 0 {
 		users, err := h.userRepo.GetByIDs(c.UserContext(), userIDs)
 		if err == nil {
 			for _, u := range users {
-				userMap[u.ID.Hex()] = u.Name
+				userMap[u.ID.Hex()] = userInfo{
+					Name:  u.Name,
+					Photo: u.ProfilePicture,
+				}
 			}
 		}
 	}
@@ -169,7 +182,10 @@ func (h *CommentHandler) GetCommentsByPostID(c *fiber.Ctx) error {
 	// Convert to responses
 	var responses []*CommentResponse
 	for _, comment := range comments {
-		responses = append(responses, h.toCommentResponse(comment, userMap[comment.UserID.Hex()]))
+		uid := comment.UserID.Hex()
+		info := userMap[uid]
+
+		responses = append(responses, h.toCommentResponse(comment, info.Name, info.Photo))
 	}
 
 	return c.Status(fiber.StatusOK).JSON(map[string]interface{}{
@@ -225,12 +241,13 @@ func (h *CommentHandler) DeleteComment(c *fiber.Ctx) error {
 // Helper methods
 
 // toCommentResponse converts a domain.Comment to a CommentResponse
-func (h *CommentHandler) toCommentResponse(comment *domain.Comment, userName string) *CommentResponse {
+func (h *CommentHandler) toCommentResponse(comment *domain.Comment, userName string, userPhoto string) *CommentResponse {
 	return &CommentResponse{
 		ID:        comment.ID.Hex(),
 		PostID:    comment.PostID.Hex(),
 		UserID:    comment.UserID.Hex(),
 		UserName:  userName,
+		UserPhoto: userPhoto,
 		Text:      comment.Text,
 		CreatedAt: comment.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		UpdatedAt: comment.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
