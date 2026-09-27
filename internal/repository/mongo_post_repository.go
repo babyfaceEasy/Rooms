@@ -4,10 +4,12 @@ import (
 	"context"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"temp_backend/internal/domain"
+
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // MongoPostRepository implements PostRepository for MongoDB
@@ -64,7 +66,6 @@ func (m *MongoPostRepository) DeletePost(ctx context.Context, id primitive.Objec
 			},
 		},
 	)
-
 	if err != nil {
 		return err
 	}
@@ -74,4 +75,168 @@ func (m *MongoPostRepository) DeletePost(ctx context.Context, id primitive.Objec
 	}
 
 	return nil
+}
+
+// AddValidation adds a user ID to the post's validations array ($addToSet prevents duplicates).
+func (m *MongoPostRepository) AddValidation(ctx context.Context, postID, userID primitive.ObjectID) error {
+	result, err := m.collection.UpdateOne(
+		ctx,
+		bson.M{"_id": postID, "deleted_at": nil},
+		bson.M{
+			"$addToSet": bson.M{"validations": userID},
+			"$set":      bson.M{"updated_at": time.Now()},
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	if result.MatchedCount == 0 {
+		return domain.ErrPostNotFound
+	}
+
+	return nil
+}
+
+// RemoveValidation removes a user ID from the post's validations array.
+func (m *MongoPostRepository) RemoveValidation(ctx context.Context, postID, userID primitive.ObjectID) error {
+	result, err := m.collection.UpdateOne(
+		ctx,
+		bson.M{"_id": postID, "deleted_at": nil},
+		bson.M{
+			"$pull": bson.M{"validations": userID},
+			"$set":  bson.M{"updated_at": time.Now()},
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	if result.MatchedCount == 0 {
+		return domain.ErrPostNotFound
+	}
+
+	return nil
+}
+
+// AddRespect adds a user ID to the post's respects array ($addToSet prevents duplicates).
+func (m *MongoPostRepository) AddRespect(ctx context.Context, postID, userID primitive.ObjectID) error {
+	result, err := m.collection.UpdateOne(
+		ctx,
+		bson.M{"_id": postID, "deleted_at": nil},
+		bson.M{
+			"$addToSet": bson.M{"respects": userID},
+			"$set":      bson.M{"updated_at": time.Now()},
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	if result.MatchedCount == 0 {
+		return domain.ErrPostNotFound
+	}
+
+	return nil
+}
+
+// RemoveRespect removes a user ID from the post's respects array.
+func (m *MongoPostRepository) RemoveRespect(ctx context.Context, postID, userID primitive.ObjectID) error {
+	result, err := m.collection.UpdateOne(
+		ctx,
+		bson.M{"_id": postID, "deleted_at": nil},
+		bson.M{
+			"$pull": bson.M{"respects": userID},
+			"$set":  bson.M{"updated_at": time.Now()},
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	if result.MatchedCount == 0 {
+		return domain.ErrPostNotFound
+	}
+
+	return nil
+}
+
+// GetByRoomID retrieves paginated posts for a room (excluding soft-deleted), newest first.
+// Returns the posts, total count matching the filter, and any error.
+func (m *MongoPostRepository) GetByRoomID(ctx context.Context, roomID primitive.ObjectID, page, limit int) ([]*domain.Post, int64, error) {
+	filter := bson.M{
+		"room_id":    roomID,
+		"deleted_at": nil,
+	}
+
+	total, err := m.collection.CountDocuments(ctx, filter)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	skip := (page - 1) * limit
+	opts := options.Find().
+		SetSort(bson.M{"created_at": -1}).
+		SetSkip(int64(skip)).
+		SetLimit(int64(limit))
+
+	cursor, err := m.collection.Find(ctx, filter, opts)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer cursor.Close(ctx)
+
+	var posts []*domain.Post
+	if err = cursor.All(ctx, &posts); err != nil {
+		return nil, 0, err
+	}
+
+	if posts == nil {
+		posts = []*domain.Post{}
+	}
+
+	return posts, total, nil
+}
+
+// IncrementReportCount increments the report count for a post and returns the new count
+func (m *MongoPostRepository) IncrementReportCount(ctx context.Context, postID primitive.ObjectID) (int, error) {
+	result := m.collection.FindOneAndUpdate(
+		ctx,
+		bson.M{"_id": postID},
+		bson.M{
+			"$inc": bson.M{"report_count": 1},
+			"$set": bson.M{"updated_at": time.Now()},
+		},
+	)
+
+	if result.Err() != nil {
+		return 0, result.Err()
+	}
+
+	var post domain.Post
+	if err := result.Decode(&post); err != nil {
+		return 0, err
+	}
+
+	// The FindOneAndUpdate returns the document BEFORE the update, so we need to add 1
+	return post.ReportCount + 1, nil
+}
+
+// DeleteByUserAndRoom soft-deletes all posts by a user in a specific room
+func (m *MongoPostRepository) DeleteByUserAndRoom(ctx context.Context, userID, roomID primitive.ObjectID) error {
+	now := time.Now()
+	_, err := m.collection.UpdateMany(
+		ctx,
+		bson.M{
+			"user_id": userID,
+			"room_id": roomID,
+		},
+		bson.M{
+			"$set": bson.M{
+				"deleted_at": now,
+				"updated_at": now,
+			},
+		},
+	)
+	return err
 }

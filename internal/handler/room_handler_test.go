@@ -6,19 +6,25 @@ import (
 	"testing"
 	"time"
 
+	"temp_backend/internal/domain"
+
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"temp_backend/internal/domain"
 )
 
 // MockRoomService is a mock implementation for testing
 type MockRoomService struct {
-	createRoomFunc    func(ctx context.Context, name, code string, userID primitive.ObjectID) (*domain.Room, error)
-	addUserToRoomFunc func(ctx context.Context, code string, userID primitive.ObjectID) (*domain.Room, error)
-	getRoom           func(ctx context.Context, code string) (*domain.Room, error)
-	leaveRoom         func(ctx context.Context, code string, userID primitive.ObjectID) error
-	deleteRoom        func(ctx context.Context, code string, userID primitive.ObjectID) error
-	listUserRooms     func(ctx context.Context, userID primitive.ObjectID) ([]*domain.Room, error)
+	createRoomFunc          func(ctx context.Context, name, code string, userID primitive.ObjectID) (*domain.Room, error)
+	addUserToRoomFunc       func(ctx context.Context, code string, userID primitive.ObjectID) (*domain.Room, error)
+	addUserToRoomByUserCode func(ctx context.Context, roomCode, userCode string) (*domain.Room, error)
+	getRoom                 func(ctx context.Context, code string) (*domain.Room, error)
+	getRoomByID             func(ctx context.Context, roomID primitive.ObjectID) (*domain.Room, error)
+	getRoomUsers            func(ctx context.Context, code string) ([]*domain.User, error)
+	leaveRoom               func(ctx context.Context, code string, userID primitive.ObjectID) error
+	removeMemberFromRoom          func(ctx context.Context, code string, ownerID, memberID primitive.ObjectID) error
+	deleteRoom                    func(ctx context.Context, code string, userID primitive.ObjectID) error
+	listUserRooms                 func(ctx context.Context, userID primitive.ObjectID) ([]*domain.Room, error)
+	removeUserFromRoomByUserCode  func(ctx context.Context, roomCode, userCode string, ownerID primitive.ObjectID) error
 }
 
 func (m *MockRoomService) CreateRoom(ctx context.Context, name, code string, userID primitive.ObjectID) (*domain.Room, error) {
@@ -35,9 +41,30 @@ func (m *MockRoomService) AddUserToRoom(ctx context.Context, code string, userID
 	return nil, nil
 }
 
+func (m *MockRoomService) AddUserToRoomByUserCode(ctx context.Context, roomCode, userCode string) (*domain.Room, error) {
+	if m.addUserToRoomByUserCode != nil {
+		return m.addUserToRoomByUserCode(ctx, roomCode, userCode)
+	}
+	return nil, nil
+}
+
 func (m *MockRoomService) GetRoom(ctx context.Context, code string) (*domain.Room, error) {
 	if m.getRoom != nil {
 		return m.getRoom(ctx, code)
+	}
+	return nil, nil
+}
+
+func (m *MockRoomService) GetRoomByID(ctx context.Context, roomID primitive.ObjectID) (*domain.Room, error) {
+	if m.getRoomByID != nil {
+		return m.getRoomByID(ctx, roomID)
+	}
+	return nil, nil
+}
+
+func (m *MockRoomService) GetRoomUsers(ctx context.Context, code string) ([]*domain.User, error) {
+	if m.getRoomUsers != nil {
+		return m.getRoomUsers(ctx, code)
 	}
 	return nil, nil
 }
@@ -49,9 +76,23 @@ func (m *MockRoomService) LeaveRoom(ctx context.Context, code string, userID pri
 	return nil
 }
 
+func (m *MockRoomService) RemoveMemberFromRoom(ctx context.Context, code string, ownerID, memberID primitive.ObjectID) error {
+	if m.removeMemberFromRoom != nil {
+		return m.removeMemberFromRoom(ctx, code, ownerID, memberID)
+	}
+	return nil
+}
+
 func (m *MockRoomService) DeleteRoom(ctx context.Context, code string, userID primitive.ObjectID) error {
 	if m.deleteRoom != nil {
 		return m.deleteRoom(ctx, code, userID)
+	}
+	return nil
+}
+
+func (m *MockRoomService) RemoveUserFromRoomByUserCode(ctx context.Context, roomCode, userCode string, ownerID primitive.ObjectID) error {
+	if m.removeUserFromRoomByUserCode != nil {
+		return m.removeUserFromRoomByUserCode(ctx, roomCode, userCode, ownerID)
 	}
 	return nil
 }
@@ -678,5 +719,3 @@ func TestListUserRooms_MultipleRooms(t *testing.T) {
 	handler := NewRoomHandler(mockService)
 	assert.NotNil(t, handler.ListUserRooms)
 }
-
-

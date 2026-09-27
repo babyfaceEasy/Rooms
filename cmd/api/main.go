@@ -23,6 +23,7 @@ import (
 	"temp_backend/internal/service"
 	"temp_backend/pkg/mongodb"
 	pks3 "temp_backend/pkg/s3"
+	pksendgrid "temp_backend/pkg/sendgrid"
 )
 
 func main() {
@@ -67,7 +68,7 @@ func main() {
 
 	// Item repositories and service
 	itemRepo := repository.NewMongoItemRepository(mongoClient.Database(cfg.Mongo.Database))
-	storageRepo := repository.NewS3Repository(s3Client, cfg.S3.Bucket)
+	storageRepo := repository.NewS3Repository(s3Client, cfg.S3.Bucket, cfg.S3.PublicURL)
 	itemService := service.NewItemService(itemRepo, storageRepo)
 	itemHandler := handler.NewItemHandler(itemService)
 
@@ -85,24 +86,59 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Email repositories and service (initialized early for use in user handler)
+	emailRepo, err := repository.NewMongoEmailRepository(mongoClient.Database(cfg.Mongo.Database))
+	if err != nil {
+		logger.Error("email repository initialization failed", slog.Any("error", err))
+		os.Exit(1)
+	}
+
+	sendgridClient := pksendgrid.NewClient(cfg.SendGrid.APIKey)
+	emailService := service.NewEmailService(
+		emailRepo,
+		sendgridClient,
+		cfg.SendGrid.SenderEmail,
+		cfg.SendGrid.Enabled,
+		cfg.SendGrid.VerificationTemplateID,
+		cfg.SendGrid.PasswordResetTemplateID,
+		logger,
+	)
+
 	userService := service.NewUserService(userRepo, refreshTokenRepo)
-	userHandler := handler.NewUserHandler(userService)
+	userHandler := handler.NewUserHandler(userService, emailService, storageRepo)
 
 	// Auth services
 	authService := service.NewAuthService(userRepo, refreshTokenRepo, cfg)
 	authHandler := handler.NewAuthHandler(authService)
 
-	// Room repositories and service
+	// Room repositories (without service yet, created later after repos are ready)
 	roomRepo := repository.NewMongoRoomRepository(mongoClient.Database(cfg.Mongo.Database))
-	roomService := service.NewRoomService(roomRepo)
-	roomHandler := handler.NewRoomHandler(roomService)
 
 	// Post repositories and service
 	postRepo := repository.NewMongoPostRepository(mongoClient.Database(cfg.Mongo.Database))
-	postService := service.NewPostService(postRepo)
-	postHandler := handler.NewPostHandler(postService, storageRepo)
 
-	server := api.NewServer(cfg, logger, itemHandler, userHandler, authHandler, roomHandler, postHandler, authService)
+	// SSE Manager for real-time post updates
+	sseManager := service.NewSSEManager()
+
+	postService := service.NewPostService(postRepo, roomRepo, sseManager)
+	postHandler := handler.NewPostHandler(postService, storageRepo, roomRepo, userRepo, sseManager)
+
+	// Comment repositories and service
+	commentRepo := repository.NewMongoCommentRepository(mongoClient.Database(cfg.Mongo.Database).Collection("comments"), postRepo)
+	commentService := service.NewCommentService(commentRepo, postRepo, roomRepo)
+	commentHandler := handler.NewCommentHandler(commentService, userRepo, postRepo, sseManager)
+
+	// Room service (now that postRepo and commentRepo are ready)
+	roomService := service.NewRoomService(roomRepo, userRepo, postRepo, commentRepo)
+	roomHandler := handler.NewRoomHandler(roomService)
+
+	// Report repositories and service
+	reportRepo := repository.NewMongoReportRepository(mongoClient.Database(cfg.Mongo.Database))
+	notificationRepo := repository.NewMongoNotificationRepository(mongoClient.Database(cfg.Mongo.Database))
+	reportService := service.NewReportService(reportRepo, notificationRepo, postRepo, cfg.Reporting.AutoSoftDeleteThreshold, cfg.Reporting.MaxReportsPerDay)
+	reportHandler := handler.NewReportHandler(reportService, cfg.Reporting.MaxReportsPerDay)
+
+	server := api.NewServer(cfg, logger, itemHandler, userHandler, authHandler, roomHandler, postHandler, commentHandler, reportHandler, authService)
 
 	go func() {
 		if err := server.Start(); err != nil && !errors.Is(err, http.ErrServerClosed) {

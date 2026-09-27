@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"golang.org/x/crypto/bcrypt"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"golang.org/x/crypto/bcrypt"
 	"temp_backend/config"
 	"temp_backend/internal/domain"
 	"temp_backend/internal/repository"
@@ -24,9 +24,9 @@ type AuthService interface {
 }
 
 type authService struct {
-	userRepo          repository.UserRepository
-	refreshTokenRepo  repository.RefreshTokenRepository
-	cfg               config.Config
+	userRepo         repository.UserRepository
+	refreshTokenRepo repository.RefreshTokenRepository
+	cfg              config.Config
 }
 
 // NewAuthService creates a new AuthService.

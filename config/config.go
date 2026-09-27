@@ -28,11 +28,29 @@ type Config struct {
 		SecretKey       string
 		UseSSL          bool
 		PresignedExpiry time.Duration
+		PublicURL       string
 	}
 	JWT struct {
 		Secret          string
 		AccessTokenTTL  time.Duration
 		RefreshTokenTTL time.Duration
+	}
+	SendGrid struct {
+		APIKey                  string
+		SenderEmail             string
+		Enabled                 bool
+		VerificationTemplateID  string
+		PasswordResetTemplateID string
+	}
+	RateLimit struct {
+		GlobalMax    int
+		GlobalWindow time.Duration
+		AuthMax      int
+		AuthWindow   time.Duration
+	}
+	Reporting struct {
+		MaxReportsPerDay        int
+		AutoSoftDeleteThreshold int
 	}
 }
 
@@ -56,10 +74,25 @@ func Load() (Config, error) {
 	cfg.S3.SecretKey = getEnv("S3_SECRET_KEY", "minioadmin")
 	cfg.S3.UseSSL = parseBool(getEnv("S3_USE_SSL", "false"))
 	cfg.S3.PresignedExpiry = parseDuration(getEnv("S3_PRESIGNED_EXPIRY", "15m"))
+	cfg.S3.PublicURL = getEnv("S3_PUBLIC_URL", "http://localhost:9000")
 
 	cfg.JWT.Secret = getEnv("JWT_SECRET", "")
 	cfg.JWT.AccessTokenTTL = parseDuration(getEnv("ACCESS_TOKEN_TTL", "1h"))
 	cfg.JWT.RefreshTokenTTL = parseDuration(getEnv("REFRESH_TOKEN_TTL", "168h"))
+
+	cfg.RateLimit.GlobalMax = getInt("RATE_LIMIT_GLOBAL_MAX", 100)
+	cfg.RateLimit.GlobalWindow = parseDuration(getEnv("RATE_LIMIT_GLOBAL_WINDOW", "1m"))
+	cfg.RateLimit.AuthMax = getInt("RATE_LIMIT_AUTH_MAX", 20)
+	cfg.RateLimit.AuthWindow = parseDuration(getEnv("RATE_LIMIT_AUTH_WINDOW", "1m"))
+
+	cfg.Reporting.MaxReportsPerDay = getInt("MAX_REPORTS_PER_DAY", 10)
+	cfg.Reporting.AutoSoftDeleteThreshold = getInt("AUTO_SOFT_DELETE_REPORT_THRESHOLD", 15)
+
+	cfg.SendGrid.APIKey = getEnv("SENDGRID_API_KEY", "")
+	cfg.SendGrid.SenderEmail = getEnv("SENDGRID_SENDER_EMAIL", "noreply@tempbackend.com")
+	cfg.SendGrid.Enabled = parseBool(getEnv("SENDGRID_ENABLED", "true"))
+	cfg.SendGrid.VerificationTemplateID = getEnv("SENDGRID_VERIFICATION_TEMPLATE_ID", "")
+	cfg.SendGrid.PasswordResetTemplateID = getEnv("SENDGRID_PASSWORD_RESET_TEMPLATE_ID", "")
 
 	if cfg.Mongo.URI == "" {
 		return cfg, fmt.Errorf("MONGO_URI is required")
@@ -83,6 +116,15 @@ func Load() (Config, error) {
 func getEnv(key, fallback string) string {
 	if value, ok := os.LookupEnv(key); ok && value != "" {
 		return value
+	}
+	return fallback
+}
+
+func getInt(key string, fallback int) int {
+	if value, ok := os.LookupEnv(key); ok && value != "" {
+		if i, err := strconv.Atoi(value); err == nil {
+			return i
+		}
 	}
 	return fallback
 }

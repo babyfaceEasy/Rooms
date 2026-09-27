@@ -104,7 +104,7 @@ Adds the authenticated user to a room by room code.
 |-----------|------|----------|-------------|
 | code | string | Yes | Unique room code |
 
-**Success Response (201 Created):**
+**Success Response (200 OK) - New Member Added:**
 
 ```json
 {
@@ -121,7 +121,28 @@ Adds the authenticated user to a room by room code.
     "updated_at": "2024-06-28T21:30:00Z"
   },
   "message": "user added to room successfully",
-  "status": 201
+  "status": 200
+}
+```
+
+**Success Response (200 OK) - Already a Member:**
+
+```json
+{
+  "data": {
+    "id": "507f1f77bcf86cd799439011",
+    "name": "Conference Room A",
+    "code": "CONF_A_001",
+    "created_by": "507f1f77bcf86cd799439012",
+    "members": [
+      "507f1f77bcf86cd799439013",
+      "507f1f77bcf86cd799439014"
+    ],
+    "created_at": "2024-06-28T21:15:00Z",
+    "updated_at": "2024-06-28T21:30:00Z"
+  },
+  "message": "you are already a member of this room",
+  "status": 200
 }
 ```
 
@@ -130,6 +151,7 @@ Adds the authenticated user to a room by room code.
 | Status | Error | Description |
 |--------|-------|-------------|
 | 400 | invalid input | Missing code |
+| 400 | cannot join own room | User is the room creator |
 | 404 | room not found | Room with code doesn't exist |
 | 500 | internal server error | Server error |
 
@@ -142,9 +164,182 @@ Adds the authenticated user to a room by room code.
 }
 ```
 
+**Example Error Response (400 - Creator):**
+
+```json
+{
+  "error": "cannot join own room",
+  "message": "you are the creator of this room and are already a member",
+  "status": 400
+}
+```
+
 ---
 
-### 3. List User's Rooms
+### 3. Add User to Room by User Code
+
+Adds a specified user to a room using the user's unique customer code. This endpoint allows adding a user to a room without requiring the target user's MongoDB ObjectID.
+
+**Endpoint:** `POST /api/v1/rooms/add-member-by-code`
+
+**Authentication:** Required
+
+**Request Body:**
+
+```json
+{
+  "room_code": "CONF_A_001",
+  "user_code": "12345678"
+}
+```
+
+**Request Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| room_code | string | Yes | Unique room code |
+| user_code | string | Yes | Target user's 8-digit customer code |
+
+**Success Response (200 OK) - New Member Added:**
+
+```json
+{
+  "data": {
+    "id": "507f1f77bcf86cd799439011",
+    "name": "Conference Room A",
+    "code": "CONF_A_001",
+    "created_by": "507f1f77bcf86cd799439012",
+    "members": [
+      "507f1f77bcf86cd799439013",
+      "507f1f77bcf86cd799439014",
+      "507f1f77bcf86cd799439015"
+    ],
+    "created_at": "2024-06-28T21:15:00Z",
+    "updated_at": "2024-06-28T21:30:00Z"
+  },
+  "message": "user added to room successfully",
+  "status": 200
+}
+```
+
+**Success Response (200 OK) - Already a Member:**
+
+```json
+{
+  "data": {
+    "id": "507f1f77bcf86cd799439011",
+    "name": "Conference Room A",
+    "code": "CONF_A_001",
+    "created_by": "507f1f77bcf86cd799439012",
+    "members": [
+      "507f1f77bcf86cd799439013",
+      "507f1f77bcf86cd799439014"
+    ],
+    "created_at": "2024-06-28T21:15:00Z",
+    "updated_at": "2024-06-28T21:30:00Z"
+  },
+  "message": "user is already a member of this room",
+  "status": 200
+}
+```
+
+**Error Responses:**
+
+| Status | Error | Description |
+|--------|-------|-------------|
+| 400 | invalid input | Missing room_code or user_code |
+| 404 | user not found | User with the specified user_code doesn't exist |
+| 404 | room not found | Room with the specified room_code doesn't exist |
+| 500 | internal server error | Server error |
+
+**Example Error Response (404 - User Not Found):**
+
+```json
+{
+  "error": "user not found",
+  "status": 404
+}
+```
+
+**Example Error Response (404 - Room Not Found):**
+
+```json
+{
+  "error": "room not found",
+  "status": 404
+}
+```
+
+---
+
+### 4. Remove User from Room by User Code
+
+Removes a specified user from a room using the user's unique customer code. Only the room owner can remove users.
+
+**Endpoint:** `POST /api/v1/rooms/remove-member-by-code`
+
+**Authentication:** Required
+
+**Request Body:**
+
+```json
+{
+  "room_code": "CONF_A_001",
+  "user_code": "12345678"
+}
+```
+
+**Request Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| room_code | string | Yes | Unique room code |
+| user_code | string | Yes | Target user's 8-digit customer code |
+
+**Success Response (200 OK):**
+
+```json
+{
+  "data": null,
+  "message": "user removed from room successfully",
+  "status": 200
+}
+```
+
+**Error Responses:**
+
+| Status | Error | Description |
+|--------|-------|-------------|
+| 400 | invalid input | Missing room_code or user_code, or user is not a member of the room |
+| 401 | unauthorized | Missing or invalid JWT token |
+| 403 | forbidden | Requester is not the room owner |
+| 404 | user not found | User with the specified user_code doesn't exist |
+| 404 | room not found | Room with the specified room_code doesn't exist |
+| 500 | internal server error | Server error |
+
+**Example Error Response (403 - Not Owner):**
+
+```json
+{
+  "error": "access denied",
+  "code": "FORBIDDEN",
+  "status": 403
+}
+```
+
+**Example Error Response (400 - User Not Member):**
+
+```json
+{
+  "error": "The provided input is invalid",
+  "code": "INVALID_INPUT",
+  "status": 400
+}
+```
+
+---
+
+### 5. List User's Rooms
 
 Retrieves all rooms the authenticated user is part of (as owner or member).
 
@@ -206,7 +401,7 @@ Retrieves all rooms the authenticated user is part of (as owner or member).
 
 ---
 
-### 4. Get Room Details
+### 6. Get Room Details
 
 Retrieves details of a specific room. Only the room owner or members can access.
 
@@ -259,7 +454,71 @@ Retrieves details of a specific room. Only the room owner or members can access.
 
 ---
 
-### 5. Get Room Members
+### 7. Get Room Details by ID
+
+Retrieves details of a specific room by its ID. Only the room owner or members can access.
+
+**Endpoint:** `GET /api/v1/rooms/by-id/:id`
+
+**Authentication:** Required
+
+**URL Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| id | string | Yes | Room ID (MongoDB ObjectID hex) |
+
+**Success Response (200 OK):**
+
+```json
+{
+  "data": {
+    "id": "507f1f77bcf86cd799439011",
+    "name": "Conference Room A",
+    "code": "CONF_A_001",
+    "created_by": "507f1f77bcf86cd799439012",
+    "members": [
+      "507f1f77bcf86cd799439013",
+      "507f1f77bcf86cd799439014"
+    ],
+    "created_at": "2024-06-28T21:15:00Z",
+    "updated_at": "2024-06-28T21:30:00Z"
+  },
+  "message": "room details retrieved successfully",
+  "status": 200
+}
+```
+
+**Error Responses:**
+
+| Status | Error | Description |
+|--------|-------|-------------|
+| 400 | invalid room id | Invalid ObjectID format |
+| 403 | forbidden | User is not owner or member |
+| 404 | room not found | Room doesn't exist |
+| 500 | internal server error | Server error |
+
+**Example Error Response (400):**
+
+```json
+{
+  "error": "invalid room id",
+  "status": 400
+}
+```
+
+**Example Error Response (403):**
+
+```json
+{
+  "error": "you do not have permission to access this room",
+  "status": 403
+}
+```
+
+---
+
+### 8. Get Room Members
 
 Lists all members of a room. Only the room owner or members can access.
 
@@ -303,9 +562,200 @@ Lists all members of a room. Only the room owner or members can access.
 
 ---
 
-### 6. Delete or Leave Room
+### 9. Get Room Users
 
-Deletes a room (if owner) or leaves a room (if member).
+Retrieves full user details for all members of a room. Only the room owner or members can access.
+
+**Endpoint:** `GET /api/v1/rooms/:code/users`
+
+**Authentication:** Required
+
+**URL Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| code | string | Yes | Unique room code |
+
+**Success Response (200 OK):**
+
+```json
+{
+  "data": [
+    {
+      "id": "507f1f77bcf86cd799439012",
+      "code": "12345678",
+      "name": "John Doe",
+      "email": "john@example.com",
+      "is_age_verified": true,
+      "creator": true,
+      "created_at": "2024-06-20T10:30:00Z"
+    },
+    {
+      "id": "507f1f77bcf86cd799439013",
+      "code": "87654321",
+      "name": "Jane Smith",
+      "email": "jane@example.com",
+      "is_age_verified": true,
+      "creator": false,
+      "created_at": "2024-06-22T14:15:00Z"
+    }
+  ],
+  "count": 2,
+  "message": "room users retrieved successfully",
+  "status": 200
+}
+```
+
+**Error Responses:**
+
+| Status | Error | Description |
+|--------|-------|-------------|
+| 403 | forbidden | User is not owner or member |
+| 404 | room not found | Room doesn't exist |
+| 500 | internal server error | Server error |
+
+**Example Error Response (403):**
+
+```json
+{
+  "error": "you do not have permission to access this room",
+  "status": 403
+}
+```
+
+**Note:** This endpoint returns the owner and all members with their full user details (name, email, etc.), unlike `/rooms/:code/members` which only returns user IDs. Each user object includes a `creator` boolean field — `true` for the room creator, `false` for all other members.
+
+---
+
+### 10. Remove Member from Room
+
+Removes a member from a room. Only the room owner can perform this action.
+
+**Endpoint:** `POST /api/v1/rooms/:code/remove-member`
+
+**Authentication:** Required
+
+**URL Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| code | string | Yes | Unique room code |
+
+**Request Body:**
+
+```json
+{
+  "member_id": "507f1f77bcf86cd799439013"
+}
+```
+
+**Request Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| member_id | string | Yes | MongoDB ObjectID hex of the member to remove |
+
+**Success Response (200 OK):**
+
+```json
+{
+  "data": null,
+  "message": "member removed from room successfully",
+  "status": 200
+}
+```
+
+**Error Responses:**
+
+| Status | Error | Description |
+|--------|-------|-------------|
+| 400 | invalid input | Member not found in room members list |
+| 400 | invalid member id | Invalid ObjectID format |
+| 403 | forbidden | User is not the room owner |
+| 404 | room not found | Room doesn't exist |
+| 500 | internal server error | Server error |
+
+**Example Error Response (403):**
+
+```json
+{
+  "error": "you do not have permission to perform this action",
+  "status": 403
+}
+```
+
+**Example Error Response (400 - Member not found):**
+
+```json
+{
+  "error": "invalid input",
+  "status": 400
+}
+```
+
+---
+
+### 11. Leave Room
+
+Removes the authenticated user from a room. Only members can leave a room; room owners/creators cannot use this endpoint.
+
+**Endpoint:** `POST /api/v1/rooms/:code/leave`
+
+**Authentication:** Required
+
+**URL Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| code | string | Yes | Unique room code |
+
+**Request Body:** None
+
+**Success Response (200 OK):**
+
+```json
+{
+  "data": null,
+  "message": "you have left the room successfully",
+  "status": 200
+}
+```
+
+**Error Responses:**
+
+| Status | Error | Description |
+|--------|-------|-------------|
+| 400 | invalid input | User is not a member of the room |
+| 403 | forbidden | User is the room owner/creator (cannot leave their own room) |
+| 404 | room not found | Room doesn't exist |
+| 500 | internal server error | Server error |
+
+**Example Error Response (403 - Owner):**
+
+```json
+{
+  "error": "room owners cannot leave their own room",
+  "message": "delete the room instead if you want to remove it",
+  "status": 403
+}
+```
+
+**Example Error Response (400 - Not a Member):**
+
+```json
+{
+  "error": "invalid input",
+  "status": 400
+}
+```
+
+---
+
+### 12. Delete or Leave Room
+
+**Deprecated**: Use `POST /api/v1/rooms/:code/leave` for members to leave a room (see Endpoint #11).
+
+This endpoint maintains backward compatibility and handles both delete (owner) and leave (member) operations.
 
 **Endpoint:** `DELETE /api/v1/rooms/:code`
 
@@ -351,6 +801,97 @@ Deletes a room (if owner) or leaves a room (if member).
 {
   "error": "invalid input",
   "status": 400
+}
+```
+
+---
+
+### 13. Get Posts by Room Code
+
+Retrieves all posts for a specific room. Only room members can retrieve posts from a room.
+
+**Endpoint:** `GET /api/v1/rooms/:code/posts`
+
+**Authentication:** Required
+
+**URL Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| code | string | Yes | Unique room code |
+
+**Success Response (200 OK):**
+
+```json
+{
+  "data": [
+    {
+      "id": "507f1f77bcf86cd799439020",
+      "room_id": "507f1f77bcf86cd799439011",
+      "room_code": "TEAM_001",
+      "room_name": "Team Meeting Room",
+      "user_id": "507f1f77bcf86cd799439013",
+      "text": "Hello team! Let's discuss the Q3 roadmap.",
+      "image": null,
+      "video": null,
+      "audio": null,
+      "created_at": "2024-06-28T21:15:00Z",
+      "updated_at": "2024-06-28T21:15:00Z"
+    },
+    {
+      "id": "507f1f77bcf86cd799439021",
+      "room_id": "507f1f77bcf86cd799439011",
+      "room_code": "TEAM_001",
+      "room_name": "Team Meeting Room",
+      "user_id": "507f1f77bcf86cd799439014",
+      "text": "Great idea! I've already started the Q3 planning document.",
+      "image": "https://s3.amazonaws.com/temp-bucket/items/...",
+      "video": null,
+      "audio": null,
+      "created_at": "2024-06-28T21:16:30Z",
+      "updated_at": "2024-06-28T21:16:30Z"
+    }
+  ],
+  "count": 2,
+  "message": "posts retrieved successfully",
+  "status": 200
+}
+```
+
+**Empty Response (200 OK):**
+
+```json
+{
+  "data": [],
+  "count": 0,
+  "message": "posts retrieved successfully",
+  "status": 200
+}
+```
+
+**Error Responses:**
+
+| Status | Error | Description |
+|--------|-------|-------------|
+| 403 | forbidden | User is not a member of the room |
+| 404 | room not found | Room doesn't exist |
+| 500 | internal server error | Server error |
+
+**Example Error Response (403 - Not a Member):**
+
+```json
+{
+  "error": "not a member of this room",
+  "status": 403
+}
+```
+
+**Example Error Response (404):**
+
+```json
+{
+  "error": "room not found",
+  "status": 404
 }
 ```
 

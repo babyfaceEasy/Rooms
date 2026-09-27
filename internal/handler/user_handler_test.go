@@ -5,17 +5,18 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"temp_backend/internal/domain"
 	"temp_backend/internal/service"
+
+	"github.com/stretchr/testify/assert"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // MockUserService is a mock implementation of UserService for testing.
 type MockUserService struct {
 	registerFunc       func(ctx context.Context, name, email, password string, ageVerified bool) (*domain.User, error)
 	getUserByIDFunc    func(ctx context.Context, id string) (*domain.User, error)
-	updateProfileFunc  func(ctx context.Context, id, name string) (*domain.User, error)
+	updateProfileFunc  func(ctx context.Context, id, name, profilePictureURL string) (*domain.User, error)
 	changePasswordFunc func(ctx context.Context, id, currentPassword, newPassword string) error
 	deleteUserFunc     func(ctx context.Context, id string) error
 	deleteAccountFunc  func(ctx context.Context, id string) error
@@ -35,9 +36,9 @@ func (m *MockUserService) GetUserByID(ctx context.Context, id string) (*domain.U
 	return nil, nil
 }
 
-func (m *MockUserService) UpdateProfile(ctx context.Context, id, name string) (*domain.User, error) {
+func (m *MockUserService) UpdateProfile(ctx context.Context, id, name, profilePictureURL string) (*domain.User, error) {
 	if m.updateProfileFunc != nil {
-		return m.updateProfileFunc(ctx, id, name)
+		return m.updateProfileFunc(ctx, id, name, profilePictureURL)
 	}
 	return nil, nil
 }
@@ -63,11 +64,32 @@ func (m *MockUserService) DeleteAccount(ctx context.Context, id string) error {
 	return nil
 }
 
+// MockEmailService is a mock implementation of EmailService for testing.
+type MockEmailService struct {
+	sendVerificationEmailFunc  func(ctx context.Context, userID primitive.ObjectID, recipientEmail string, dynamicData map[string]string) error
+	sendPasswordResetEmailFunc func(ctx context.Context, userID primitive.ObjectID, recipientEmail string, dynamicData map[string]string) error
+}
+
+func (m *MockEmailService) SendVerificationEmail(ctx context.Context, userID primitive.ObjectID, recipientEmail string, dynamicData map[string]string) error {
+	if m.sendVerificationEmailFunc != nil {
+		return m.sendVerificationEmailFunc(ctx, userID, recipientEmail, dynamicData)
+	}
+	return nil
+}
+
+func (m *MockEmailService) SendPasswordResetEmail(ctx context.Context, userID primitive.ObjectID, recipientEmail string, dynamicData map[string]string) error {
+	if m.sendPasswordResetEmailFunc != nil {
+		return m.sendPasswordResetEmailFunc(ctx, userID, recipientEmail, dynamicData)
+	}
+	return nil
+}
+
 func TestNewUserHandler(t *testing.T) {
 	mock := &MockUserService{}
 	var svc service.UserService = mock
+	emailSvc := &MockEmailService{}
 
-	handler := NewUserHandler(svc)
+	handler := NewUserHandler(svc, emailSvc, nil)
 
 	assert.NotNil(t, handler)
 	assert.Equal(t, handler.svc, svc)
@@ -89,8 +111,9 @@ func TestViewProfile_Success(t *testing.T) {
 			return nil, domain.ErrUserNotFound
 		},
 	}
+	emailSvc := &MockEmailService{}
 
-	handler := NewUserHandler(mock)
+	handler := NewUserHandler(mock, emailSvc, nil)
 
 	// We can't easily test Fiber handlers without the full HTTP stack
 	// Just verify the handler exists and is callable
@@ -103,8 +126,9 @@ func TestViewProfile_UserNotFound(t *testing.T) {
 			return nil, domain.ErrUserNotFound
 		},
 	}
+	emailSvc := &MockEmailService{}
 
-	handler := NewUserHandler(mock)
+	handler := NewUserHandler(mock, emailSvc, nil)
 
 	// Verify the handler exists
 	assert.NotNil(t, handler.ViewProfile)
@@ -124,7 +148,8 @@ func TestUserHandler_CreatesWithValidService(t *testing.T) {
 	}
 
 	var svc service.UserService = mock
-	handler := NewUserHandler(svc)
+	emailSvc := &MockEmailService{}
+	handler := NewUserHandler(svc, emailSvc, nil)
 
 	assert.NotNil(t, handler)
 }
@@ -147,7 +172,8 @@ func TestUserHandler_HandlesGetUserByID(t *testing.T) {
 	}
 
 	var svc service.UserService = mock
-	handler := NewUserHandler(svc)
+	emailSvc := &MockEmailService{}
+	handler := NewUserHandler(svc, emailSvc, nil)
 
 	// Test successful retrieval
 	user, err := handler.svc.GetUserByID(context.Background(), userID.Hex())
@@ -173,7 +199,8 @@ func TestUserHandler_HandlesDeleteUser(t *testing.T) {
 	}
 
 	var svc service.UserService = mock
-	handler := NewUserHandler(svc)
+	emailSvc := &MockEmailService{}
+	handler := NewUserHandler(svc, emailSvc, nil)
 
 	// Test successful deletion
 	err := handler.svc.DeleteUser(context.Background(), userID.Hex())
@@ -221,12 +248,14 @@ func TestRegisterRequest_Structure(t *testing.T) {
 func TestUserResponse_Structure(t *testing.T) {
 	resp := UserResponse{
 		ID:        "507f1f77bcf86cd799439011",
+		Code:      "12345678",
 		Name:      "John Doe",
 		Email:     "john@example.com",
 		CreatedAt: "2026-06-28T19:00:00Z",
 	}
 
 	assert.Equal(t, "507f1f77bcf86cd799439011", resp.ID)
+	assert.Equal(t, "12345678", resp.Code)
 	assert.Equal(t, "John Doe", resp.Name)
 	assert.Equal(t, "john@example.com", resp.Email)
 	assert.Equal(t, "2026-06-28T19:00:00Z", resp.CreatedAt)
@@ -241,7 +270,7 @@ func TestUpdateProfile_Success(t *testing.T) {
 	}
 
 	mock := &MockUserService{
-		updateProfileFunc: func(ctx context.Context, id, name string) (*domain.User, error) {
+		updateProfileFunc: func(ctx context.Context, id, name, profilePictureURL string) (*domain.User, error) {
 			if id == userID.Hex() && name == "Updated Name" {
 				return updatedUser, nil
 			}
@@ -249,7 +278,8 @@ func TestUpdateProfile_Success(t *testing.T) {
 		},
 	}
 
-	handler := NewUserHandler(mock)
+	emailSvc := &MockEmailService{}
+	handler := NewUserHandler(mock, emailSvc, nil)
 
 	// Verify the handler exists and is callable
 	assert.NotNil(t, handler.UpdateProfile)
@@ -259,7 +289,7 @@ func TestUpdateProfile_InvalidName(t *testing.T) {
 	userID := primitive.NewObjectID()
 
 	mock := &MockUserService{
-		updateProfileFunc: func(ctx context.Context, id, name string) (*domain.User, error) {
+		updateProfileFunc: func(ctx context.Context, id, name, profilePictureURL string) (*domain.User, error) {
 			if name == "" {
 				return nil, domain.ErrInvalidInput
 			}
@@ -267,35 +297,29 @@ func TestUpdateProfile_InvalidName(t *testing.T) {
 		},
 	}
 
-	handler := NewUserHandler(mock)
+	emailSvc := &MockEmailService{}
+	handler := NewUserHandler(mock, emailSvc, nil)
 
 	// Test with invalid name
-	_, err := handler.svc.UpdateProfile(context.Background(), userID.Hex(), "")
+	_, err := handler.svc.UpdateProfile(context.Background(), userID.Hex(), "", "")
 	assert.Error(t, err)
 	assert.True(t, errors.Is(err, domain.ErrInvalidInput))
 }
 
 func TestUpdateProfile_UserNotFound(t *testing.T) {
 	mock := &MockUserService{
-		updateProfileFunc: func(ctx context.Context, id, name string) (*domain.User, error) {
+		updateProfileFunc: func(ctx context.Context, id, name, profilePictureURL string) (*domain.User, error) {
 			return nil, domain.ErrUserNotFound
 		},
 	}
 
-	handler := NewUserHandler(mock)
+	emailSvc := &MockEmailService{}
+	handler := NewUserHandler(mock, emailSvc, nil)
 
 	// Test with non-existent user
-	_, err := handler.svc.UpdateProfile(context.Background(), primitive.NewObjectID().Hex(), "New Name")
+	_, err := handler.svc.UpdateProfile(context.Background(), primitive.NewObjectID().Hex(), "New Name", "")
 	assert.Error(t, err)
 	assert.True(t, errors.Is(err, domain.ErrUserNotFound))
-}
-
-func TestUpdateProfileRequest_Structure(t *testing.T) {
-	req := UpdateProfileRequest{
-		Name: "Updated Name",
-	}
-
-	assert.Equal(t, "Updated Name", req.Name)
 }
 
 func TestChangePassword_Success(t *testing.T) {
@@ -310,7 +334,8 @@ func TestChangePassword_Success(t *testing.T) {
 		},
 	}
 
-	handler := NewUserHandler(mock)
+	emailSvc := &MockEmailService{}
+	handler := NewUserHandler(mock, emailSvc, nil)
 
 	// Verify the handler exists and is callable
 	assert.NotNil(t, handler.ChangePassword)
@@ -328,7 +353,8 @@ func TestChangePassword_InvalidCurrentPassword(t *testing.T) {
 		},
 	}
 
-	handler := NewUserHandler(mock)
+	emailSvc := &MockEmailService{}
+	handler := NewUserHandler(mock, emailSvc, nil)
 
 	// Test with wrong current password
 	err := handler.svc.ChangePassword(context.Background(), userID.Hex(), "WrongPass123!", "NewPass456!")
@@ -343,7 +369,8 @@ func TestChangePassword_UserNotFound(t *testing.T) {
 		},
 	}
 
-	handler := NewUserHandler(mock)
+	emailSvc := &MockEmailService{}
+	handler := NewUserHandler(mock, emailSvc, nil)
 
 	// Test with non-existent user
 	err := handler.svc.ChangePassword(context.Background(), primitive.NewObjectID().Hex(), "OldPass123!", "NewPass456!")
@@ -381,7 +408,8 @@ func TestDeleteAccount_Success(t *testing.T) {
 		},
 	}
 
-	handler := NewUserHandler(mock)
+	emailSvc := &MockEmailService{}
+	handler := NewUserHandler(mock, emailSvc, nil)
 
 	// Verify the handler exists and is callable
 	assert.NotNil(t, handler.DeleteAccount)
@@ -394,7 +422,8 @@ func TestDeleteAccount_UserNotFound(t *testing.T) {
 		},
 	}
 
-	handler := NewUserHandler(mock)
+	emailSvc := &MockEmailService{}
+	handler := NewUserHandler(mock, emailSvc, nil)
 
 	// Test with non-existent user
 	err := handler.svc.DeleteAccount(context.Background(), primitive.NewObjectID().Hex())
@@ -409,7 +438,8 @@ func TestDeleteAccount_InvalidID(t *testing.T) {
 		},
 	}
 
-	handler := NewUserHandler(mock)
+	emailSvc := &MockEmailService{}
+	handler := NewUserHandler(mock, emailSvc, nil)
 
 	// Test with invalid ID
 	err := handler.svc.DeleteAccount(context.Background(), "invalid")

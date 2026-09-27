@@ -32,6 +32,7 @@ curl -X POST $BASE_URL/auth/register \
 {
   "data": {
     "id": "507f1f77bcf86cd799439011",
+    "code": "87654321",
     "name": "Test User",
     "email": "test@example.com",
     "age_verified": true,
@@ -83,6 +84,7 @@ curl -X GET $BASE_URL/profile \
 {
   "data": {
     "id": "507f1f77bcf86cd799439011",
+    "code": "87654321",
     "name": "Test User",
     "email": "test@example.com"
   },
@@ -106,6 +108,7 @@ curl -X PATCH $BASE_URL/profile \
 {
   "data": {
     "id": "507f1f77bcf86cd799439011",
+    "code": "87654321",
     "name": "Updated Test User",
     "email": "test@example.com"
   },

@@ -2,15 +2,16 @@ package domain
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"time"
 )
 
 func TestValidatePost_Success(t *testing.T) {
 	post := &Post{
 		ID:        primitive.NewObjectID(),
+		RoomID:    primitive.NewObjectID(),
 		UserID:    primitive.NewObjectID(),
 		Text:      "This is a valid post",
 		CreatedAt: time.Now(),
@@ -23,6 +24,7 @@ func TestValidatePost_Success(t *testing.T) {
 func TestValidatePost_EmptyText(t *testing.T) {
 	post := &Post{
 		ID:        primitive.NewObjectID(),
+		RoomID:    primitive.NewObjectID(),
 		UserID:    primitive.NewObjectID(),
 		Text:      "",
 		CreatedAt: time.Now(),
@@ -41,6 +43,7 @@ func TestValidatePost_TextTooLong(t *testing.T) {
 
 	post := &Post{
 		ID:        primitive.NewObjectID(),
+		RoomID:    primitive.NewObjectID(),
 		UserID:    primitive.NewObjectID(),
 		Text:      longText,
 		CreatedAt: time.Now(),
@@ -55,6 +58,7 @@ func TestValidatePost_WithImage(t *testing.T) {
 	imageURL := "https://s3.amazonaws.com/bucket/image.jpg"
 	post := &Post{
 		ID:        primitive.NewObjectID(),
+		RoomID:    primitive.NewObjectID(),
 		UserID:    primitive.NewObjectID(),
 		Text:      "Post with image",
 		Image:     &imageURL,
@@ -69,6 +73,7 @@ func TestValidatePost_WithVideo(t *testing.T) {
 	videoURL := "https://s3.amazonaws.com/bucket/video.mp4"
 	post := &Post{
 		ID:        primitive.NewObjectID(),
+		RoomID:    primitive.NewObjectID(),
 		UserID:    primitive.NewObjectID(),
 		Text:      "Post with video",
 		Video:     &videoURL,
@@ -82,6 +87,7 @@ func TestValidatePost_WithVideo(t *testing.T) {
 func TestPost_Structure(t *testing.T) {
 	post := &Post{
 		ID:        primitive.NewObjectID(),
+		RoomID:    primitive.NewObjectID(),
 		UserID:    primitive.NewObjectID(),
 		Text:      "Test post",
 		CreatedAt: time.Now(),
@@ -89,6 +95,7 @@ func TestPost_Structure(t *testing.T) {
 	}
 
 	assert.NotNil(t, post.ID)
+	assert.NotNil(t, post.RoomID)
 	assert.NotNil(t, post.UserID)
 	assert.Equal(t, "Test post", post.Text)
 	assert.Nil(t, post.Image)

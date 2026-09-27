@@ -6,20 +6,21 @@ import (
 	"testing"
 	"time"
 
+	"temp_backend/internal/domain"
+
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"temp_backend/internal/domain"
 )
 
 // MockRoomRepository is a mock implementation for testing
 type MockRoomRepository struct {
-	createFunc           func(ctx context.Context, room *domain.Room) error
-	getByIDFunc          func(ctx context.Context, id primitive.ObjectID) (*domain.Room, error)
-	getByCodeFunc        func(ctx context.Context, code string) (*domain.Room, error)
-	addUserToRoomFunc    func(ctx context.Context, roomID, userID primitive.ObjectID) error
+	createFunc             func(ctx context.Context, room *domain.Room) error
+	getByIDFunc            func(ctx context.Context, id primitive.ObjectID) (*domain.Room, error)
+	getByCodeFunc          func(ctx context.Context, code string) (*domain.Room, error)
+	addUserToRoomFunc      func(ctx context.Context, roomID, userID primitive.ObjectID) error
 	removeUserFromRoomFunc func(ctx context.Context, roomID, userID primitive.ObjectID) error
-	deleteRoomFunc       func(ctx context.Context, roomID primitive.ObjectID) error
-	listUserRoomsFunc    func(ctx context.Context, userID primitive.ObjectID) ([]*domain.Room, error)
+	deleteRoomFunc         func(ctx context.Context, roomID primitive.ObjectID) error
+	listUserRoomsFunc      func(ctx context.Context, userID primitive.ObjectID) ([]*domain.Room, error)
 }
 
 func (m *MockRoomRepository) Create(ctx context.Context, room *domain.Room) error {
@@ -71,6 +72,14 @@ func (m *MockRoomRepository) ListUserRooms(ctx context.Context, userID primitive
 	return []*domain.Room{}, nil
 }
 
+func (m *MockRoomRepository) IsUserMember(ctx context.Context, roomID, userID primitive.ObjectID) (bool, error) {
+	return true, nil
+}
+
+func (m *MockRoomRepository) GetByRoomID(ctx context.Context, roomID primitive.ObjectID) ([]*domain.Room, error) {
+	return []*domain.Room{}, nil
+}
+
 func TestCreateRoom_Success(t *testing.T) {
 	userID := primitive.NewObjectID()
 	repoMock := &MockRoomRepository{
@@ -83,7 +92,8 @@ func TestCreateRoom_Success(t *testing.T) {
 		},
 	}
 
-	svc := NewRoomService(repoMock)
+	userRepoMock := &MockUserRepository{}
+	svc := NewRoomService(repoMock, userRepoMock)
 	room, err := svc.CreateRoom(context.Background(), "Conference Room A", "CONF_A_001", userID)
 
 	assert.NoError(t, err)
@@ -97,7 +107,8 @@ func TestCreateRoom_InvalidName_Empty(t *testing.T) {
 	userID := primitive.NewObjectID()
 	repoMock := &MockRoomRepository{}
 
-	svc := NewRoomService(repoMock)
+	userRepoMock := &MockUserRepository{}
+	svc := NewRoomService(repoMock, userRepoMock)
 	room, err := svc.CreateRoom(context.Background(), "", "CONF_A_001", userID)
 
 	assert.Error(t, err)
@@ -109,7 +120,8 @@ func TestCreateRoom_InvalidName_TooLong(t *testing.T) {
 	userID := primitive.NewObjectID()
 	repoMock := &MockRoomRepository{}
 
-	svc := NewRoomService(repoMock)
+	userRepoMock := &MockUserRepository{}
+	svc := NewRoomService(repoMock, userRepoMock)
 	room, err := svc.CreateRoom(context.Background(), "This is a very long room name that exceeds the fifty character limit", "CONF_A_001", userID)
 
 	assert.Error(t, err)
@@ -121,7 +133,8 @@ func TestCreateRoom_InvalidCode_Empty(t *testing.T) {
 	userID := primitive.NewObjectID()
 	repoMock := &MockRoomRepository{}
 
-	svc := NewRoomService(repoMock)
+	userRepoMock := &MockUserRepository{}
+	svc := NewRoomService(repoMock, userRepoMock)
 	room, err := svc.CreateRoom(context.Background(), "Conference Room A", "", userID)
 
 	assert.Error(t, err)
@@ -133,7 +146,8 @@ func TestCreateRoom_InvalidCode_InvalidCharacters(t *testing.T) {
 	userID := primitive.NewObjectID()
 	repoMock := &MockRoomRepository{}
 
-	svc := NewRoomService(repoMock)
+	userRepoMock := &MockUserRepository{}
+	svc := NewRoomService(repoMock, userRepoMock)
 	room, err := svc.CreateRoom(context.Background(), "Conference Room A", "CONF@A#1", userID)
 
 	assert.Error(t, err)
@@ -159,7 +173,8 @@ func TestCreateRoom_CodeAlreadyExists(t *testing.T) {
 		},
 	}
 
-	svc := NewRoomService(repoMock)
+	userRepoMock := &MockUserRepository{}
+	svc := NewRoomService(repoMock, userRepoMock)
 	room, err := svc.CreateRoom(context.Background(), "Conference Room A", "CONF_A_001", userID)
 
 	assert.Error(t, err)
@@ -178,7 +193,8 @@ func TestCreateRoom_RepositoryError(t *testing.T) {
 		},
 	}
 
-	svc := NewRoomService(repoMock)
+	userRepoMock := &MockUserRepository{}
+	svc := NewRoomService(repoMock, userRepoMock)
 	room, err := svc.CreateRoom(context.Background(), "Conference Room A", "CONF_A_001", userID)
 
 	assert.Error(t, err)
@@ -187,10 +203,10 @@ func TestCreateRoom_RepositoryError(t *testing.T) {
 
 func TestCreateRoom_ValidateCodeFormatWithValidInputs(t *testing.T) {
 	userID := primitive.NewObjectID()
-	
+
 	testCases := []struct {
-		name    string
-		code    string
+		name       string
+		code       string
 		shouldFail bool
 	}{
 		{"Alphanumeric", "ABC123", false},
@@ -215,7 +231,8 @@ func TestCreateRoom_ValidateCodeFormatWithValidInputs(t *testing.T) {
 				},
 			}
 
-			svc := NewRoomService(repoMock)
+			userRepoMock := &MockUserRepository{}
+			svc := NewRoomService(repoMock, userRepoMock)
 			room, err := svc.CreateRoom(context.Background(), "Test Room", tc.code, userID)
 
 			if tc.shouldFail {
@@ -264,7 +281,8 @@ func TestAddUserToRoom_Success(t *testing.T) {
 		},
 	}
 
-	svc := NewRoomService(repoMock)
+	userRepoMock := &MockUserRepository{}
+	svc := NewRoomService(repoMock, userRepoMock)
 	updatedRoom, err := svc.AddUserToRoom(context.Background(), roomCode, userID)
 
 	assert.NoError(t, err)
@@ -283,7 +301,8 @@ func TestAddUserToRoom_RoomNotFound(t *testing.T) {
 		},
 	}
 
-	svc := NewRoomService(repoMock)
+	userRepoMock := &MockUserRepository{}
+	svc := NewRoomService(repoMock, userRepoMock)
 	room, err := svc.AddUserToRoom(context.Background(), roomCode, userID)
 
 	assert.Error(t, err)
@@ -316,7 +335,8 @@ func TestAddUserToRoom_RepositoryAddError(t *testing.T) {
 		},
 	}
 
-	svc := NewRoomService(repoMock)
+	userRepoMock := &MockUserRepository{}
+	svc := NewRoomService(repoMock, userRepoMock)
 	updatedRoom, err := svc.AddUserToRoom(context.Background(), roomCode, userID)
 
 	assert.Error(t, err)
@@ -347,7 +367,8 @@ func TestGetRoom_Success(t *testing.T) {
 		},
 	}
 
-	svc := NewRoomService(repoMock)
+	userRepoMock := &MockUserRepository{}
+	svc := NewRoomService(repoMock, userRepoMock)
 	retrievedRoom, err := svc.GetRoom(context.Background(), roomCode)
 
 	assert.NoError(t, err)
@@ -364,7 +385,8 @@ func TestGetRoom_NotFound(t *testing.T) {
 		},
 	}
 
-	svc := NewRoomService(repoMock)
+	userRepoMock := &MockUserRepository{}
+	svc := NewRoomService(repoMock, userRepoMock)
 	room, err := svc.GetRoom(context.Background(), roomCode)
 
 	assert.Error(t, err)
@@ -400,7 +422,8 @@ func TestLeaveRoom_Success(t *testing.T) {
 		},
 	}
 
-	svc := NewRoomService(repoMock)
+	userRepoMock := &MockUserRepository{}
+	svc := NewRoomService(repoMock, userRepoMock)
 	err := svc.LeaveRoom(context.Background(), roomCode, userID)
 
 	assert.NoError(t, err)
@@ -416,7 +439,8 @@ func TestLeaveRoom_NotFound(t *testing.T) {
 		},
 	}
 
-	svc := NewRoomService(repoMock)
+	userRepoMock := &MockUserRepository{}
+	svc := NewRoomService(repoMock, userRepoMock)
 	err := svc.LeaveRoom(context.Background(), roomCode, userID)
 
 	assert.Error(t, err)
@@ -449,7 +473,8 @@ func TestLeaveRoom_UserNotMember(t *testing.T) {
 		},
 	}
 
-	svc := NewRoomService(repoMock)
+	userRepoMock := &MockUserRepository{}
+	svc := NewRoomService(repoMock, userRepoMock)
 	err := svc.LeaveRoom(context.Background(), roomCode, userID)
 
 	assert.Error(t, err)
@@ -484,7 +509,8 @@ func TestLeaveRoom_RepositoryError(t *testing.T) {
 		},
 	}
 
-	svc := NewRoomService(repoMock)
+	userRepoMock := &MockUserRepository{}
+	svc := NewRoomService(repoMock, userRepoMock)
 	err := svc.LeaveRoom(context.Background(), roomCode, userID)
 
 	assert.Error(t, err)
@@ -518,7 +544,8 @@ func TestDeleteRoom_Success(t *testing.T) {
 		},
 	}
 
-	svc := NewRoomService(repoMock)
+	userRepoMock := &MockUserRepository{}
+	svc := NewRoomService(repoMock, userRepoMock)
 	err := svc.DeleteRoom(context.Background(), roomCode, ownerID)
 
 	assert.NoError(t, err)
@@ -550,7 +577,8 @@ func TestDeleteRoom_NotOwner(t *testing.T) {
 		},
 	}
 
-	svc := NewRoomService(repoMock)
+	userRepoMock := &MockUserRepository{}
+	svc := NewRoomService(repoMock, userRepoMock)
 	err := svc.DeleteRoom(context.Background(), roomCode, memberID)
 
 	assert.Error(t, err)
@@ -567,7 +595,8 @@ func TestDeleteRoom_NotFound(t *testing.T) {
 		},
 	}
 
-	svc := NewRoomService(repoMock)
+	userRepoMock := &MockUserRepository{}
+	svc := NewRoomService(repoMock, userRepoMock)
 	err := svc.DeleteRoom(context.Background(), roomCode, ownerID)
 
 	assert.Error(t, err)
@@ -602,7 +631,8 @@ func TestDeleteRoom_RepositoryError(t *testing.T) {
 		},
 	}
 
-	svc := NewRoomService(repoMock)
+	userRepoMock := &MockUserRepository{}
+	svc := NewRoomService(repoMock, userRepoMock)
 	err := svc.DeleteRoom(context.Background(), roomCode, ownerID)
 
 	assert.Error(t, err)
@@ -633,7 +663,8 @@ func TestListUserRooms_AsOwner(t *testing.T) {
 		},
 	}
 
-	svc := NewRoomService(repoMock)
+	userRepoMock := &MockUserRepository{}
+	svc := NewRoomService(repoMock, userRepoMock)
 	rooms, err := svc.ListUserRooms(context.Background(), ownerID)
 
 	assert.NoError(t, err)
@@ -667,7 +698,8 @@ func TestListUserRooms_AsMember(t *testing.T) {
 		},
 	}
 
-	svc := NewRoomService(repoMock)
+	userRepoMock := &MockUserRepository{}
+	svc := NewRoomService(repoMock, userRepoMock)
 	rooms, err := svc.ListUserRooms(context.Background(), memberID)
 
 	assert.NoError(t, err)
@@ -684,7 +716,8 @@ func TestListUserRooms_Empty(t *testing.T) {
 		},
 	}
 
-	svc := NewRoomService(repoMock)
+	userRepoMock := &MockUserRepository{}
+	svc := NewRoomService(repoMock, userRepoMock)
 	rooms, err := svc.ListUserRooms(context.Background(), userID)
 
 	assert.NoError(t, err)
@@ -700,7 +733,8 @@ func TestListUserRooms_RepositoryError(t *testing.T) {
 		},
 	}
 
-	svc := NewRoomService(repoMock)
+	userRepoMock := &MockUserRepository{}
+	svc := NewRoomService(repoMock, userRepoMock)
 	rooms, err := svc.ListUserRooms(context.Background(), userID)
 
 	assert.Error(t, err)

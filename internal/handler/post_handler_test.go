@@ -6,21 +6,27 @@ import (
 	"testing"
 	"time"
 
+	"temp_backend/internal/domain"
+
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"temp_backend/internal/domain"
 )
 
 // MockPostService is a mock implementation for testing
 type MockPostService struct {
-	createPostFunc func(ctx context.Context, text string, userID primitive.ObjectID, imageURL, videoURL *string) (*domain.Post, error)
-	getPostFunc    func(ctx context.Context, id primitive.ObjectID) (*domain.Post, error)
-	deletePostFunc func(ctx context.Context, id, userID primitive.ObjectID) error
+	createPostFunc       func(ctx context.Context, text string, userID, roomID primitive.ObjectID, imageURL, videoURL, audioURL *string) (*domain.Post, error)
+	getPostFunc          func(ctx context.Context, id primitive.ObjectID) (*domain.Post, error)
+	getPostsByRoomIDFunc func(ctx context.Context, roomID primitive.ObjectID, page, limit int) ([]*domain.Post, int64, error)
+	deletePostFunc       func(ctx context.Context, id, userID primitive.ObjectID) error
+	validatePostFunc     func(ctx context.Context, postID, userID primitive.ObjectID) (*domain.Post, error)
+	removeValidationFunc func(ctx context.Context, postID, userID primitive.ObjectID) error
+	respectPostFunc      func(ctx context.Context, postID, userID primitive.ObjectID) (*domain.Post, error)
+	removeRespectFunc    func(ctx context.Context, postID, userID primitive.ObjectID) error
 }
 
-func (m *MockPostService) CreatePost(ctx context.Context, text string, userID primitive.ObjectID, imageURL, videoURL *string) (*domain.Post, error) {
+func (m *MockPostService) CreatePost(ctx context.Context, text string, userID, roomID primitive.ObjectID, imageURL, videoURL, audioURL *string) (*domain.Post, error) {
 	if m.createPostFunc != nil {
-		return m.createPostFunc(ctx, text, userID, imageURL, videoURL)
+		return m.createPostFunc(ctx, text, userID, roomID, imageURL, videoURL, audioURL)
 	}
 	return nil, nil
 }
@@ -32,11 +38,94 @@ func (m *MockPostService) GetPost(ctx context.Context, id primitive.ObjectID) (*
 	return nil, nil
 }
 
+func (m *MockPostService) GetPostsByRoomID(ctx context.Context, roomID primitive.ObjectID, page, limit int) ([]*domain.Post, int64, error) {
+	if m.getPostsByRoomIDFunc != nil {
+		return m.getPostsByRoomIDFunc(ctx, roomID, page, limit)
+	}
+	return nil, 0, nil
+}
+
 func (m *MockPostService) DeletePost(ctx context.Context, id, userID primitive.ObjectID) error {
 	if m.deletePostFunc != nil {
 		return m.deletePostFunc(ctx, id, userID)
 	}
 	return nil
+}
+
+func (m *MockPostService) ValidatePost(ctx context.Context, postID, userID primitive.ObjectID) (*domain.Post, error) {
+	if m.validatePostFunc != nil {
+		return m.validatePostFunc(ctx, postID, userID)
+	}
+	return nil, nil
+}
+
+func (m *MockPostService) RemoveValidation(ctx context.Context, postID, userID primitive.ObjectID) error {
+	if m.removeValidationFunc != nil {
+		return m.removeValidationFunc(ctx, postID, userID)
+	}
+	return nil
+}
+
+func (m *MockPostService) RespectPost(ctx context.Context, postID, userID primitive.ObjectID) (*domain.Post, error) {
+	if m.respectPostFunc != nil {
+		return m.respectPostFunc(ctx, postID, userID)
+	}
+	return nil, nil
+}
+
+func (m *MockPostService) RemoveRespect(ctx context.Context, postID, userID primitive.ObjectID) error {
+	if m.removeRespectFunc != nil {
+		return m.removeRespectFunc(ctx, postID, userID)
+	}
+	return nil
+}
+
+// MockRoomRepository is a mock implementation for testing
+type MockRoomRepository struct {
+	getByCodeFunc    func(ctx context.Context, code string) (*domain.Room, error)
+	getByIDFunc      func(ctx context.Context, id primitive.ObjectID) (*domain.Room, error)
+	isUserMemberFunc func(ctx context.Context, roomID, userID primitive.ObjectID) (bool, error)
+}
+
+func (m *MockRoomRepository) Create(ctx context.Context, room *domain.Room) error {
+	return nil
+}
+
+func (m *MockRoomRepository) GetByID(ctx context.Context, id primitive.ObjectID) (*domain.Room, error) {
+	if m.getByIDFunc != nil {
+		return m.getByIDFunc(ctx, id)
+	}
+	return nil, nil
+}
+
+func (m *MockRoomRepository) GetByCode(ctx context.Context, code string) (*domain.Room, error) {
+	if m.getByCodeFunc != nil {
+		return m.getByCodeFunc(ctx, code)
+	}
+	return nil, nil
+}
+
+func (m *MockRoomRepository) AddUserToRoom(ctx context.Context, roomID, userID primitive.ObjectID) error {
+	return nil
+}
+
+func (m *MockRoomRepository) RemoveUserFromRoom(ctx context.Context, roomID, userID primitive.ObjectID) error {
+	return nil
+}
+
+func (m *MockRoomRepository) DeleteRoom(ctx context.Context, roomID primitive.ObjectID) error {
+	return nil
+}
+
+func (m *MockRoomRepository) ListUserRooms(ctx context.Context, userID primitive.ObjectID) ([]*domain.Room, error) {
+	return nil, nil
+}
+
+func (m *MockRoomRepository) IsUserMember(ctx context.Context, roomID, userID primitive.ObjectID) (bool, error) {
+	if m.isUserMemberFunc != nil {
+		return m.isUserMemberFunc(ctx, roomID, userID)
+	}
+	return false, nil
 }
 
 func TestCreatePostRequest_Structure(t *testing.T) {
@@ -50,6 +139,9 @@ func TestCreatePostRequest_Structure(t *testing.T) {
 func TestPostResponse_Structure(t *testing.T) {
 	resp := PostResponse{
 		ID:        "507f1f77bcf86cd799439011",
+		RoomID:    "507f1f77bcf86cd799439013",
+		RoomCode:  "room-code",
+		RoomName:  "Test Room",
 		UserID:    "507f1f77bcf86cd799439012",
 		Text:      "Test post",
 		CreatedAt: "2024-06-29T00:00:00Z",
@@ -57,13 +149,16 @@ func TestPostResponse_Structure(t *testing.T) {
 	}
 
 	assert.Equal(t, "507f1f77bcf86cd799439011", resp.ID)
+	assert.Equal(t, "507f1f77bcf86cd799439013", resp.RoomID)
+	assert.Equal(t, "room-code", resp.RoomCode)
 	assert.Equal(t, "507f1f77bcf86cd799439012", resp.UserID)
 	assert.Equal(t, "Test post", resp.Text)
 }
 
 func TestNewPostHandler(t *testing.T) {
 	mockService := &MockPostService{}
-	handler := NewPostHandler(mockService, nil)
+	mockRoomRepo := &MockRoomRepository{}
+	handler := NewPostHandler(mockService, nil, mockRoomRepo, nil, nil)
 
 	assert.NotNil(t, handler)
 	assert.NotNil(t, handler.CreatePost)
@@ -73,12 +168,14 @@ func TestNewPostHandler(t *testing.T) {
 
 func TestCreatePost_Success(t *testing.T) {
 	userID := primitive.NewObjectID()
+	roomID := primitive.NewObjectID()
 	postID := primitive.NewObjectID()
 	text := "My first post"
 	now := time.Now()
 
 	post := &domain.Post{
 		ID:        postID,
+		RoomID:    roomID,
 		UserID:    userID,
 		Text:      text,
 		CreatedAt: now,
@@ -86,26 +183,30 @@ func TestCreatePost_Success(t *testing.T) {
 	}
 
 	mockService := &MockPostService{
-		createPostFunc: func(ctx context.Context, t string, uID primitive.ObjectID, imageURL, videoURL *string) (*domain.Post, error) {
+		createPostFunc: func(ctx context.Context, t string, uID, rID primitive.ObjectID, imageURL, videoURL, audioURL *string) (*domain.Post, error) {
 			return post, nil
 		},
 	}
 
-	handler := NewPostHandler(mockService, nil)
+	mockRoomRepo := &MockRoomRepository{}
+	handler := NewPostHandler(mockService, nil, mockRoomRepo, nil, nil)
 	assert.NotNil(t, handler.CreatePost)
 }
 
 func TestCreatePost_TextRequired(t *testing.T) {
 	mockService := &MockPostService{}
-	handler := NewPostHandler(mockService, nil)
+	mockRoomRepo := &MockRoomRepository{}
+	handler := NewPostHandler(mockService, nil, mockRoomRepo, nil, nil)
 	assert.NotNil(t, handler.CreatePost)
 }
 
 func TestGetPost_Success(t *testing.T) {
 	postID := primitive.NewObjectID()
+	roomID := primitive.NewObjectID()
 	userID := primitive.NewObjectID()
 	post := &domain.Post{
 		ID:        postID,
+		RoomID:    roomID,
 		UserID:    userID,
 		Text:      "Test post",
 		CreatedAt: time.Now(),
@@ -121,7 +222,8 @@ func TestGetPost_Success(t *testing.T) {
 		},
 	}
 
-	handler := NewPostHandler(mockService, nil)
+	mockRoomRepo := &MockRoomRepository{}
+	handler := NewPostHandler(mockService, nil, mockRoomRepo, nil, nil)
 	assert.NotNil(t, handler.GetPost)
 }
 
@@ -132,7 +234,8 @@ func TestGetPost_NotFound(t *testing.T) {
 		},
 	}
 
-	handler := NewPostHandler(mockService, nil)
+	mockRoomRepo := &MockRoomRepository{}
+	handler := NewPostHandler(mockService, nil, mockRoomRepo, nil, nil)
 	assert.NotNil(t, handler.GetPost)
 }
 
@@ -149,7 +252,8 @@ func TestDeletePost_Success(t *testing.T) {
 		},
 	}
 
-	handler := NewPostHandler(mockService, nil)
+	mockRoomRepo := &MockRoomRepository{}
+	handler := NewPostHandler(mockService, nil, mockRoomRepo, nil, nil)
 	assert.NotNil(t, handler.DeletePost)
 }
 
@@ -165,7 +269,8 @@ func TestDeletePost_NotOwner(t *testing.T) {
 		},
 	}
 
-	handler := NewPostHandler(mockService, nil)
+	mockRoomRepo := &MockRoomRepository{}
+	handler := NewPostHandler(mockService, nil, mockRoomRepo, nil, nil)
 	assert.NotNil(t, handler.DeletePost)
 }
 
@@ -176,7 +281,8 @@ func TestDeletePost_NotFound(t *testing.T) {
 		},
 	}
 
-	handler := NewPostHandler(mockService, nil)
+	mockRoomRepo := &MockRoomRepository{}
+	handler := NewPostHandler(mockService, nil, mockRoomRepo, nil, nil)
 	assert.NotNil(t, handler.DeletePost)
 }
 

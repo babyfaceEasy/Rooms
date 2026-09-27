@@ -3,29 +3,31 @@ package service
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"regexp"
 	"strings"
 	"time"
 	"unicode"
 
-	"golang.org/x/crypto/bcrypt"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"temp_backend/internal/domain"
 	"temp_backend/internal/repository"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // UserService defines user management operations.
 type UserService interface {
 	Register(ctx context.Context, name, email, password string, ageVerified bool) (*domain.User, error)
 	GetUserByID(ctx context.Context, id string) (*domain.User, error)
-	UpdateProfile(ctx context.Context, id, name string) (*domain.User, error)
+	UpdateProfile(ctx context.Context, id, name, profilePictureURL string) (*domain.User, error)
 	ChangePassword(ctx context.Context, id, currentPassword, newPassword string) error
 	DeleteAccount(ctx context.Context, id string) error
 	DeleteUser(ctx context.Context, id string) error
 }
 
 type userService struct {
-	userRepo       repository.UserRepository
+	userRepo         repository.UserRepository
 	refreshTokenRepo repository.RefreshTokenRepository
 }
 
@@ -38,6 +40,17 @@ func NewUserService(userRepo repository.UserRepository, refreshTokenRepo reposit
 }
 
 // Register creates a new user account with validation and password hashing.
+// generateUniqueCode generates a random 8-digit numeric code.
+// Note: In production, consider implementing a database-level unique constraint on the code field.
+func generateUniqueCode() string {
+	const digits = "0123456789"
+	code := make([]byte, 8)
+	for i := range code {
+		code[i] = digits[rand.Intn(len(digits))]
+	}
+	return string(code)
+}
+
 func (s *userService) Register(ctx context.Context, name, email, password string, ageVerified bool) (*domain.User, error) {
 	// Validate age verification
 	if !ageVerified {
@@ -61,14 +74,18 @@ func (s *userService) Register(ctx context.Context, name, email, password string
 		return nil, fmt.Errorf("failed to hash password: %w", err)
 	}
 
+	// Generate unique customer code (8-digit numeric)
+	code := generateUniqueCode()
+
 	// Create user entity
 	user := &domain.User{
-		Name:            strings.TrimSpace(name),
-		Email:           strings.ToLower(strings.TrimSpace(email)),
-		PasswordHash:    string(passwordHash),
-		IsAgeVerified:   true,
-		CreatedAt:       time.Now().UTC(),
-		UpdatedAt:       time.Now().UTC(),
+		Code:          code,
+		Name:          strings.TrimSpace(name),
+		Email:         strings.ToLower(strings.TrimSpace(email)),
+		PasswordHash:  string(passwordHash),
+		IsAgeVerified: true,
+		CreatedAt:     time.Now().UTC(),
+		UpdatedAt:     time.Now().UTC(),
 	}
 
 	// Persist to repository
@@ -124,8 +141,8 @@ func (s *userService) DeleteAccount(ctx context.Context, id string) error {
 	return nil
 }
 
-// UpdateProfile updates a user's profile name.
-func (s *userService) UpdateProfile(ctx context.Context, id, name string) (*domain.User, error) {
+// UpdateProfile updates a user's profile name and optionally the profile picture URL.
+func (s *userService) UpdateProfile(ctx context.Context, id, name, profilePictureURL string) (*domain.User, error) {
 	// Validate inputs
 	if err := validateName(name); err != nil {
 		return nil, err
@@ -143,9 +160,12 @@ func (s *userService) UpdateProfile(ctx context.Context, id, name string) (*doma
 		return nil, err
 	}
 
-	// Update only the name field
+	// Update fields
 	user.Name = strings.TrimSpace(name)
 	user.UpdatedAt = time.Now().UTC()
+	if profilePictureURL != "" {
+		user.ProfilePicture = profilePictureURL
+	}
 
 	// Persist changes
 	if err := s.userRepo.Update(ctx, user); err != nil {

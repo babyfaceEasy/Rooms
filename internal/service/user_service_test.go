@@ -5,20 +5,23 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"golang.org/x/crypto/bcrypt"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"temp_backend/internal/domain"
+
+	"github.com/stretchr/testify/assert"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // MockUserRepository is a mock implementation of UserRepository for testing.
 type MockUserRepository struct {
-	createFunc      func(ctx context.Context, user *domain.User) error
-	getByEmailFunc  func(ctx context.Context, email string) (*domain.User, error)
-	getByIDFunc     func(ctx context.Context, id primitive.ObjectID) (*domain.User, error)
-	updateFunc      func(ctx context.Context, user *domain.User) error
-	deleteFunc      func(ctx context.Context, id primitive.ObjectID) error
-	softDeleteFunc  func(ctx context.Context, id primitive.ObjectID) error
+	createFunc     func(ctx context.Context, user *domain.User) error
+	getByEmailFunc func(ctx context.Context, email string) (*domain.User, error)
+	getByIDFunc    func(ctx context.Context, id primitive.ObjectID) (*domain.User, error)
+	getByIDsFunc   func(ctx context.Context, ids []primitive.ObjectID) ([]*domain.User, error)
+	getByCodeFunc  func(ctx context.Context, code string) (*domain.User, error)
+	updateFunc     func(ctx context.Context, user *domain.User) error
+	deleteFunc     func(ctx context.Context, id primitive.ObjectID) error
+	softDeleteFunc func(ctx context.Context, id primitive.ObjectID) error
 }
 
 func (m *MockUserRepository) Create(ctx context.Context, user *domain.User) error {
@@ -38,6 +41,20 @@ func (m *MockUserRepository) GetByEmail(ctx context.Context, email string) (*dom
 func (m *MockUserRepository) GetByID(ctx context.Context, id primitive.ObjectID) (*domain.User, error) {
 	if m.getByIDFunc != nil {
 		return m.getByIDFunc(ctx, id)
+	}
+	return nil, domain.ErrUserNotFound
+}
+
+func (m *MockUserRepository) GetByIDs(ctx context.Context, ids []primitive.ObjectID) ([]*domain.User, error) {
+	if m.getByIDsFunc != nil {
+		return m.getByIDsFunc(ctx, ids)
+	}
+	return []*domain.User{}, nil
+}
+
+func (m *MockUserRepository) GetByCode(ctx context.Context, code string) (*domain.User, error) {
+	if m.getByCodeFunc != nil {
+		return m.getByCodeFunc(ctx, code)
 	}
 	return nil, domain.ErrUserNotFound
 }
@@ -369,7 +386,7 @@ func TestUpdateProfile_Success(t *testing.T) {
 	refreshTokenRepoMock := &MockRefreshTokenRepository{}
 	svc := NewUserService(mock, refreshTokenRepoMock)
 
-	user, err := svc.UpdateProfile(context.Background(), userID.Hex(), "New Name")
+	user, err := svc.UpdateProfile(context.Background(), userID.Hex(), "New Name", "")
 
 	assert.NoError(t, err)
 	assert.NotNil(t, user)
@@ -384,7 +401,7 @@ func TestUpdateProfile_InvalidID(t *testing.T) {
 	refreshTokenRepoMock := &MockRefreshTokenRepository{}
 	svc := NewUserService(mock, refreshTokenRepoMock)
 
-	user, err := svc.UpdateProfile(context.Background(), "invalid", "New Name")
+	user, err := svc.UpdateProfile(context.Background(), "invalid", "New Name", "")
 
 	assert.Error(t, err)
 	assert.Nil(t, user)
@@ -400,7 +417,7 @@ func TestUpdateProfile_UserNotFound(t *testing.T) {
 	refreshTokenRepoMock := &MockRefreshTokenRepository{}
 	svc := NewUserService(mock, refreshTokenRepoMock)
 
-	user, err := svc.UpdateProfile(context.Background(), primitive.NewObjectID().Hex(), "New Name")
+	user, err := svc.UpdateProfile(context.Background(), primitive.NewObjectID().Hex(), "New Name", "")
 
 	assert.Error(t, err)
 	assert.Nil(t, user)
@@ -412,7 +429,7 @@ func TestUpdateProfile_InvalidName_Empty(t *testing.T) {
 	refreshTokenRepoMock := &MockRefreshTokenRepository{}
 	svc := NewUserService(mock, refreshTokenRepoMock)
 
-	user, err := svc.UpdateProfile(context.Background(), primitive.NewObjectID().Hex(), "")
+	user, err := svc.UpdateProfile(context.Background(), primitive.NewObjectID().Hex(), "", "")
 
 	assert.Error(t, err)
 	assert.Nil(t, user)
@@ -424,7 +441,7 @@ func TestUpdateProfile_InvalidName_TooShort(t *testing.T) {
 	refreshTokenRepoMock := &MockRefreshTokenRepository{}
 	svc := NewUserService(mock, refreshTokenRepoMock)
 
-	user, err := svc.UpdateProfile(context.Background(), primitive.NewObjectID().Hex(), "J")
+	user, err := svc.UpdateProfile(context.Background(), primitive.NewObjectID().Hex(), "J", "")
 
 	assert.Error(t, err)
 	assert.Nil(t, user)
@@ -441,7 +458,7 @@ func TestUpdateProfile_InvalidName_TooLong(t *testing.T) {
 		longName += "a"
 	}
 
-	user, err := svc.UpdateProfile(context.Background(), primitive.NewObjectID().Hex(), longName)
+	user, err := svc.UpdateProfile(context.Background(), primitive.NewObjectID().Hex(), longName, "")
 
 	assert.Error(t, err)
 	assert.Nil(t, user)
