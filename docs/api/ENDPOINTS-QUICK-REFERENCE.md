@@ -8,6 +8,11 @@
 | `POST` | `/auth/register` | ❌ | Register new user |
 | `POST` | `/auth/login` | ❌ | Login and get tokens |
 | `POST` | `/auth/refresh` | ❌ | Get new access token |
+| `POST` | `/auth/verify-email` | ❌ | Verify email address with token |
+| `POST` | `/auth/resend-verification-email` | ❌ | Resend verification email (2 min cooldown) |
+| `POST` | `/auth/forgot-password` | ❌ | Request password reset email |
+| `POST` | `/auth/resend-password-reset-email` | ❌ | Resend password reset email (2 min cooldown) |
+| `POST` | `/auth/reset-password` | ❌ | Reset password with token |
 | `POST` | `/auth/logout` | ✅ | Logout and invalidate tokens |
 
 ### Profile
@@ -65,11 +70,12 @@
 
 ### New User - Registration & First Post
 ```
-1. POST /auth/register → Create account
-2. POST /auth/login → Get access_token
-3. POST /rooms → Create a room (get room_code)
-4. POST /posts → Create post with room_code
-5. POST /auth/logout → End session (optional)
+1. POST /auth/register → Create account (verification email sent)
+2. POST /auth/verify-email → Verify email with token from email
+3. POST /auth/login → Get access_token
+4. POST /rooms → Create a room (get room_code)
+5. POST /posts → Create post with room_code
+6. POST /auth/logout → End session (optional)
 ```
 
 ### Joining Existing Room & Viewing Posts
@@ -90,9 +96,11 @@
 
 ### Password Reset
 ```
-1. POST /profile/change-password (with old + new password)
-2. All sessions logged out automatically
-3. POST /auth/login again with new password
+1. POST /auth/forgot-password with email
+2. Check email for reset link (includes token)
+3. POST /auth/reset-password with token + new password
+4. All sessions logged out automatically
+5. POST /auth/login again with new password
 ```
 
 ### Account Deletion
@@ -174,6 +182,7 @@ Users can create and join rooms to collaborate. Posts are scoped to rooms.
 | `age verification required` | 400 | Register |
 | `email already exists` | 409 | Register |
 | `invalid credentials` | 401 | Login |
+| `email not verified` | 403 | Login |
 | `invalid or expired refresh token` | 401 | Refresh |
 | `unauthorized` | 401 | Protected endpoints |
 | `not a member of this room` | 403 | Posts (create/view) |
@@ -251,6 +260,56 @@ curl -X POST http://localhost:8080/api/v1/auth/login \
   -d '{
     "email": "john@example.com",
     "password": "SecurePass123!"
+  }'
+```
+
+#### Verify Email
+```bash
+curl -X POST http://localhost:8080/api/v1/auth/verify-email \
+  -H "Content-Type: application/json" \
+  -d '{
+    "token": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6"
+  }'
+```
+
+#### Resend Verification Email
+```bash
+curl -X POST http://localhost:8080/api/v1/auth/resend-verification-email \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "john@example.com"
+  }'
+```
+
+**Note:** Limited to 1 resend per 2 minutes per email address.
+
+#### Forgot Password
+```bash
+curl -X POST http://localhost:8080/api/v1/auth/forgot-password \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "john@example.com"
+  }'
+```
+
+#### Resend Password Reset Email
+```bash
+curl -X POST http://localhost:8080/api/v1/auth/resend-password-reset-email \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "john@example.com"
+  }'
+```
+
+**Note:** Limited to 1 resend per 2 minutes per email address.
+
+#### Reset Password
+```bash
+curl -X POST http://localhost:8080/api/v1/auth/reset-password \
+  -H "Content-Type: application/json" \
+  -d '{
+    "token": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6",
+    "new_password": "NewSecurePass456!"
   }'
 ```
 

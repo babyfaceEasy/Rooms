@@ -41,6 +41,7 @@ var (
 )
 
 // IsValidReason checks if the provided reason is valid
+// Also normalizes shorthand versions to their full values
 func IsValidReason(reason string) bool {
 	validReasons := []ReportReason{
 		ReportReasonUnder18,
@@ -60,4 +61,22 @@ func IsValidReason(reason string) bool {
 		}
 	}
 	return false
+}
+
+// NormalizeReportReason converts shorthand variations to the canonical reason string
+func NormalizeReportReason(reason string) string {
+	// Map common variations to their canonical values
+	reasonMap := map[string]string{
+		"dont_want_to_see":       string(ReportReasonDontWantToSee),
+		"don't_want_to_see":      string(ReportReasonDontWantToSee),
+		"dont_want_to_see_this":  string(ReportReasonDontWantToSee),
+		"don't_want_to_see_this": string(ReportReasonDontWantToSee),
+		"i_dont_want_to_see":     string(ReportReasonDontWantToSee),
+		"i_don't_want_to_see":    string(ReportReasonDontWantToSee),
+	}
+
+	if normalized, exists := reasonMap[reason]; exists {
+		return normalized
+	}
+	return reason
 }

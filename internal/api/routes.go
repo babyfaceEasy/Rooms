@@ -8,7 +8,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
-func (s *Server) registerRoutes(itemHandler *handler.ItemHandler, userHandler *handler.UserHandler, authHandler *handler.AuthHandler, roomHandler *handler.RoomHandler, postHandler *handler.PostHandler, commentHandler *handler.CommentHandler, reportHandler *handler.ReportHandler, authService service.AuthService) {
+func (s *Server) registerRoutes(itemHandler *handler.ItemHandler, userHandler *handler.UserHandler, authHandler *handler.AuthHandler, roomHandler *handler.RoomHandler, postHandler *handler.PostHandler, commentHandler *handler.CommentHandler, reportHandler *handler.ReportHandler, authService service.AuthService, emailRateLimiter fiber.Handler) {
 	s.app.Get("/health", func(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusOK).JSON(fiber.Map{
 			"status": "ok",
@@ -17,19 +17,19 @@ func (s *Server) registerRoutes(itemHandler *handler.ItemHandler, userHandler *h
 
 	// DEBUG: returns all environment variables visible to the process.
 	// This endpoint is intended for local testing only and must not be deployed to production.
-	/*
-		s.app.Get("/debug/env", func(c *fiber.Ctx) error {
-			envVars := make(map[string]string)
-			for _, env := range os.Environ() {
-				parts := strings.SplitN(env, "=", 2)
-				if len(parts) == 2 {
-					envVars[parts[0]] = parts[1]
-				}
+
+	/*s.app.Get("/debug/env", func(c *fiber.Ctx) error {
+		envVars := make(map[string]string)
+		for _, env := range os.Environ() {
+			parts := strings.SplitN(env, "=", 2)
+			if len(parts) == 2 {
+				envVars[parts[0]] = parts[1]
 			}
-			return c.JSON(fiber.Map{
-				"env": envVars,
-			})
+		}
+		return c.JSON(fiber.Map{
+			"env": envVars,
 		})
+	})
 	*/
 
 	// Public auth routes
@@ -37,6 +37,11 @@ func (s *Server) registerRoutes(itemHandler *handler.ItemHandler, userHandler *h
 	authGroup.Post("/register", userHandler.Register)
 	authGroup.Post("/login", authHandler.Login)
 	authGroup.Post("/refresh", authHandler.RefreshAccessToken)
+	authGroup.Post("/verify-email", emailRateLimiter, userHandler.VerifyEmail)
+	authGroup.Post("/resend-verification-email", emailRateLimiter, userHandler.ResendVerificationEmail)
+	authGroup.Post("/forgot-password", emailRateLimiter, userHandler.ForgotPassword)
+	authGroup.Post("/resend-password-reset-email", emailRateLimiter, userHandler.ResendPasswordResetEmail)
+	authGroup.Post("/reset-password", emailRateLimiter, userHandler.ResetPassword)
 
 	api := s.app.Group("/api/v1")
 

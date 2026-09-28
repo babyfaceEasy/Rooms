@@ -155,11 +155,13 @@ func (r *MongoUserRepository) Update(ctx context.Context, user *domain.User) err
 		bson.M{"_id": user.ID},
 		bson.M{
 			"$set": bson.M{
-				"name":            user.Name,
-				"email":           strings.ToLower(user.Email),
-				"password_hash":   user.PasswordHash,
-				"is_age_verified": user.IsAgeVerified,
-				"updated_at":      user.UpdatedAt,
+				"name":               user.Name,
+				"email":              strings.ToLower(user.Email),
+				"password_hash":      user.PasswordHash,
+				"is_age_verified":    user.IsAgeVerified,
+				"is_email_verified":  user.IsEmailVerified,
+				"profile_picture":    user.ProfilePicture,
+				"updated_at":         user.UpdatedAt,
 			},
 		},
 	)

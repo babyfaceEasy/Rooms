@@ -104,7 +104,21 @@ func main() {
 		logger,
 	)
 
-	userService := service.NewUserService(userRepo, refreshTokenRepo)
+	// Verification token repository for email verification
+	verificationTokenRepo, err := repository.NewMongoVerificationTokenRepository(mongoClient.Database(cfg.Mongo.Database))
+	if err != nil {
+		logger.Error("verification token repository initialization failed", slog.Any("error", err))
+		os.Exit(1)
+	}
+
+	// Password reset token repository
+	passwordResetTokenRepo, err := repository.NewMongoPasswordResetTokenRepository(mongoClient.Database(cfg.Mongo.Database))
+	if err != nil {
+		logger.Error("password reset token repository initialization failed", slog.Any("error", err))
+		os.Exit(1)
+	}
+
+	userService := service.NewUserService(userRepo, refreshTokenRepo, verificationTokenRepo, passwordResetTokenRepo, cfg)
 	userHandler := handler.NewUserHandler(userService, emailService, storageRepo)
 
 	// Auth services

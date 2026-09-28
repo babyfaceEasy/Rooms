@@ -45,7 +45,7 @@ POST /auth/register
 ```
 
 ### Description
-Register a new user account with name, email, password, and age verification.
+Register a new user account with name, email, password, and age verification. A verification email is sent to the provided email address — the user must verify their email before they can log in. The verification token expires after 24 hours.
 
 ### Request Headers
 ```
@@ -162,7 +162,7 @@ POST /auth/login
 ```
 
 ### Description
-Authenticate a user with email and password. Returns access and refresh tokens.
+Authenticate a user with email and password. Returns access and refresh tokens. Users must have verified their email address before they can log in — a 403 error is returned if the email is not yet verified.
 
 ### Request Headers
 ```
@@ -220,6 +220,14 @@ Content-Type: application/json
 {
   "error": "invalid credentials",
   "status": 401
+}
+```
+
+**403 Forbidden - Email Not Verified**
+```json
+{
+  "error": "please verify your email address before logging in",
+  "status": 403
 }
 ```
 
@@ -320,7 +328,397 @@ curl -X POST http://localhost:8080/api/v1/auth/refresh \
 
 ---
 
-## 4. Logout
+## 4. Verify Email
+
+### Endpoint
+```
+POST /auth/verify-email
+```
+
+### Description
+Verify a user's email address using the verification token sent during registration. Users must verify their email before they can log in.
+
+### Request Headers
+```
+Content-Type: application/json
+```
+
+### Request Body
+```json
+{
+  "token": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6"
+}
+```
+
+### Request Body Schema
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `token` | string | Yes | Verification token received in the registration email |
+
+### Response (200 OK)
+```json
+{
+  "message": "Email verified successfully"
+}
+```
+
+### Error Responses
+
+**400 Bad Request - Missing Token**
+```json
+{
+  "error": "invalid input",
+  "status": 400
+}
+```
+
+**400 Bad Request - Token Expired**
+```json
+{
+  "error": "invalid input",
+  "status": 400
+}
+```
+
+**400 Bad Request - Token Already Used**
+```json
+{
+  "error": "invalid input",
+  "status": 400
+}
+```
+
+**400 Bad Request - Invalid Token**
+```json
+{
+  "error": "invalid input",
+  "status": 400
+}
+```
+
+### Example cURL
+```bash
+curl -X POST http://localhost:8080/api/v1/auth/verify-email \
+  -H "Content-Type: application/json" \
+  -d '{
+    "token": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6"
+  }'
+```
+
+### Notes
+- Verification token expires after 24 hours
+- Token is one-time use only
+- If the token expires, the user must re-register or request support
+
+---
+
+## 5. Resend Verification Email
+
+### Endpoint
+```
+POST /auth/resend-verification-email
+```
+
+### Description
+Request a new verification email if the original one was not delivered or the user needs a fresh verification code. A new 6-character verification token is generated and sent to the user's email. Returns the same response regardless of whether the email exists (prevents email enumeration).
+
+**Rate Limiting:** Limited to 5 requests per IP per 1 hour. Per-user cooldown: 2 minutes between resend requests (configurable via `TOKEN_RESEND_COOLDOWN`).
+
+### Request Headers
+```
+Content-Type: application/json
+```
+
+### Request Body
+```json
+{
+  "email": "john@example.com"
+}
+```
+
+### Request Body Schema
+| Field | Type | Required |
+|-------|------|----------|
+| `email` | string | Yes |
+
+### Response (200 OK)
+```json
+{
+  "message": "If an account with this email exists and is not verified, a verification email has been sent."
+}
+```
+
+### Error Responses
+
+**400 Bad Request - Missing Email**
+```json
+{
+  "error": "invalid input",
+  "status": 400
+}
+```
+
+**400 Bad Request - Resend Too Soon**
+```json
+{
+  "error": "invalid input",
+  "status": 400
+}
+```
+
+**429 Too Many Requests - Rate Limited**
+```json
+{
+  "error": "rate limited",
+  "code": "RATE_LIMITED",
+  "status": 429
+}
+```
+
+### Example cURL
+```bash
+curl -X POST http://localhost:8080/api/v1/auth/resend-verification-email \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "john@example.com"
+  }'
+```
+
+### Notes
+- Always returns 200 to prevent email enumeration
+- New verification token expires after 24 hours
+- Token is one-time use only
+- Per-user cooldown: users must wait 2 minutes (default, configurable) between resend requests
+- Global rate limit: 5 requests per IP per 1 hour
+- Sends email with `verification_url` and `verification_token` (6-char code) in dynamic template data
+
+---
+
+## 6. Forgot Password
+
+### Endpoint
+```
+POST /auth/forgot-password
+```
+
+### Description
+Request a password reset email. If the email exists on an account, a reset token is generated and sent via email. Returns the same response regardless of whether the email exists (prevents email enumeration).
+
+### Request Headers
+```
+Content-Type: application/json
+```
+
+### Request Body
+```json
+{
+  "email": "john@example.com"
+}
+```
+
+### Request Body Schema
+| Field | Type | Required |
+|-------|------|----------|
+| `email` | string | Yes |
+
+### Response (200 OK)
+```json
+{
+  "message": "If an account with this email exists, a password reset link has been sent."
+}
+```
+
+### Error Responses
+
+**400 Bad Request - Missing Email**
+```json
+{
+  "error": "invalid input",
+  "status": 400
+}
+```
+
+### Example cURL
+```bash
+curl -X POST http://localhost:8080/api/v1/auth/forgot-password \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "john@example.com"
+  }'
+```
+
+### Notes
+- Always returns 200 to prevent email enumeration
+- Reset token expires after 1 hour
+- Sends email with `reset_url` and `reset_token` in dynamic template data
+
+---
+
+## 6.5. Resend Password Reset Email
+
+### Endpoint
+```
+POST /auth/resend-password-reset-email
+```
+
+### Description
+Resend a password reset email if the user didn't receive the initial email or the token expired. Enforces a 2-minute cooldown between resend attempts to prevent abuse. Returns the same response regardless of whether the email exists (prevents email enumeration).
+
+### Request Headers
+```
+Content-Type: application/json
+```
+
+### Request Body
+```json
+{
+  "email": "john@example.com"
+}
+```
+
+### Request Body Schema
+| Field | Type | Required |
+|-------|------|----------|
+| `email` | string | Yes |
+
+### Response (200 OK)
+```json
+{
+  "message": "If an account with this email exists, a password reset email has been sent."
+}
+```
+
+### Error Responses
+
+**400 Bad Request - Missing Email**
+```json
+{
+  "error": "invalid input",
+  "status": 400
+}
+```
+
+**400 Bad Request - Resend Too Soon**
+```json
+{
+  "error": "invalid input",
+  "status": 400,
+  "message": "password reset email resend too soon, try again in 1m45s"
+}
+```
+
+### Example cURL
+```bash
+curl -X POST http://localhost:8080/api/v1/auth/resend-password-reset-email \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "john@example.com"
+  }'
+```
+
+### Notes
+- Always returns 200 to prevent email enumeration
+- Per-user cooldown: users must wait 2 minutes (default, configurable) between resend requests
+- Reset token expires after 1 hour
+- Generates a new reset token, invalidating any previous tokens for the user
+- Sends email with `reset_url` and `reset_token` in dynamic template data
+
+---
+
+## 7. Reset Password
+
+### Endpoint
+```
+POST /auth/reset-password
+```
+
+### Description
+Reset a user's password using a valid reset token received via email. Invalidates all refresh tokens, logging out all devices.
+
+### Request Headers
+```
+Content-Type: application/json
+```
+
+### Request Body
+```json
+{
+  "token": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6",
+  "new_password": "NewSecurePass456!"
+}
+```
+
+### Request Body Schema
+| Field | Type | Required | Constraints |
+|-------|------|----------|-------------|
+| `token` | string | Yes | Reset token from email |
+| `new_password` | string | Yes | Min 8 chars, 1 uppercase, 1 lowercase, 1 digit, 1 special char |
+
+### Response (200 OK)
+```json
+{
+  "message": "Password has been reset successfully. Please log in with your new password."
+}
+```
+
+### Error Responses
+
+**400 Bad Request - Missing Fields**
+```json
+{
+  "error": "invalid input",
+  "status": 400
+}
+```
+
+**400 Bad Request - Token Expired**
+```json
+{
+  "error": "invalid input",
+  "status": 400
+}
+```
+
+**400 Bad Request - Token Already Used**
+```json
+{
+  "error": "invalid input",
+  "status": 400
+}
+```
+
+**400 Bad Request - Invalid Token**
+```json
+{
+  "error": "invalid input",
+  "status": 400
+}
+```
+
+**400 Bad Request - Weak Password**
+```json
+{
+  "error": "invalid password",
+  "status": 400
+}
+```
+
+### Important Notes
+⚠️ **All refresh tokens are immediately invalidated.** User must login again with the new password on all devices.
+
+### Example cURL
+```bash
+curl -X POST http://localhost:8080/api/v1/auth/reset-password \
+  -H "Content-Type: application/json" \
+  -d '{
+    "token": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6",
+    "new_password": "NewSecurePass456!"
+  }'
+```
+
+---
+
+## 8. Logout
 
 ### Endpoint
 ```
@@ -371,7 +769,7 @@ curl -X POST http://localhost:8080/api/v1/auth/logout \
 
 ---
 
-## 5. View Profile
+## 9. View Profile
 
 ### Endpoint
 ```
@@ -437,7 +835,7 @@ curl -X GET http://localhost:8080/api/v1/profile \
 
 ---
 
-## 6. Update Profile
+## 9. Update Profile
 
 ### Endpoint
 ```
@@ -517,7 +915,7 @@ curl -X PATCH http://localhost:8080/api/v1/profile \
 
 ---
 
-## 7. Change Password
+## 10. Change Password
 
 ### Endpoint
 ```
@@ -624,7 +1022,7 @@ curl -X POST http://localhost:8080/api/v1/profile/change-password \
 
 ---
 
-## 8. Delete Account
+## 11. Delete Account
 
 ### Endpoint
 ```
@@ -740,9 +1138,19 @@ Passwords must meet the following criteria:
 
 ### Registration → Login Flow
 ```
-1. POST /auth/register → Get user ID
-2. POST /auth/login → Get access + refresh tokens
-3. Use access_token in Authorization header for protected endpoints
+1. POST /auth/register → Get user ID (verification email sent)
+2. POST /auth/verify-email → Verify email with token
+3. POST /auth/login → Get access + refresh tokens
+4. Use access_token in Authorization header for protected endpoints
+```
+
+### Password Reset Flow
+```
+1. POST /auth/forgot-password with email
+2. Check email for reset link (includes token)
+3. POST /auth/reset-password with token + new password
+4. All refresh tokens invalidated
+5. POST /auth/login again with new password
 ```
 
 ### Token Refresh Flow
