@@ -87,7 +87,7 @@ func (s *emailService) SendVerificationEmail(ctx context.Context, userID primiti
 	}
 
 	// Send email via SendGrid
-	msgID, err := s.sendEmail(ctx, recipientEmail, s.verificationTplID, dynamicData)
+	msgID, err := s.sendEmail(ctx, recipientEmail, s.verificationTplID, "Verify your Email Address", dynamicData)
 	if err != nil {
 		// Update status to failed in database
 		errMsg := err.Error()
@@ -96,7 +96,11 @@ func (s *emailService) SendVerificationEmail(ctx context.Context, userID primiti
 			s.logger.ErrorContext(ctx, "failed to update email status", "email_id", savedEmail.ID.Hex(), "error", updateErr)
 		}
 		if s.logger != nil {
-			s.logger.ErrorContext(ctx, "failed to send verification email", "user_id", userID.Hex(), "error", err)
+			s.logger.ErrorContext(ctx, "failed to send verification email",
+				"user_id", userID.Hex(),
+				"recipient_email", recipientEmail,
+				"sender_email", s.senderEmail,
+				"error", err)
 		}
 		return &domain.EmailSendResult{
 			Success:      false,
@@ -155,7 +159,7 @@ func (s *emailService) SendPasswordResetEmail(ctx context.Context, userID primit
 	}
 
 	// Send email via SendGrid
-	msgID, err := s.sendEmail(ctx, recipientEmail, s.passwordResetTplID, dynamicData)
+	msgID, err := s.sendEmail(ctx, recipientEmail, s.passwordResetTplID, "Reset your Password", dynamicData)
 	if err != nil {
 		// Update status to failed in database
 		errMsg := err.Error()
@@ -164,7 +168,11 @@ func (s *emailService) SendPasswordResetEmail(ctx context.Context, userID primit
 			s.logger.ErrorContext(ctx, "failed to update email status", "email_id", savedEmail.ID.Hex(), "error", updateErr)
 		}
 		if s.logger != nil {
-			s.logger.ErrorContext(ctx, "failed to send password reset email", "user_id", userID.Hex(), "error", err)
+			s.logger.ErrorContext(ctx, "failed to send password reset email",
+				"user_id", userID.Hex(),
+				"recipient_email", recipientEmail,
+				"sender_email", s.senderEmail,
+				"error", err)
 		}
 		return &domain.EmailSendResult{
 			Success:      false,
@@ -193,13 +201,13 @@ func (s *emailService) SendPasswordResetEmail(ctx context.Context, userID primit
 }
 
 // sendEmail is a helper that sends an email via SendGrid using dynamic templates.
-func (s *emailService) sendEmail(ctx context.Context, recipientEmail, templateID string, dynamicData map[string]string) (string, error) {
-	from := mail.NewEmail("Temp Backend", s.senderEmail)
+func (s *emailService) sendEmail(ctx context.Context, recipientEmail, templateID, subject string, dynamicData map[string]string) (string, error) {
+	from := mail.NewEmail("Tepbak", s.senderEmail)
 	to := mail.NewEmail("User", recipientEmail)
 
 	m := mail.NewV3Mail()
 	m.SetFrom(from)
-	m.Subject = "Email Notification"
+	m.Subject = subject
 	m.SetTemplateID(templateID)
 
 	// Create personalization with recipient and dynamic data
@@ -214,13 +222,35 @@ func (s *emailService) sendEmail(ctx context.Context, recipientEmail, templateID
 	p.DynamicTemplateData = dynamicDataInterface
 	m.AddPersonalizations(p)
 
+	if s.logger != nil {
+		s.logger.DebugContext(ctx, "sending email via SendGrid",
+			"from_email", s.senderEmail,
+			"to_email", recipientEmail,
+			"template_id", templateID)
+	}
+
 	response, err := s.sendgridClient.SendWithContext(ctx, m)
 	if err != nil {
+		if s.logger != nil {
+			s.logger.ErrorContext(ctx, "sendgrid send error",
+				"from_email", s.senderEmail,
+				"to_email", recipientEmail,
+				"template_id", templateID,
+				"error", err)
+		}
 		return "", fmt.Errorf("sendgrid send failed: %w", err)
 	}
 
 	// Check response status code
 	if response.StatusCode >= 400 {
+		if s.logger != nil {
+			s.logger.ErrorContext(ctx, "sendgrid returned error status",
+				"from_email", s.senderEmail,
+				"to_email", recipientEmail,
+				"template_id", templateID,
+				"status_code", response.StatusCode,
+				"response_body", response.Body)
+		}
 		return "", fmt.Errorf("sendgrid returned status %d: %s", response.StatusCode, response.Body)
 	}
 
