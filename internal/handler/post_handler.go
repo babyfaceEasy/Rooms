@@ -43,21 +43,23 @@ type PostResponse struct {
 
 // PostHandler handles post-related endpoints
 type PostHandler struct {
-	svc        service.PostService
-	storage    repository.ObjectStorage
-	roomRepo   repository.RoomRepository
-	userRepo   repository.UserRepository
-	sseManager *service.SSEManager
+	svc              service.PostService
+	storage          repository.ObjectStorage
+	roomRepo         repository.RoomRepository
+	userRepo         repository.UserRepository
+	sseManager       *service.SSEManager
+	appSyncPublisher *service.AppSyncRealtimePublisher
 }
 
 // NewPostHandler creates a new post handler
-func NewPostHandler(svc service.PostService, storage repository.ObjectStorage, roomRepo repository.RoomRepository, userRepo repository.UserRepository, sseManager *service.SSEManager) *PostHandler {
+func NewPostHandler(svc service.PostService, storage repository.ObjectStorage, roomRepo repository.RoomRepository, userRepo repository.UserRepository, sseManager *service.SSEManager, appSyncPublisher *service.AppSyncRealtimePublisher) *PostHandler {
 	return &PostHandler{
-		svc:        svc,
-		storage:    storage,
-		roomRepo:   roomRepo,
-		userRepo:   userRepo,
-		sseManager: sseManager,
+		svc:              svc,
+		storage:          storage,
+		roomRepo:         roomRepo,
+		userRepo:         userRepo,
+		sseManager:       sseManager,
+		appSyncPublisher: appSyncPublisher,
 	}
 }
 
@@ -194,8 +196,13 @@ func (h *PostHandler) CreatePost(c *fiber.Ctx) error {
 	// Convert domain Post to PostResponse using helper
 	response := h.toPostResponse(post, room, userName, userProfilePicture, userObjID)
 
-	// Publish SSE event to room subscribers
-	h.sseManager.PublishNewPost(room.ID.Hex(), post.ID.Hex(), response)
+	// Publish realtime events to both SSE subscribers and AppSync
+	if h.sseManager != nil {
+		h.sseManager.PublishNewPost(room.ID.Hex(), post.ID.Hex(), response)
+	}
+	if h.appSyncPublisher != nil {
+		h.appSyncPublisher.PublishNewPost(room.ID.Hex(), post.ID.Hex(), response)
+	}
 
 	return c.Status(fiber.StatusCreated).JSON(map[string]interface{}{
 		"data":    response,

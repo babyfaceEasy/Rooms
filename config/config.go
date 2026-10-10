@@ -57,6 +57,12 @@ type Config struct {
 		MaxReportsPerDay        int
 		AutoSoftDeleteThreshold int
 	}
+	AppSync struct {
+		Enabled  bool
+		Endpoint string
+		APIKey   string
+		Region   string
+	}
 }
 
 // Load reads configuration from environment variables and applies sensible defaults.
@@ -94,6 +100,11 @@ func Load() (Config, error) {
 
 	cfg.Reporting.MaxReportsPerDay = getInt("MAX_REPORTS_PER_DAY", 10)
 	cfg.Reporting.AutoSoftDeleteThreshold = getInt("AUTO_SOFT_DELETE_REPORT_THRESHOLD", 15)
+
+	cfg.AppSync.Enabled = parseBool(getEnv("APPSYNC_ENABLED", "false"))
+	cfg.AppSync.Endpoint = getEnv("APPSYNC_ENDPOINT", "")
+	cfg.AppSync.APIKey = getEnv("APPSYNC_API_KEY", "")
+	cfg.AppSync.Region = getEnv("AWS_REGION", "us-east-1")
 
 	cfg.SendGrid.APIKey = getEnv("SENDGRID_API_KEY", "")
 	cfg.SendGrid.SenderEmail = getEnv("SENDGRID_SENDER_EMAIL", "noreply@tempbackend.com")
