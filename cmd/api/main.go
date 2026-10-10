@@ -131,16 +131,17 @@ func main() {
 	// Post repositories and service
 	postRepo := repository.NewMongoPostRepository(mongoClient.Database(cfg.Mongo.Database))
 
-	// SSE Manager for real-time post updates
+	// Realtime managers for event publication
 	sseManager := service.NewSSEManager()
+	appSyncPublisher := service.NewAppSyncRealtimePublisher(cfg.AppSync.Endpoint, cfg.AppSync.APIKey, cfg.AppSync.Enabled, logger)
 
 	postService := service.NewPostService(postRepo, roomRepo, sseManager)
-	postHandler := handler.NewPostHandler(postService, storageRepo, roomRepo, userRepo, sseManager)
+	postHandler := handler.NewPostHandler(postService, storageRepo, roomRepo, userRepo, sseManager, appSyncPublisher)
 
 	// Comment repositories and service
 	commentRepo := repository.NewMongoCommentRepository(mongoClient.Database(cfg.Mongo.Database).Collection("comments"), postRepo)
 	commentService := service.NewCommentService(commentRepo, postRepo, roomRepo)
-	commentHandler := handler.NewCommentHandler(commentService, userRepo, postRepo, sseManager)
+	commentHandler := handler.NewCommentHandler(commentService, userRepo, postRepo, sseManager, appSyncPublisher)
 
 	// Room service (now that postRepo and commentRepo are ready)
 	roomService := service.NewRoomService(roomRepo, userRepo, postRepo, commentRepo)
