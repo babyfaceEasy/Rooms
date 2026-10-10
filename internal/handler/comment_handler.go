@@ -15,19 +15,21 @@ import (
 
 // CommentHandler handles HTTP requests for comments
 type CommentHandler struct {
-	svc        service.CommentService
-	userRepo   repository.UserRepository
-	postRepo   repository.PostRepository
-	sseManager *service.SSEManager
+	svc              service.CommentService
+	userRepo         repository.UserRepository
+	postRepo         repository.PostRepository
+	sseManager       *service.SSEManager
+	appSyncPublisher *service.AppSyncRealtimePublisher
 }
 
 // NewCommentHandler creates a new CommentHandler
-func NewCommentHandler(svc service.CommentService, userRepo repository.UserRepository, postRepo repository.PostRepository, sseManager *service.SSEManager) *CommentHandler {
+func NewCommentHandler(svc service.CommentService, userRepo repository.UserRepository, postRepo repository.PostRepository, sseManager *service.SSEManager, appSyncPublisher *service.AppSyncRealtimePublisher) *CommentHandler {
 	return &CommentHandler{
-		svc:        svc,
-		userRepo:   userRepo,
-		postRepo:   postRepo,
-		sseManager: sseManager,
+		svc:              svc,
+		userRepo:         userRepo,
+		postRepo:         postRepo,
+		sseManager:       sseManager,
+		appSyncPublisher: appSyncPublisher,
 	}
 }
 
@@ -103,8 +105,13 @@ func (h *CommentHandler) CreateComment(c *fiber.Ctx) error {
 	// Convert to response
 	response := h.toCommentResponse(comment, userName, userPhoto)
 
-	// Publish SSE event to post subscribers
-	h.sseManager.PublishCommentCreated(postObjID.Hex(), comment.ID.Hex(), response)
+	// Publish realtime events to both SSE subscribers and AppSync
+	if h.sseManager != nil {
+		h.sseManager.PublishCommentCreated(postObjID.Hex(), comment.ID.Hex(), response)
+	}
+	if h.appSyncPublisher != nil {
+		h.appSyncPublisher.PublishCommentCreated(postObjID.Hex(), comment.ID.Hex(), response)
+	}
 
 	return c.Status(fiber.StatusCreated).JSON(map[string]interface{}{
 		"data":    response,
