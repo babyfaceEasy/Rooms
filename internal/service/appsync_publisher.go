@@ -126,6 +126,15 @@ func (p *AppSyncRealtimePublisher) publish(eventType, resourceID, objectID strin
 	req.Header.Set("x-api-key", p.apiKey)
 	req.Header.Set("X-Api-User-Agent", "temp_backend/1.0")
 
+	// Debug: Log request details before sending
+	if p.logger != nil && p.logger.Enabled(context.Background(), slog.LevelDebug) {
+		p.logger.Debug("appsync event request sending",
+			slog.String("endpoint", p.endpoint),
+			slog.String("method", http.MethodPost),
+			slog.String("body", string(jsonBody)),
+		)
+	}
+
 	resp, err := p.client.Do(req)
 	if err != nil {
 		if p.logger != nil {
