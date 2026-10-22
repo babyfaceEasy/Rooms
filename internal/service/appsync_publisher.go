@@ -101,6 +101,15 @@ func (p *AppSyncRealtimePublisher) publish(eventType, resourceID, objectID strin
 		return
 	}
 
+	// Debug: Log the payload being sent
+	if p.logger != nil && p.logger.Enabled(context.Background(), slog.LevelDebug) {
+		p.logger.Debug("appsync event payload details",
+			slog.String("event_type", eventType),
+			slog.String("payload_json", string(jsonBody)),
+			slog.Int("events_count", len(payload["events"].([]string))),
+		)
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -146,6 +155,7 @@ func (p *AppSyncRealtimePublisher) publish(eventType, resourceID, objectID strin
 
 	if p.logger != nil && p.logger.Enabled(context.Background(), slog.LevelDebug) {
 		p.logger.Debug("appsync event published",
+			slog.String("channel", "default/channel"),
 			slog.String("event_type", eventType),
 			slog.String("resource_id", resourceID),
 			slog.String("object_id", objectID),
