@@ -40,12 +40,12 @@ var (
 	ErrTokenExpired            = &AppError{Code: "TOKEN_EXPIRED", Message: "Token has expired", HTTPStatus: http.StatusUnauthorized}
 	ErrTokenInvalid            = &AppError{Code: "TOKEN_INVALID", Message: "Invalid token", HTTPStatus: http.StatusUnauthorized}
 	ErrTokenNotFound           = &AppError{Code: "TOKEN_NOT_FOUND", Message: "Token not found", HTTPStatus: http.StatusNotFound}
-	ErrCodeAlreadyExists       = &AppError{Code: "CODE_ALREADY_EXISTS", Message: "Room code already exists", HTTPStatus: http.StatusConflict}
-	ErrRoomNotFound            = &AppError{Code: "ROOM_NOT_FOUND", Message: "This room doesn't exist or has been deleted", HTTPStatus: http.StatusNotFound}
-	ErrNotRoomMember           = &AppError{Code: "NOT_ROOM_MEMBER", Message: "You are not a member of this room", HTTPStatus: http.StatusForbidden}
-	ErrCannotJoinOwnRoom       = &AppError{Code: "CANNOT_JOIN_OWN_ROOM", Message: "You are the creator of this room and are already a member", HTTPStatus: http.StatusBadRequest}
-	ErrOwnerCannotLeaveRoom    = &AppError{Code: "OWNER_CANNOT_LEAVE", Message: "Room owners cannot leave their own room. Delete the room instead.", HTTPStatus: http.StatusForbidden}
-	ErrRoomFull                = &AppError{Code: "ROOM_FULL", Message: "This room is full. Maximum capacity is 10 members.", HTTPStatus: http.StatusBadRequest}
+	ErrCodeAlreadyExists       = &AppError{Code: "CODE_ALREADY_EXISTS", Message: "Patch code already exists", HTTPStatus: http.StatusConflict}
+	ErrRoomNotFound            = &AppError{Code: "ROOM_NOT_FOUND", Message: "This patch doesn't exist or has been deleted", HTTPStatus: http.StatusNotFound}
+	ErrNotRoomMember           = &AppError{Code: "NOT_ROOM_MEMBER", Message: "You are not a member of this patch", HTTPStatus: http.StatusForbidden}
+	ErrCannotJoinOwnRoom       = &AppError{Code: "CANNOT_JOIN_OWN_ROOM", Message: "You are the creator of this patch and are already a member", HTTPStatus: http.StatusBadRequest}
+	ErrOwnerCannotLeaveRoom    = &AppError{Code: "OWNER_CANNOT_LEAVE", Message: "Patch owners cannot leave their own patch. Delete the patch instead.", HTTPStatus: http.StatusForbidden}
+	ErrRoomFull                = &AppError{Code: "ROOM_FULL", Message: "This patch is full. Maximum capacity is 10 members.", HTTPStatus: http.StatusBadRequest}
 	ErrEmailNotVerified        = &AppError{Code: "EMAIL_NOT_VERIFIED", Message: "Please verify your email address before logging in", HTTPStatus: http.StatusForbidden}
 
 	// 5xx errors
