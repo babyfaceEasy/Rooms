@@ -83,10 +83,10 @@ func (h *PostHandler) CreatePost(c *fiber.Ctx) error {
 		return domain.ErrPostTextRequired
 	}
 
-	// Parse room_code from form data
-	roomCode := c.FormValue("room_code")
+	// Parse patch_code from form data
+	roomCode := c.FormValue("patch_code")
 	if roomCode == "" {
-		return &domain.AppError{Code: "ROOM_CODE_REQUIRED", Message: "room_code is required", HTTPStatus: fiber.StatusBadRequest}
+		return &domain.AppError{Code: "PATCH_CODE_REQUIRED", Message: "patch_code is required", HTTPStatus: fiber.StatusBadRequest}
 	}
 
 	// Get room by code
@@ -289,10 +289,10 @@ func (h *PostHandler) GetPostsByRoomCode(c *fiber.Ctx) error {
 		return &domain.AppError{Code: "INVALID_USER_ID", Message: "Invalid user ID", HTTPStatus: fiber.StatusBadRequest}
 	}
 
-	// Get room code from URL parameter
+	// Get patch code from URL parameter
 	roomCode := c.Params("code")
 	if roomCode == "" {
-		return &domain.AppError{Code: "ROOM_CODE_REQUIRED", Message: "room_code is required", HTTPStatus: fiber.StatusBadRequest}
+		return &domain.AppError{Code: "PATCH_CODE_REQUIRED", Message: "patch_code is required", HTTPStatus: fiber.StatusBadRequest}
 	}
 
 	// Parse pagination query params
@@ -475,6 +475,27 @@ func (h *PostHandler) ValidatePost(c *fiber.Ctx) error {
 		userProfilePicture = postUser.ProfilePicture
 	}
 
+	// Look up reactor name and profile picture for AppSync event
+	reactorUser, err := h.userRepo.GetByID(c.UserContext(), userObjID)
+	var reactorName string
+	var reactorProfilePicture string
+	if err == nil && reactorUser != nil {
+		reactorName = reactorUser.Name
+		reactorProfilePicture = reactorUser.ProfilePicture
+	}
+
+	// Publish post_validated event to AppSync in background (non-blocking)
+	if h.appSyncPublisher != nil && h.appSyncPublisher.IsEnabled() {
+		appSyncData := map[string]interface{}{
+			"postId":                 postID,
+			"reactorUserId":          userID,
+			"reactorName":            reactorName,
+			"reactorProfilePicture":  reactorProfilePicture,
+			"totalValidationCount":   len(updatedPost.Validations),
+		}
+		go h.appSyncPublisher.PublishPostValidated(postID, userID, appSyncData)
+	}
+
 	room, err := h.roomRepo.GetByID(c.UserContext(), updatedPost.RoomID)
 	if err != nil {
 		return err
@@ -528,6 +549,31 @@ func (h *PostHandler) RemoveValidation(c *fiber.Ctx) error {
 	// Remove validation
 	if err := h.svc.RemoveValidation(c.UserContext(), postObjID, userObjID); err != nil {
 		return err
+	}
+
+	// Get updated post for validation count and reactor info
+	updatedPost, err := h.svc.GetPost(c.UserContext(), postObjID)
+	if err == nil && updatedPost != nil {
+		// Look up reactor name and profile picture for AppSync event
+		reactorUser, err := h.userRepo.GetByID(c.UserContext(), userObjID)
+		var reactorName string
+		var reactorProfilePicture string
+		if err == nil && reactorUser != nil {
+			reactorName = reactorUser.Name
+			reactorProfilePicture = reactorUser.ProfilePicture
+		}
+
+		// Publish post_validation_removed event to AppSync in background (non-blocking)
+		if h.appSyncPublisher != nil && h.appSyncPublisher.IsEnabled() {
+			appSyncData := map[string]interface{}{
+				"postId":                 postID,
+				"reactorUserId":          userID,
+				"reactorName":            reactorName,
+				"reactorProfilePicture":  reactorProfilePicture,
+				"totalValidationCount":   len(updatedPost.Validations),
+			}
+			go h.appSyncPublisher.PublishPostValidationRemoved(postID, userID, appSyncData)
+		}
 	}
 
 	return c.Status(fiber.StatusOK).JSON(map[string]interface{}{
@@ -589,6 +635,27 @@ func (h *PostHandler) RespectPost(c *fiber.Ctx) error {
 		userProfilePicture = postUser.ProfilePicture
 	}
 
+	// Look up reactor name and profile picture for AppSync event
+	reactorUser, err := h.userRepo.GetByID(c.UserContext(), userObjID)
+	var reactorName string
+	var reactorProfilePicture string
+	if err == nil && reactorUser != nil {
+		reactorName = reactorUser.Name
+		reactorProfilePicture = reactorUser.ProfilePicture
+	}
+
+	// Publish post_respected event to AppSync in background (non-blocking)
+	if h.appSyncPublisher != nil && h.appSyncPublisher.IsEnabled() {
+		appSyncData := map[string]interface{}{
+			"postId":                postID,
+			"reactorUserId":         userID,
+			"reactorName":           reactorName,
+			"reactorProfilePicture": reactorProfilePicture,
+			"totalRespectCount":     len(updatedPost.Respects),
+		}
+		go h.appSyncPublisher.PublishPostRespected(postID, userID, appSyncData)
+	}
+
 	room, err := h.roomRepo.GetByID(c.UserContext(), updatedPost.RoomID)
 	if err != nil {
 		return err
@@ -642,6 +709,31 @@ func (h *PostHandler) RemoveRespect(c *fiber.Ctx) error {
 	// Remove respect
 	if err := h.svc.RemoveRespect(c.UserContext(), postObjID, userObjID); err != nil {
 		return err
+	}
+
+	// Get updated post for respect count and reactor info
+	updatedPost, err := h.svc.GetPost(c.UserContext(), postObjID)
+	if err == nil && updatedPost != nil {
+		// Look up reactor name and profile picture for AppSync event
+		reactorUser, err := h.userRepo.GetByID(c.UserContext(), userObjID)
+		var reactorName string
+		var reactorProfilePicture string
+		if err == nil && reactorUser != nil {
+			reactorName = reactorUser.Name
+			reactorProfilePicture = reactorUser.ProfilePicture
+		}
+
+		// Publish post_respect_removed event to AppSync in background (non-blocking)
+		if h.appSyncPublisher != nil && h.appSyncPublisher.IsEnabled() {
+			appSyncData := map[string]interface{}{
+				"postId":                postID,
+				"reactorUserId":         userID,
+				"reactorName":           reactorName,
+				"reactorProfilePicture": reactorProfilePicture,
+				"totalRespectCount":     len(updatedPost.Respects),
+			}
+			go h.appSyncPublisher.PublishPostRespectRemoved(postID, userID, appSyncData)
+		}
 	}
 
 	return c.Status(fiber.StatusOK).JSON(map[string]interface{}{
@@ -742,10 +834,10 @@ func (h *PostHandler) StreamNewPosts(c *fiber.Ctx) error {
 		return &domain.AppError{Code: "INVALID_USER_ID", Message: "Invalid user ID", HTTPStatus: fiber.StatusBadRequest}
 	}
 
-	// Get room code from query parameter
-	roomCode := c.Query("room_code")
+	// Get patch code from query parameter
+	roomCode := c.Query("patch_code")
 	if roomCode == "" {
-		return &domain.AppError{Code: "ROOM_CODE_REQUIRED", Message: "room_code query parameter is required", HTTPStatus: fiber.StatusBadRequest}
+		return &domain.AppError{Code: "PATCH_CODE_REQUIRED", Message: "patch_code query parameter is required", HTTPStatus: fiber.StatusBadRequest}
 	}
 
 	// Get room by code
