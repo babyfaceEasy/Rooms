@@ -61,6 +61,34 @@ func (p *AppSyncRealtimePublisher) PublishCommentCreated(postID, commentID strin
 	p.publish("new_comment", postID, commentID, data)
 }
 
+// PublishPostValidated publishes a post_validated event when a user validates a post.
+// postID is the post identifier.
+// data should contain reactor name, profile picture, and updated validation count.
+func (p *AppSyncRealtimePublisher) PublishPostValidated(postID, userID string, data interface{}) {
+	p.publish("post_validated", postID, userID, data)
+}
+
+// PublishPostValidationRemoved publishes a post_validation_removed event when a user removes their validation.
+// postID is the post identifier.
+// data should contain reactor name, profile picture, and updated validation count.
+func (p *AppSyncRealtimePublisher) PublishPostValidationRemoved(postID, userID string, data interface{}) {
+	p.publish("post_validation_removed", postID, userID, data)
+}
+
+// PublishPostRespected publishes a post_respected event when a user respects a post.
+// postID is the post identifier.
+// data should contain reactor name, profile picture, and updated respect count.
+func (p *AppSyncRealtimePublisher) PublishPostRespected(postID, userID string, data interface{}) {
+	p.publish("post_respected", postID, userID, data)
+}
+
+// PublishPostRespectRemoved publishes a post_respect_removed event when a user removes their respect.
+// postID is the post identifier.
+// data should contain reactor name, profile picture, and updated respect count.
+func (p *AppSyncRealtimePublisher) PublishPostRespectRemoved(postID, userID string, data interface{}) {
+	p.publish("post_respect_removed", postID, userID, data)
+}
+
 // publish sends an event to the AppSync Event API endpoint.
 // The event is routed to all subscribers listening for that channel.
 // AppSync Event API requires events to be stringified JSON in an array with a channel field.
