@@ -31,6 +31,10 @@ vendor/
 
 AI
 agent.md
+AGENTS.md
+secrets.txt
+.env.production
+scratches/
 
 personal
 hold.txt
@@ -39,3 +43,6 @@ builds
 temp_backend
 report_options.jpeg
 .gitignore
+main
+
+
