@@ -153,7 +153,45 @@ func main() {
 	reportService := service.NewReportService(reportRepo, notificationRepo, postRepo, cfg.Reporting.AutoSoftDeleteThreshold, cfg.Reporting.MaxReportsPerDay)
 	reportHandler := handler.NewReportHandler(reportService, cfg.Reporting.MaxReportsPerDay)
 
-	server := api.NewServer(cfg, logger, itemHandler, userHandler, authHandler, roomHandler, postHandler, commentHandler, reportHandler, authService)
+	// Device token and notification repositories and services
+	deviceTokenRepo := repository.NewMongoDeviceTokenRepository(mongoClient.Database(cfg.Mongo.Database))
+	activityCooldownRepo := repository.NewMongoActivityCooldownRepository(mongoClient.Database(cfg.Mongo.Database))
+
+	deviceTokenService := service.NewDeviceTokenService(deviceTokenRepo)
+	activityCooldownService := service.NewActivityCooldownService(activityCooldownRepo, notificationRepo, cfg.Notifications.ActivityCooldownMinutes)
+	notificationService := service.NewNotificationService(notificationRepo)
+
+	// TODO: Phase 5 - Initialize Firebase Admin SDK here
+	// var fcmClient interface{} // firebase.Messaging client
+	// if cfg.Firebase.Enabled {
+	//    firebaseApp, err := firebase.NewApp(ctx, &firebase.Config{
+	//        ServiceAccountKeyPath: cfg.Firebase.ServiceAccountKeyPath,
+	//    })
+	//    if err != nil {
+	//        logger.Error("firebase app initialization failed", slog.Any("error", err))
+	//        os.Exit(1)
+	//    }
+	//    fcmClient, err = firebaseApp.Messaging(ctx)
+	//    if err != nil {
+	//        logger.Error("firebase messaging client initialization failed", slog.Any("error", err))
+	//        os.Exit(1)
+	//    }
+	// }
+
+	// TODO: Phase 6 - Initialize FCMService and NotificationOrchestratorService
+	// fcmService := service.NewFCMService(notificationRepo, deviceTokenRepo, fcmClient)
+	// orchestratorService := service.NewNotificationOrchestratorService(
+	//     fcmService,
+	//     activityCooldownService,
+	//     deviceTokenRepo,
+	//     notificationRepo,
+	//     activityCooldownRepo,
+	// )
+
+	deviceHandler := handler.NewDeviceHandler(deviceTokenService, notificationService)
+	patchActivityHandler := handler.NewPatchActivityHandler(activityCooldownService)
+
+	server := api.NewServer(cfg, logger, itemHandler, userHandler, authHandler, roomHandler, postHandler, commentHandler, reportHandler, deviceHandler, patchActivityHandler, authService)
 
 	go func() {
 		if err := server.Start(); err != nil && !errors.Is(err, http.ErrServerClosed) {
