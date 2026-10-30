@@ -8,7 +8,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
-func (s *Server) registerRoutes(itemHandler *handler.ItemHandler, userHandler *handler.UserHandler, authHandler *handler.AuthHandler, roomHandler *handler.RoomHandler, postHandler *handler.PostHandler, commentHandler *handler.CommentHandler, reportHandler *handler.ReportHandler, authService service.AuthService, emailRateLimiter fiber.Handler) {
+func (s *Server) registerRoutes(itemHandler *handler.ItemHandler, userHandler *handler.UserHandler, authHandler *handler.AuthHandler, roomHandler *handler.RoomHandler, postHandler *handler.PostHandler, commentHandler *handler.CommentHandler, reportHandler *handler.ReportHandler, deviceHandler *handler.DeviceHandler, patchActivityHandler *handler.PatchActivityHandler, authService service.AuthService, emailRateLimiter fiber.Handler) {
 	s.app.Get("/health", func(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusOK).JSON(fiber.Map{
 			"status": "ok",
@@ -97,4 +97,15 @@ func (s *Server) registerRoutes(itemHandler *handler.ItemHandler, userHandler *h
 	apiProtected.Put("/items/:id", itemHandler.UpdateItem)
 	apiProtected.Delete("/items/:id", itemHandler.DeleteItem)
 	apiProtected.Get("/items/:id/download", itemHandler.DownloadItem)
+
+	// Device token routes (protected)
+	apiProtected.Post("/devices/register", deviceHandler.RegisterDevice)
+	apiProtected.Get("/devices", deviceHandler.GetDevices)
+	apiProtected.Delete("/devices/:tokenId", deviceHandler.UnregisterDevice)
+
+	// Notification routes (protected)
+	apiProtected.Get("/notifications/history", deviceHandler.GetNotificationHistory)
+
+	// Patch activity routes (protected)
+	apiProtected.Post("/patches/:patchId/viewed", patchActivityHandler.MarkPatchViewed)
 }
