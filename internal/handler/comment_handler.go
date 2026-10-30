@@ -2,8 +2,10 @@ package handler
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"temp_backend/internal/domain"
 	"temp_backend/internal/repository"
@@ -15,11 +17,13 @@ import (
 
 // CommentHandler handles HTTP requests for comments
 type CommentHandler struct {
-	svc              service.CommentService
-	userRepo         repository.UserRepository
-	postRepo         repository.PostRepository
-	sseManager       *service.SSEManager
-	appSyncPublisher *service.AppSyncRealtimePublisher
+	svc                          service.CommentService
+	userRepo                     repository.UserRepository
+	postRepo                     repository.PostRepository
+	roomRepo                     repository.RoomRepository
+	sseManager                   *service.SSEManager
+	appSyncPublisher             *service.AppSyncRealtimePublisher
+	notificationOrchestrator     service.NotificationOrchestratorService
 }
 
 // NewCommentHandler creates a new CommentHandler
@@ -31,6 +35,11 @@ func NewCommentHandler(svc service.CommentService, userRepo repository.UserRepos
 		sseManager:       sseManager,
 		appSyncPublisher: appSyncPublisher,
 	}
+}
+
+// SetNotificationOrchestrator sets the notification orchestrator
+func (h *CommentHandler) SetNotificationOrchestrator(orchestrator service.NotificationOrchestratorService) {
+	h.notificationOrchestrator = orchestrator
 }
 
 // CreateCommentRequest represents the request body for creating a comment
@@ -91,6 +100,28 @@ func (h *CommentHandler) CreateComment(c *fiber.Ctx) error {
 	comment, err := h.svc.CreateComment(c.UserContext(), postObjID, userObjID, req.Text)
 	if err != nil {
 		return err
+	}
+
+	// Send activity notification to room members
+	if h.notificationOrchestrator != nil {
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			// Get post to retrieve room info
+			post, err := h.postRepo.GetByID(ctx, postObjID)
+			if err == nil && post != nil {
+				// Get room to retrieve members
+				room, err := h.roomRepo.GetByID(ctx, post.RoomID)
+				if err == nil && room != nil {
+					// Notify all room members except the comment creator
+					for _, memberID := range room.Members {
+						if memberID != userObjID {
+							_ = h.notificationOrchestrator.NotifyPatchActivity(ctx, memberID, room.Name, room.ID)
+						}
+					}
+				}
+			}
+		}()
 	}
 
 	// Look up user name for the response

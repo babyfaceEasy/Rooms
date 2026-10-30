@@ -1,6 +1,10 @@
 package handler
 
 import (
+	"context"
+	"strings"
+	"time"
+
 	"temp_backend/internal/domain"
 	"temp_backend/internal/service"
 
@@ -59,7 +63,8 @@ type RoomMembersResponse struct {
 
 // RoomHandler handles room-related endpoints
 type RoomHandler struct {
-	svc service.RoomService
+	svc                    service.RoomService
+	notificationOrchestrator service.NotificationOrchestratorService
 }
 
 // UserDetailResponse represents user details in the response
@@ -75,6 +80,11 @@ type UserDetailResponse struct {
 // NewRoomHandler creates a new room handler
 func NewRoomHandler(svc service.RoomService) *RoomHandler {
 	return &RoomHandler{svc: svc}
+}
+
+// SetNotificationOrchestrator sets the notification orchestrator for sending notifications
+func (h *RoomHandler) SetNotificationOrchestrator(orchestrator service.NotificationOrchestratorService) {
+	h.notificationOrchestrator = orchestrator
 }
 
 // CreateRoom creates a new room
@@ -189,6 +199,21 @@ func (h *RoomHandler) AddUserToRoom(c *fiber.Ctx) error {
 	room, err = h.svc.AddUserToRoom(c.UserContext(), req.Code, userObjID)
 	if err != nil {
 		return err
+	}
+
+	// Send notification to newly added user
+	if h.notificationOrchestrator != nil {
+		// Get creator name from email or fallback
+		creatorName := "Someone"
+		if creatorEmail, ok := c.Locals("user_email").(string); ok && creatorEmail != "" {
+			creatorName = strings.Split(creatorEmail, "@")[0]
+		}
+		// Async notification send (don't block response)
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			_ = h.notificationOrchestrator.NotifyUserAdded(ctx, userObjID, creatorName, room.Name, room.ID)
+		}()
 	}
 
 	// Convert members to string slice for response

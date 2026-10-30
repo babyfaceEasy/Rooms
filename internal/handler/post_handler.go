@@ -2,10 +2,12 @@ package handler
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"mime/multipart"
 	"path/filepath"
+	"time"
 
 	"temp_backend/internal/domain"
 	"temp_backend/internal/repository"
@@ -43,12 +45,13 @@ type PostResponse struct {
 
 // PostHandler handles post-related endpoints
 type PostHandler struct {
-	svc              service.PostService
-	storage          repository.ObjectStorage
-	roomRepo         repository.RoomRepository
-	userRepo         repository.UserRepository
-	sseManager       *service.SSEManager
-	appSyncPublisher *service.AppSyncRealtimePublisher
+	svc                          service.PostService
+	storage                      repository.ObjectStorage
+	roomRepo                     repository.RoomRepository
+	userRepo                     repository.UserRepository
+	sseManager                   *service.SSEManager
+	appSyncPublisher             *service.AppSyncRealtimePublisher
+	notificationOrchestrator     service.NotificationOrchestratorService
 }
 
 // NewPostHandler creates a new post handler
@@ -61,6 +64,11 @@ func NewPostHandler(svc service.PostService, storage repository.ObjectStorage, r
 		sseManager:       sseManager,
 		appSyncPublisher: appSyncPublisher,
 	}
+}
+
+// SetNotificationOrchestrator sets the notification orchestrator
+func (h *PostHandler) SetNotificationOrchestrator(orchestrator service.NotificationOrchestratorService) {
+	h.notificationOrchestrator = orchestrator
 }
 
 // CreatePost creates a new post with optional file upload
@@ -182,6 +190,20 @@ func (h *PostHandler) CreatePost(c *fiber.Ctx) error {
 	post, err := h.svc.CreatePost(c.UserContext(), text, userObjID, room.ID, imageURL, videoURL, audioURL)
 	if err != nil {
 		return err
+	}
+
+	// Send activity notification to room members
+	if h.notificationOrchestrator != nil {
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			// Notify all room members except the post creator
+			for _, memberID := range room.Members {
+				if memberID != userObjID {
+					_ = h.notificationOrchestrator.NotifyPatchActivity(ctx, memberID, room.Name, room.ID)
+				}
+			}
+		}()
 	}
 
 	// Look up user name and profile picture for the response
