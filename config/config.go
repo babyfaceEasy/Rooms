@@ -63,6 +63,14 @@ type Config struct {
 		APIKey   string
 		Region   string
 	}
+	Firebase struct {
+		ServiceAccountKeyPath string
+		Enabled               bool
+	}
+	Notifications struct {
+		ActivityCooldownMinutes int
+		DeviceTokenExpiryDays  int
+	}
 }
 
 // Load reads configuration from environment variables and applies sensible defaults.
@@ -113,6 +121,12 @@ func Load() (Config, error) {
 	cfg.SendGrid.PasswordResetTemplateID = getEnv("SENDGRID_PASSWORD_RESET_TEMPLATE_ID", "d-24abe7a851db4a169f750ee1ad0d1597")
 
 	cfg.Token.ResendCooldown = parseDuration(getEnv("TOKEN_RESEND_COOLDOWN", "2m"))
+
+	cfg.Firebase.Enabled = parseBool(getEnv("FIREBASE_ENABLED", "true"))
+	cfg.Firebase.ServiceAccountKeyPath = getEnv("FIREBASE_SERVICE_ACCOUNT_KEY_PATH", "")
+
+	cfg.Notifications.ActivityCooldownMinutes = getInt("NOTIFICATION_ACTIVITY_COOLDOWN_MINUTES", 30)
+	cfg.Notifications.DeviceTokenExpiryDays = getInt("DEVICE_TOKEN_EXPIRY_DAYS", 90)
 
 	if cfg.Mongo.URI == "" {
 		return cfg, fmt.Errorf("MONGO_URI is required")
