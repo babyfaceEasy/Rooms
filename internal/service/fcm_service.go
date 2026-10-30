@@ -2,10 +2,13 @@ package service
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	"temp_backend/internal/domain"
 	"temp_backend/internal/repository"
 
+	"firebase.google.com/go/v4/messaging"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -24,19 +27,22 @@ type FCMService interface {
 type fcmService struct {
 	notificationRepo repository.NotificationRepository
 	deviceTokenRepo  repository.DeviceTokenRepository
-	fcmClient        interface{} // firebase.Messaging from Firebase Admin SDK
+	messagingClient  interface{} // *messaging.Client from Firebase Admin SDK
+	enabled          bool
 }
 
 // NewFCMService creates a new FCM service
 func NewFCMService(
 	notificationRepo repository.NotificationRepository,
 	deviceTokenRepo repository.DeviceTokenRepository,
-	fcmClient interface{},
+	messagingClient interface{},
 ) FCMService {
+	enabled := messagingClient != nil
 	return &fcmService{
 		notificationRepo: notificationRepo,
 		deviceTokenRepo:  deviceTokenRepo,
-		fcmClient:        fcmClient,
+		messagingClient:  messagingClient,
+		enabled:          enabled,
 	}
 }
 
@@ -49,7 +55,7 @@ func (s *fcmService) SendNotification(ctx context.Context, userID primitive.Obje
 	// Get all active device tokens for the user
 	activeTokens, err := s.deviceTokenRepo.GetActiveByUserID(ctx, userID)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get active tokens: %w", err)
 	}
 
 	if len(activeTokens) == 0 {
@@ -71,57 +77,112 @@ func (s *fcmService) SendToDevices(ctx context.Context, tokens []string, notific
 		return nil
 	}
 
-	if s.fcmClient == nil {
-		return domain.ErrInvalidInput // Firebase not initialized
+	if s.messagingClient == nil {
+		return fmt.Errorf("firebase messaging client not initialized")
 	}
 
-	// Cast fcmClient to Firebase Messaging client
-	// Note: This is a placeholder. In Phase 4 integration, this will use:
-	// messaging := s.fcmClient.(*firebase.App).Messaging(ctx)
-	//
-	// For now, we create the structure that Phase 5 will implement with actual Firebase calls:
-	//
-	// For each token, send:
-	// message := &messaging.Message{
-	//     Notification: &messaging.Notification{
-	//         Title: extractTitle(notification),
-	//         Body:  notification.Message,
-	//     },
-	//     Data: map[string]string{
-	//         "notification_id": notification.ID.Hex(),
-	//         "type":            string(notification.NotificationType),
-	//     },
-	//     Token: token,
-	// }
-	//
-	// resp, err := messaging.Send(ctx, message)
-	// if err != nil {
-	//     update status to failed with error
-	// } else {
-	//     update status to sent with FCM message ID
-	// }
-
-	// For Phase 4, we structure the logic without actual Firebase calls
-	// Phase 5 will implement the actual Firebase Admin SDK integration
-
-	// Record that we attempted to send
-	now := ctx.Value("timestamp")
-	if now == nil {
-		now = nil // Will use time.Now() in actual implementation
+	// Cast to Firebase messaging client
+	messagingClient, ok := s.messagingClient.(*messaging.Client)
+	if !ok {
+		return fmt.Errorf("invalid messaging client type")
 	}
 
-	// Update notification status to sent (actual Firebase call will happen in Phase 5)
-	if notification.ID.IsZero() {
-		return domain.ErrInvalidInput
+	// Build the notification message
+	message := &messaging.Message{
+		Notification: &messaging.Notification{
+			Title: s.extractTitle(notification),
+			Body:  notification.Message,
+		},
+		Data: map[string]string{
+			"notification_id":  notification.ID.Hex(),
+			"type":             string(notification.NotificationType),
+			"patch_id":         notification.PatchID.Hex(),
+			"created_at":       notification.CreatedAt.Format(time.RFC3339),
+		},
 	}
 
-	// This is where Phase 5 will integrate with actual Firebase messaging
-	// For now, we're setting up the infrastructure
+	// Track which tokens succeeded and which failed
+	var lastErr error
+	var fcmMessageID string
+	successCount := 0
+
+	// Send to each token individually (multicast not ideal for tracking individual failures)
+	for _, token := range tokens {
+		msg := *message
+		msg.Token = token
+
+		resp, err := messagingClient.Send(ctx, &msg)
+		if err != nil {
+			lastErr = err
+			// Mark device as inactive if token is invalid
+			if isInvalidTokenError(err) {
+				_ = s.deviceTokenRepo.MarkInactive(ctx, primitive.ObjectID{}) // TODO: pass actual token ID
+			}
+			continue
+		}
+
+		successCount++
+		if fcmMessageID == "" {
+			fcmMessageID = resp
+		}
+	}
+
+	// Update notification status in database
+	now := time.Now()
+
+	if successCount > 0 {
+		// At least some tokens succeeded
+		if err := s.notificationRepo.UpdateStatus(ctx, notification.ID, domain.NotificationStatusSent, now); err != nil {
+			return fmt.Errorf("failed to update notification status: %w", err)
+		}
+
+		if fcmMessageID != "" {
+			_ = s.notificationRepo.UpdateFCMMessageID(ctx, notification.ID, fcmMessageID)
+		}
+
+		return nil
+	}
+
+	// All tokens failed
+	if lastErr != nil {
+		errMsg := fmt.Sprintf("FCM send failed: %v", lastErr)
+		if err := s.notificationRepo.UpdateStatusWithError(ctx, notification.ID, domain.NotificationStatusFailed, errMsg); err != nil {
+			return fmt.Errorf("failed to update notification error status: %w", err)
+		}
+		return lastErr
+	}
 
 	return nil
 }
 
 // IsEnabled checks if FCM is configured
 func (s *fcmService) IsEnabled() bool {
-	return s.fcmClient != nil
+	return s.enabled && s.messagingClient != nil
+}
+
+// extractTitle creates a notification title from the notification type
+func (s *fcmService) extractTitle(notif *domain.Notification) string {
+	switch notif.NotificationType {
+	case domain.NotificationTypeAdded:
+		return "Added to Patch"
+	case domain.NotificationTypeJoined:
+		return "Someone Joined"
+	case domain.NotificationTypeActivity:
+		return "Patch Activity"
+	default:
+		return "Notification"
+	}
+}
+
+// isInvalidTokenError checks if an error is due to an invalid device token
+func isInvalidTokenError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	errStr := err.Error()
+	// Firebase returns errors like "registration token is invalid"
+	return errStr == "registration token is invalid" ||
+		errStr == "mismatched credential" ||
+		errStr == "third party auth error"
 }
