@@ -21,6 +21,7 @@ import (
 	"temp_backend/internal/handler"
 	"temp_backend/internal/repository"
 	"temp_backend/internal/service"
+	"temp_backend/pkg/firebase"
 	"temp_backend/pkg/mongodb"
 	pks3 "temp_backend/pkg/s3"
 	pksendgrid "temp_backend/pkg/sendgrid"
@@ -153,7 +154,52 @@ func main() {
 	reportService := service.NewReportService(reportRepo, notificationRepo, postRepo, cfg.Reporting.AutoSoftDeleteThreshold, cfg.Reporting.MaxReportsPerDay)
 	reportHandler := handler.NewReportHandler(reportService, cfg.Reporting.MaxReportsPerDay)
 
-	server := api.NewServer(cfg, logger, itemHandler, userHandler, authHandler, roomHandler, postHandler, commentHandler, reportHandler, authService)
+	// Device token and notification repositories and services
+	deviceTokenRepo := repository.NewMongoDeviceTokenRepository(mongoClient.Database(cfg.Mongo.Database))
+	activityCooldownRepo := repository.NewMongoActivityCooldownRepository(mongoClient.Database(cfg.Mongo.Database))
+
+	deviceTokenService := service.NewDeviceTokenService(deviceTokenRepo)
+	activityCooldownService := service.NewActivityCooldownService(activityCooldownRepo, notificationRepo, cfg.Notifications.ActivityCooldownMinutes)
+	notificationService := service.NewNotificationService(notificationRepo)
+
+	// Initialize Firebase Admin SDK if enabled
+	var fcmClient interface{}
+	if cfg.Firebase.Enabled {
+		if cfg.Firebase.ServiceAccountKeyPath == "" {
+			logger.Warn("firebase enabled but service account key path not provided")
+		} else {
+			_, msgClient, err := firebase.InitializeApp(ctx, cfg.Firebase.ServiceAccountKeyPath)
+			if err != nil {
+				logger.Error("firebase initialization failed", slog.Any("error", err))
+				os.Exit(1)
+			}
+			fcmClient = msgClient
+			logger.Info("firebase messaging client initialized successfully")
+		}
+	}
+
+	// Initialize FCM and orchestrator services
+	fcmService := service.NewFCMService(notificationRepo, deviceTokenRepo, fcmClient)
+	orchestratorService := service.NewNotificationOrchestratorService(
+		fcmService,
+		activityCooldownService,
+		deviceTokenRepo,
+		notificationRepo,
+		activityCooldownRepo,
+	)
+
+	deviceHandler := handler.NewDeviceHandler(deviceTokenService, notificationService)
+	patchActivityHandler := handler.NewPatchActivityHandler(activityCooldownService)
+
+	// Update handlers with orchestrator for notification triggers
+	roomHandler.SetNotificationOrchestrator(orchestratorService)
+	postHandler.SetNotificationOrchestrator(orchestratorService)
+	commentHandler.SetNotificationOrchestrator(orchestratorService)
+
+	// Start background jobs
+	go startCleanupJobs(ctx, logger, deviceTokenService, notificationRepo, cfg.Notifications.DeviceTokenExpiryDays)
+
+	server := api.NewServer(cfg, logger, itemHandler, userHandler, authHandler, roomHandler, postHandler, commentHandler, reportHandler, deviceHandler, patchActivityHandler, authService)
 
 	go func() {
 		if err := server.Start(); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -175,6 +221,39 @@ func main() {
 		os.Exit(1)
 	}
 	logger.Info("server stopped")
+}
+
+func startCleanupJobs(ctx context.Context, logger *slog.Logger, deviceTokenService service.DeviceTokenService, notificationRepo repository.NotificationRepository, expiryDays int) {
+	// Daily job to delete stale device tokens
+	ticker := time.NewTicker(24 * time.Hour)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			logger.Info("cleanup jobs stopped")
+			return
+		case <-ticker.C:
+			jobCtx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+
+			// Delete stale device tokens (older than expiryDays)
+			if err := deviceTokenService.DeleteStaleTokens(jobCtx, expiryDays); err != nil {
+				logger.Error("failed to delete stale tokens", slog.Any("error", err))
+			} else {
+				logger.Info("stale device tokens cleaned up", slog.Int("expiry_days", expiryDays))
+			}
+
+			// Delete old notifications (older than 30 days)
+			thirtyDaysAgo := time.Now().AddDate(0, 0, -30)
+			if err := notificationRepo.DeleteOlderThan(jobCtx, thirtyDaysAgo); err != nil {
+				logger.Error("failed to delete old notifications", slog.Any("error", err))
+			} else {
+				logger.Info("old notifications cleaned up")
+			}
+
+			cancel()
+		}
+	}
 }
 
 func ensureBucket(ctx context.Context, client *s3.Client, cfg config.Config) error {
