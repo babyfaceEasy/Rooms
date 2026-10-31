@@ -210,3 +210,182 @@ func (r *MongoUserRepository) SoftDelete(ctx context.Context, id primitive.Objec
 	}
 	return nil
 }
+
+// SuspendUser suspends a user account with a reason
+func (r *MongoUserRepository) SuspendUser(ctx context.Context, userID primitive.ObjectID, reason string, suspendedBy primitive.ObjectID) error {
+	now := time.Now().UTC()
+	result, err := r.collection.UpdateOne(
+		ctx,
+		bson.M{"_id": userID, "deleted_at": nil},
+		bson.M{
+			"$set": bson.M{
+				"is_suspended":      true,
+				"suspension_reason": reason,
+				"suspended_at":      now,
+				"suspended_by":      suspendedBy,
+				"updated_at":        now,
+			},
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("failed to suspend user: %w", err)
+	}
+	if result.MatchedCount == 0 {
+		return fmt.Errorf("user not found: %w", domain.ErrUserNotFound)
+	}
+	return nil
+}
+
+// UnsuspendUser unsuspends a user account
+func (r *MongoUserRepository) UnsuspendUser(ctx context.Context, userID primitive.ObjectID) error {
+	result, err := r.collection.UpdateOne(
+		ctx,
+		bson.M{"_id": userID, "deleted_at": nil},
+		bson.M{
+			"$set": bson.M{
+				"is_suspended":      false,
+				"suspension_reason": nil,
+				"suspended_at":      nil,
+				"suspended_by":      nil,
+				"updated_at":        time.Now().UTC(),
+			},
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("failed to unsuspend user: %w", err)
+	}
+	if result.MatchedCount == 0 {
+		return fmt.Errorf("user not found: %w", domain.ErrUserNotFound)
+	}
+	return nil
+}
+
+// ListSuspendedUsers retrieves all suspended users (paginated)
+func (r *MongoUserRepository) ListSuspendedUsers(ctx context.Context, limit int, offset int) ([]*domain.User, error) {
+	filter := bson.M{
+		"is_suspended": true,
+		"deleted_at":   nil,
+	}
+
+	opts := options.Find().
+		SetSkip(int64(offset)).
+		SetLimit(int64(limit)).
+		SetSort(bson.M{"suspended_at": -1})
+
+	cursor, err := r.collection.Find(ctx, filter, opts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list suspended users: %w", err)
+	}
+	defer cursor.Close(ctx)
+
+	var users []*domain.User
+	if err := cursor.All(ctx, &users); err != nil {
+		return nil, fmt.Errorf("failed to decode users: %w", err)
+	}
+
+	if users == nil {
+		users = make([]*domain.User, 0)
+	}
+
+	return users, nil
+}
+
+// ListDeletedUsers retrieves all soft-deleted users (paginated)
+func (r *MongoUserRepository) ListDeletedUsers(ctx context.Context, limit int, offset int) ([]*domain.User, error) {
+	filter := bson.M{
+		"deleted_at": bson.M{"$ne": nil},
+	}
+
+	opts := options.Find().
+		SetSkip(int64(offset)).
+		SetLimit(int64(limit)).
+		SetSort(bson.M{"deleted_at": -1})
+
+	cursor, err := r.collection.Find(ctx, filter, opts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list deleted users: %w", err)
+	}
+	defer cursor.Close(ctx)
+
+	var users []*domain.User
+	if err := cursor.All(ctx, &users); err != nil {
+		return nil, fmt.Errorf("failed to decode users: %w", err)
+	}
+
+	if users == nil {
+		users = make([]*domain.User, 0)
+	}
+
+	return users, nil
+}
+
+// CountAllUsers counts all active users
+func (r *MongoUserRepository) CountAllUsers(ctx context.Context) (int, error) {
+	count, err := r.collection.CountDocuments(ctx, bson.M{"deleted_at": nil})
+	if err != nil {
+		return 0, fmt.Errorf("failed to count users: %w", err)
+	}
+	return int(count), nil
+}
+
+// CountDeletedUsers counts all soft-deleted users
+func (r *MongoUserRepository) CountDeletedUsers(ctx context.Context) (int, error) {
+	count, err := r.collection.CountDocuments(ctx, bson.M{"deleted_at": bson.M{"$ne": nil}})
+	if err != nil {
+		return 0, fmt.Errorf("failed to count deleted users: %w", err)
+	}
+	return int(count), nil
+}
+
+// CountSuspendedUsers counts all suspended users
+func (r *MongoUserRepository) CountSuspendedUsers(ctx context.Context) (int, error) {
+	count, err := r.collection.CountDocuments(ctx, bson.M{
+		"is_suspended": true,
+		"deleted_at":   nil,
+	})
+	if err != nil {
+		return 0, fmt.Errorf("failed to count suspended users: %w", err)
+	}
+	return int(count), nil
+}
+
+// CountVerifiedUsers counts all email-verified users
+func (r *MongoUserRepository) CountVerifiedUsers(ctx context.Context) (int, error) {
+	count, err := r.collection.CountDocuments(ctx, bson.M{
+		"is_email_verified": true,
+		"deleted_at":        nil,
+	})
+	if err != nil {
+		return 0, fmt.Errorf("failed to count verified users: %w", err)
+	}
+	return int(count), nil
+}
+
+// ListAllUsers retrieves all active users (paginated)
+func (r *MongoUserRepository) ListAllUsers(ctx context.Context, limit int, offset int) ([]*domain.User, error) {
+	filter := bson.M{
+		"deleted_at": nil,
+	}
+
+	opts := options.Find().
+		SetSkip(int64(offset)).
+		SetLimit(int64(limit)).
+		SetSort(bson.M{"created_at": -1})
+
+	cursor, err := r.collection.Find(ctx, filter, opts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list all users: %w", err)
+	}
+	defer cursor.Close(ctx)
+
+	var users []*domain.User
+	if err := cursor.All(ctx, &users); err != nil {
+		return nil, fmt.Errorf("failed to decode users: %w", err)
+	}
+
+	if users == nil {
+		users = make([]*domain.User, 0)
+	}
+
+	return users, nil
+}

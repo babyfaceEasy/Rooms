@@ -71,6 +71,13 @@ type Config struct {
 		ActivityCooldownMinutes int
 		DeviceTokenExpiryDays  int
 	}
+	Admin struct {
+		AccessTokenTTL   time.Duration
+		RefreshTokenTTL  time.Duration
+		MaxLoginAttempts int
+		LockoutDuration  time.Duration
+		SetupTokenExpiry time.Duration
+	}
 }
 
 // Load reads configuration from environment variables and applies sensible defaults.
@@ -98,6 +105,12 @@ func Load() (Config, error) {
 	cfg.JWT.Secret = getEnv("JWT_SECRET", "")
 	cfg.JWT.AccessTokenTTL = parseDuration(getEnv("ACCESS_TOKEN_TTL", "1h"))
 	cfg.JWT.RefreshTokenTTL = parseDuration(getEnv("REFRESH_TOKEN_TTL", "168h"))
+
+	cfg.Admin.AccessTokenTTL = parseDuration(getEnv("ADMIN_ACCESS_TOKEN_TTL", "30m"))
+	cfg.Admin.RefreshTokenTTL = parseDuration(getEnv("ADMIN_REFRESH_TOKEN_TTL", "168h"))
+	cfg.Admin.MaxLoginAttempts = getInt("ADMIN_MAX_LOGIN_ATTEMPTS", 5)
+	cfg.Admin.LockoutDuration = parseDuration(getEnv("ADMIN_LOCKOUT_DURATION", "15m"))
+	cfg.Admin.SetupTokenExpiry = parseDuration(getEnv("ADMIN_SETUP_TOKEN_EXPIRY", "24h"))
 
 	cfg.RateLimit.GlobalMax = getInt("RATE_LIMIT_GLOBAL_MAX", 100)
 	cfg.RateLimit.GlobalWindow = parseDuration(getEnv("RATE_LIMIT_GLOBAL_WINDOW", "1m"))

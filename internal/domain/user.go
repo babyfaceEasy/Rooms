@@ -19,4 +19,10 @@ type User struct {
 	CreatedAt      time.Time          `json:"created_at" bson:"created_at"`
 	UpdatedAt      time.Time          `json:"updated_at" bson:"updated_at"`
 	DeletedAt      *time.Time         `json:"deleted_at,omitempty" bson:"deleted_at,omitempty"`
+
+	// Admin suspension
+	IsSuspended      bool                `json:"is_suspended" bson:"is_suspended"`
+	SuspensionReason *string             `json:"suspension_reason,omitempty" bson:"suspension_reason,omitempty"`
+	SuspendedAt      *time.Time          `json:"suspended_at,omitempty" bson:"suspended_at,omitempty"`
+	SuspendedBy      *primitive.ObjectID `json:"suspended_by,omitempty" bson:"suspended_by,omitempty"`
 }
