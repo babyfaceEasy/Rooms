@@ -135,7 +135,7 @@ func Load() (Config, error) {
 
 	cfg.Token.ResendCooldown = parseDuration(getEnv("TOKEN_RESEND_COOLDOWN", "2m"))
 
-	cfg.Firebase.Enabled = parseBool(getEnv("FIREBASE_ENABLED", "true"))
+	cfg.Firebase.Enabled = parseBool(getEnv("FIREBASE_ENABLED", "false"))
 	cfg.Firebase.ServiceAccountKeyPath = getEnv("FIREBASE_SERVICE_ACCOUNT_KEY_PATH", "")
 
 	cfg.Notifications.ActivityCooldownMinutes = getInt("NOTIFICATION_ACTIVITY_COOLDOWN_MINUTES", 30)
