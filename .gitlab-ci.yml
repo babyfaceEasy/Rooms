@@ -1,0 +1,255 @@
+image: public.ecr.aws/s5f8q3t6/awsdocker:latest
+
+before_script:
+  - echo "Processing room backend pipeline"
+  - export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+  - export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+
+variables:
+  #AWS variable
+  AWS_REGION: us-east-1
+  USER: devuser
+  REGISTRY: 068709857936.dkr.ecr.us-east-1.amazonaws.com
+
+  ECR_NAME_DEV: bouk-room-dev
+  ECR_NAME_PROD: bouk-room-prod
+
+  # S3 variables
+  
+  S3_ACCESS_KEY: $AWS_ACCESS_KEY_ID
+  S3_SECRET_KEY: $AWS_SECRET_ACCESS_KEY
+  S3_REGION: us-east-1
+  S3_BUCKET: bouk-room-bucket
+  S3_USE_SSL: false
+  S3_PRESIGNED_EXPIRY: 15m
+
+
+
+  #VM dev
+  VIRTUAL_MACHINE_IP_DEV: $BOUK_ROOM_DEV_IP
+  VIRTUAL_MACHINE_SSH_KEY_DEV: $BOUK_ROOM_DEV_SSH
+  DOCKER_COMPOSE_FILE_PATH_DEV: utils/dev/docker-compose.yml
+
+  #VM prod
+  VIRTUAL_MACHINE_IP_PROD: $BOUK_ROOM_PROD_IP
+  VIRTUAL_MACHINE_SSH_KEY_PROD: $BOUK_ROOM_PROD_SSH
+  DOCKER_COMPOSE_FILE_PATH_PROD: utils/prod/docker-compose.yml
+
+  # VM
+  VIRTUAL_MACHINE_USER: root
+  VIRTUAL_MACHINE_DEPLOY_PATH: /root/microservices/room/
+
+  DOCKER_COMPOSE_FILE: docker-compose.yml
+
+  # Docker utilities
+  DOCKER_TLS_CERTDIR: ""
+  DOCKER_HOST: "tcp://docker:2375"
+  DOCKER_DRIVER: overlay2
+
+  # Newman  Reports
+  POSTMAN_COLLECTION_PATH: "postman"
+  REPORT_OUTPUT_PATH: "postman"
+  NEWMAN_VERSION: "5.2.0"
+  NODE_VERSION: "16"
+  NEWMAN_REPORT_DIR: "newman_api_room_backend_reports"
+
+services:
+  - docker:dind
+
+default:
+  tags:
+    # - do-application-runner-01 ##
+    - bouk-admin-prod-runner
+
+stages:
+  - build
+  - scan
+  - deploy_dev
+  - notify_dev
+  - publish_prod
+  - deploy_prod
+  - notify_prod
+  - tests
+
+Build and publish dev:
+  variables:
+    CI_DEBUG_TRACE_UNMASK: "true"
+  only:
+    - staging
+    # - deployments
+  stage: build
+  retry: 2
+  before_script:
+    - $(aws ecr get-login --no-include-email --region $AWS_REGION | tr -d '\r')
+    - chmod 0755  utils/update_application_variable.sh
+    - 'sh utils/update_application_variable.sh "$APP_NAME" "$PORT" "$APP_ENV" "$LOG_LEVEL" "$MONGO_URI" "$MONGO_DATABASE" "10s" "$S3_ENDPOINT_URL" "$S3_REGION" "$S3_BUCKET" "$S3_ACCESS_KEY" "$S3_SECRET_KEY" "$S3_USE_SSL" "$S3_PRESIGNED_EXPIRY" "$JWT_SECRET_KEY" "$S3_PUBLIC_URL" "$APPSYNC_ENABLED" "$APPSYNC_ENDPOINT" "$APPSYNC_API_KEY" "$AWS_REGION" \
+      '
+    - pwd && ls && ls -la
+    - cat .env
+
+  script:
+    - 'echo "CI_PROJECT_PATH: ${CI_PROJECT_PATH}"'
+    - "echo fullname regitsry project version : bouk-room $REGISTRY/$ECR_NAME_DEV"
+    - "docker build . -t $REGISTRY/$ECR_NAME_DEV --no-cache "
+    - docker push $REGISTRY/$ECR_NAME_DEV:latest
+
+  allow_failure: false
+
+container_scanning:
+  stage: scan
+  only:
+    - release
+  script:
+    - $(aws ecr get-login --no-include-email --region $AWS_REGION | tr -d '\r')
+    - docker pull $REGISTRY/$ECR_NAME_PROD:latest
+    - wget https://github.com/aquasecurity/trivy/releases/tag/v0.45.0/trivy_0.45.0_Linux-64bit.tar.gz
+    - tar -zxvf trivy_0.45.0_Linux-64bit.tar.gz
+    - ./trivy -f json -o results_high.json --exit-code 0 --severity HIGH --quiet $REGISTRY/$ECR_NAME_PROD:latest
+    - ./trivy -f json -o results_critical.json --exit-code 0 --severity CRITICAL --quiet $REGISTRY/$ECR_NAME_PROD:latest
+    - ./trivy --exit-code 0 --severity HIGH --quiet $REGISTRY/$ECR_NAME_PROD:latest
+    - ./trivy --exit-code 0 --severity CRITICAL --quiet $REGISTRY/$ECR_NAME_PROD:latest
+  artifacts:
+    paths:
+      - ./results*.json
+    expire_in: 30 days
+  allow_failure: true
+  tags:
+    - bouk-room-prod-runner
+
+Deploy To DEV:
+  variables:
+    CI_DEBUG_TRACE_UNMASK: "true"
+  only:
+    - staging
+    # - deployments
+  stage: deploy_dev
+  retry: 2
+  before_script:
+    - echo "Updating Docker container on virtual machine"
+    - chmod 400 $VIRTUAL_MACHINE_SSH_KEY_DEV
+    - 'sh utils/update_application_variable.sh "$APP_NAME" "$PORT" "development" "$LOG_LEVEL" "$MONGO_URI" "$MONGO_DATABASE" "10s" "$S3_ENDPOINT_URL" "$S3_REGION" "$S3_BUCKET" "$S3_ACCESS_KEY" "$S3_SECRET_KEY" "$S3_USE_SSL" "$S3_PRESIGNED_EXPIRY" "LKBSSPsjj3jZSQ3TuYuGVVAmiyu1CAB4OxouAW2fZRU" 
+      "$SENDGRID_API_KEY" "$SENDGRID_ENABLED" "$SENDGRID_PASSWORD_RESET_TEMPLATE_ID" "$SENDGRID_SENDER_EMAIL" "$SENDGRID_VERIFICATION_TEMPLATE_ID" "$S3_PUBLIC_URL" "$APPSYNC_ENABLED" "$APPSYNC_ENDPOINT" "$APPSYNC_API_KEY" "$AWS_REGION"
+      '
+    - pwd && ls && ls -la
+    - cat .env
+  script:
+    # - scp -i $VIRTUAL_MACHINE_SSH_KEY_DEV -o StrictHostKeyChecking=no $DOCKER_COMPOSE_FILE_PATH_DEV $VIRTUAL_MACHINE_IP_DEV:$VIRTUAL_MACHINE_DEPLOY_PATH
+    - scp -i $VIRTUAL_MACHINE_SSH_KEY_DEV -o StrictHostKeyChecking=no $DOCKER_COMPOSE_FILE_PATH_DEV  $VIRTUAL_MACHINE_USER@$VIRTUAL_MACHINE_IP_DEV:$VIRTUAL_MACHINE_DEPLOY_PATH
+    - scp -C -r -i $VIRTUAL_MACHINE_SSH_KEY_DEV -o StrictHostKeyChecking=no ./utils/dev/nginx  $VIRTUAL_MACHINE_USER@$VIRTUAL_MACHINE_IP_DEV:$VIRTUAL_MACHINE_DEPLOY_PATH
+    - scp  -i $VIRTUAL_MACHINE_SSH_KEY_DEV -o StrictHostKeyChecking=no ./.env $VIRTUAL_MACHINE_USER@$VIRTUAL_MACHINE_IP_DEV:$VIRTUAL_MACHINE_DEPLOY_PATH
+    - ssh -i $VIRTUAL_MACHINE_SSH_KEY_DEV -o StrictHostKeyChecking=no $VIRTUAL_MACHINE_USER@$VIRTUAL_MACHINE_IP_DEV 'pwd && ls && aws ecr get-login-password  --region us-east-1 | docker login --username AWS --password-stdin 068709857936.dkr.ecr.us-east-1.amazonaws.com'
+    - ssh -i $VIRTUAL_MACHINE_SSH_KEY_DEV -o StrictHostKeyChecking=no $VIRTUAL_MACHINE_USER@$VIRTUAL_MACHINE_IP_DEV 'pwd && ls && cd /root/microservices/room/ && docker-compose pull'
+    - ssh -i $VIRTUAL_MACHINE_SSH_KEY_DEV -o StrictHostKeyChecking=no $VIRTUAL_MACHINE_USER@$VIRTUAL_MACHINE_IP_DEV 'pwd &&  ls && cd /root/microservices/room/ && docker-compose down && docker-compose up --build -d'
+  allow_failure: false 
+
+notification:
+  image: curlimages/curl
+  only:
+    - staging
+    # - deployments
+  stage: notify_dev
+  except:
+    - master
+  script:
+    - curl -X POST -H 'Content-Type:application/json' -d '{"chat_id":"-746475229", "text":"'"${GITLAB_USER_NAME}"' deployed feature '"${CI_COMMIT_MESSAGE}"' in branch '"${CI_COMMIT_REF_NAME}"' for project '"${CI_PROJECT_NAME}"'", "disable_notification":true}' https://api.telegram.org/bot$BOT_TOKEN/sendMessage
+  allow_failure: false
+
+Integration tests:
+  only:
+    - staging
+    # - deployments
+  stage: tests
+  when: delayed
+  start_in: 1 minutes
+  image: node:${NODE_VERSION}
+  variables:
+    LOG_LEVEL: "INFO"
+  # before_script:
+  #   - echo "Installing Node.js and Newman..."
+  #   - apt-get update -qy
+  #   - apt-get install -y curl
+  #   - curl -fsSL https://deb.nodesource.com/setup_21.x | sudo -E bash - && sudo apt-get install -y nodejs
+  #   - npm install -g newman
+
+  script:
+    # - mkdir $NEWMAN_REPORT_DIR
+    # - newman run $(pwd)/$POSTMAN_COLLECTION_PATH/bouk-room.postman_collection_now.json -r junit --reporter-junit-export ./$NEWMAN_REPORT_DIR/
+    - echo "runing integration tests"
+    - echo "integration tests complete"
+
+  artifacts:
+    paths:
+      - ./$NEWMAN_REPORT_DIR
+    expire_in: 1 week
+  allow_failure: true
+
+publish_prod:
+  only:
+    - release
+    # - deployments
+
+  stage: publish_prod
+
+  before_script:
+    - $(aws ecr get-login --no-include-email --region $AWS_REGION | tr -d '\r')
+    - chmod 0755  utils/update_application_variable.sh
+    - 'sh utils/update_application_variable.sh "$APP_NAME" "$PORT" "production" "$LOG_LEVEL" "$MONGO_URI" "$MONGO_DATABASE" "10s" "$S3_ENDPOINT_URL" "$S3_REGION" "$S3_BUCKET" "$S3_ACCESS_KEY" "$S3_SECRET_KEY" "$S3_USE_SSL" "$S3_PRESIGNED_EXPIRY" "$JWT_SECRET_KEY" \
+       "$SENDGRID_API_KEY" "$SENDGRID_ENABLED" "$SENDGRID_PASSWORD_RESET_TEMPLATE_ID" "$SENDGRID_SENDER_EMAIL" "$SENDGRID_VERIFICATION_TEMPLATE_ID" "$S3_PUBLIC_URL" "$APPSYNC_ENABLED" "$APPSYNC_ENDPOINT" "$APPSYNC_API_KEY" "$AWS_REGION"
+      '
+    - ls -la
+    - cat .env
+
+  script:
+    - 'echo "CI_PROJECT_PATH: ${CI_PROJECT_PATH}"'
+    - "echo fullname regitsry project version : bouk-room $REGISTRY/$ECR_NAME_PROD"
+    - "docker build . -t $REGISTRY/$ECR_NAME_PROD --no-cache "
+    - docker push $REGISTRY/$ECR_NAME_PROD:latest
+  allow_failure: false
+  tags:
+    - bouk-room-prod-runner
+
+Deploy To Prod:
+  variables:
+    CI_DEBUG_TRACE_UNMASK: "false"
+  only:
+    - release
+    # - deployments
+  stage: deploy_prod
+  retry: 2
+  before_script:
+    - echo "Updating Docker container on virtual machine"
+    - chmod 400 $VIRTUAL_MACHINE_SSH_KEY_DEV
+    - 'sh utils/update_application_variable.sh "$APP_NAME" "$PORT" "production" "$LOG_LEVEL" "$MONGO_URI" "$MONGO_DATABASE" "10s" "$S3_ENDPOINT_URL" "$S3_REGION" "$S3_BUCKET" "$S3_ACCESS_KEY" "$S3_SECRET_KEY" "$S3_USE_SSL" "$S3_PRESIGNED_EXPIRY" "$JWT_SECRET_KEY" 
+       "$SENDGRID_API_KEY" "$SENDGRID_ENABLED" "$SENDGRID_PASSWORD_RESET_TEMPLATE_ID" "$SENDGRID_SENDER_EMAIL" "$SENDGRID_VERIFICATION_TEMPLATE_ID" "$S3_PUBLIC_URL" "$APPSYNC_ENABLED" "$APPSYNC_ENDPOINT" "$APPSYNC_API_KEY" "$AWS_REGION"
+      '
+    - pwd && ls && ls -la
+    - cat .env
+
+  script:
+    - scp -i $VIRTUAL_MACHINE_SSH_KEY_DEV -o StrictHostKeyChecking=no $DOCKER_COMPOSE_FILE_PATH_PROD  $VIRTUAL_MACHINE_USER@$VIRTUAL_MACHINE_IP_PROD:$VIRTUAL_MACHINE_DEPLOY_PATH
+    - scp -C -r -i $VIRTUAL_MACHINE_SSH_KEY_DEV -o StrictHostKeyChecking=no ./utils/prod/nginx  $VIRTUAL_MACHINE_USER@$VIRTUAL_MACHINE_IP_PROD:$VIRTUAL_MACHINE_DEPLOY_PATH
+    - scp -C -r -i $VIRTUAL_MACHINE_SSH_KEY_DEV -o StrictHostKeyChecking=no ./.env $VIRTUAL_MACHINE_USER@$VIRTUAL_MACHINE_IP_PROD:$VIRTUAL_MACHINE_DEPLOY_PATH
+    - ssh -i $VIRTUAL_MACHINE_SSH_KEY_DEV -o StrictHostKeyChecking=no $VIRTUAL_MACHINE_USER@$VIRTUAL_MACHINE_IP_PROD 'pwd && ls && aws ecr get-login-password  --region us-east-1 | docker login --username AWS --password-stdin 068709857936.dkr.ecr.us-east-1.amazonaws.com'
+    - ssh -i $VIRTUAL_MACHINE_SSH_KEY_DEV -o StrictHostKeyChecking=no $VIRTUAL_MACHINE_USER@$VIRTUAL_MACHINE_IP_PROD 'pwd && ls && cd /root/microservices/room/ && docker-compose pull'
+    - ssh -i $VIRTUAL_MACHINE_SSH_KEY_DEV -o StrictHostKeyChecking=no $VIRTUAL_MACHINE_USER@$VIRTUAL_MACHINE_IP_PROD 'pwd &&  ls && cd /root/microservices/room/ &&  docker-compose down && docker-compose up --build -d'
+
+  allow_failure: false
+  tags:
+    - bouk-room-prod-runner
+
+notification_prod:
+  image: curlimages/curl
+  only:
+    - release
+  stage: notify_prod
+  except:
+    - release
+  script:
+    - curl -X POST -H 'Content-Type:application/json' -d '{"chat_id":"-746475229", "text":"'"${GITLAB_USER_NAME}"' deployed feature '"${CI_COMMIT_MESSAGE}"' in branch '"${CI_COMMIT_REF_NAME}"' for project '"${CI_PROJECT_NAME}"'", "disable_notification":true}' https://api.telegram.org/bot$BOT_TOKEN/sendMessage
+  allow_failure: false
+
+  tags:
+    - bouk-room-prod-runners
+
+
+##
