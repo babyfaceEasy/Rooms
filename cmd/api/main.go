@@ -196,10 +196,42 @@ func main() {
 	postHandler.SetNotificationOrchestrator(orchestratorService)
 	commentHandler.SetNotificationOrchestrator(orchestratorService)
 
+	// Admin repositories
+	adminRepo, err := repository.NewMongoAdminRepository(mongoClient.Database(cfg.Mongo.Database))
+	if err != nil {
+		logger.Error("admin repository initialization failed", slog.Any("error", err))
+		os.Exit(1)
+	}
+
+	adminRefreshTokenRepo, err := repository.NewMongoAdminRefreshTokenRepository(mongoClient.Database(cfg.Mongo.Database))
+	if err != nil {
+		logger.Error("admin refresh token repository initialization failed", slog.Any("error", err))
+		os.Exit(1)
+	}
+
+	adminLogRepo, err := repository.NewMongoAdminLogRepository(mongoClient.Database(cfg.Mongo.Database))
+	if err != nil {
+		logger.Error("admin log repository initialization failed", slog.Any("error", err))
+		os.Exit(1)
+	}
+
+	// Admin services
+	adminAuthService := service.NewAdminAuthService(adminRepo, adminRefreshTokenRepo, &cfg)
+	adminUserService := service.NewAdminUserService(adminRepo, adminAuthService)
+	adminUserMgmtService := service.NewAdminUserManagementService(userRepo)
+	adminLogService := service.NewAdminLogService(adminLogRepo)
+
+	// Admin handlers
+	adminAuthHandler := handler.NewAdminAuthHandler(adminAuthService, adminUserService)
+	adminUserHandler := handler.NewAdminUserHandler(adminUserService)
+	adminCustomerHandler := handler.NewAdminCustomerHandler(adminUserMgmtService, adminLogService)
+	adminAnalyticsHandler := handler.NewAdminAnalyticsHandler(adminUserMgmtService)
+	adminLogsHandler := handler.NewAdminLogsHandler(adminLogService)
+
 	// Start background jobs
 	go startCleanupJobs(ctx, logger, deviceTokenService, notificationRepo, cfg.Notifications.DeviceTokenExpiryDays)
 
-	server := api.NewServer(cfg, logger, itemHandler, userHandler, authHandler, roomHandler, postHandler, commentHandler, reportHandler, deviceHandler, patchActivityHandler, authService)
+	server := api.NewServer(cfg, logger, itemHandler, userHandler, authHandler, roomHandler, postHandler, commentHandler, reportHandler, deviceHandler, patchActivityHandler, authService, adminAuthService, adminAuthHandler, adminUserHandler, adminCustomerHandler, adminAnalyticsHandler, adminLogsHandler)
 
 	go func() {
 		if err := server.Start(); err != nil && !errors.Is(err, http.ErrServerClosed) {

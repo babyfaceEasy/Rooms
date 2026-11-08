@@ -1,6 +1,7 @@
 package api
 
 import (
+	"temp_backend/internal/domain"
 	"temp_backend/internal/handler"
 	"temp_backend/internal/middleware"
 	"temp_backend/internal/service"
@@ -108,4 +109,64 @@ func (s *Server) registerRoutes(itemHandler *handler.ItemHandler, userHandler *h
 
 	// Patch activity routes (protected)
 	apiProtected.Post("/patches/:patchId/viewed", patchActivityHandler.MarkPatchViewed)
+}
+
+// registerAdminRoutes registers all admin API routes
+func (s *Server) registerAdminRoutes(
+	authService service.AdminAuthService,
+	adminAuthHandler *handler.AdminAuthHandler,
+	adminUserHandler *handler.AdminUserHandler,
+	adminCustomerHandler *handler.AdminCustomerHandler,
+	adminAnalyticsHandler *handler.AdminAnalyticsHandler,
+	adminLogsHandler *handler.AdminLogsHandler,
+) {
+	// Public admin auth routes
+	adminAuthGroup := s.app.Group("/api/v1/admin/auth")
+	adminAuthGroup.Post("/login", adminAuthHandler.Login)
+	adminAuthGroup.Post("/initial-setup", adminAuthHandler.InitialSetup)
+	adminAuthGroup.Post("/forgot-password", adminAuthHandler.ForgotPassword)
+	adminAuthGroup.Post("/reset-password", adminAuthHandler.ResetPassword)
+	adminAuthGroup.Post("/refresh", adminAuthHandler.RefreshToken)
+
+	// Protected admin routes
+	adminProtected := s.app.Group("/api/v1/admin", middleware.AdminAuthMiddleware(authService))
+
+	// Admin auth routes (protected)
+	adminProtected.Post("/auth/logout", adminAuthHandler.Logout)
+
+	// Admin management routes (super_admin only)
+	adminMgmt := adminProtected.Group("/admins")
+	adminMgmt.Use(middleware.AdminPermissionMiddleware([]domain.AdminPermission{domain.PermissionManageAdmins}))
+	adminMgmt.Get("/:id", adminUserHandler.GetAdmin)
+	adminMgmt.Get("", adminUserHandler.ListAdmins)
+	adminMgmt.Post("", adminUserHandler.CreateAdmin)
+	adminMgmt.Patch("/:id", adminUserHandler.UpdateAdmin)
+	adminMgmt.Delete("/:id", adminUserHandler.DeleteAdmin)
+
+	// Customer management routes
+	customerMgmt := adminProtected.Group("/customers")
+	customerMgmt.Get("/:id", adminCustomerHandler.GetUser)
+	customerMgmt.Get("", adminCustomerHandler.ListUsers)
+	customerMgmt.Post("/:id/suspend", 
+		middleware.AdminPermissionMiddleware([]domain.AdminPermission{domain.PermissionSuspendUsers}),
+		adminCustomerHandler.SuspendUser)
+	customerMgmt.Delete("/:id/suspend", 
+		middleware.AdminPermissionMiddleware([]domain.AdminPermission{domain.PermissionSuspendUsers}),
+		adminCustomerHandler.UnsuspendUser)
+	customerMgmt.Delete("/:id", 
+		middleware.AdminPermissionMiddleware([]domain.AdminPermission{domain.PermissionDeleteUsers}),
+		adminCustomerHandler.DeleteUser)
+
+	// Analytics routes
+	analytics := adminProtected.Group("/analytics",
+		middleware.AdminPermissionMiddleware([]domain.AdminPermission{domain.PermissionViewAnalytics}))
+	analytics.Get("/users", adminAnalyticsHandler.GetUserAnalytics)
+	analytics.Get("/posts", adminAnalyticsHandler.GetPostAnalytics)
+	analytics.Get("/patches", adminAnalyticsHandler.GetPatchAnalytics)
+
+	// Logs routes
+	logs := adminProtected.Group("/logs",
+		middleware.AdminPermissionMiddleware([]domain.AdminPermission{domain.PermissionViewLogs}))
+	logs.Get("", adminLogsHandler.GetLogs)
+	logs.Get("/admin/:admin_id", adminLogsHandler.GetAdminLogs)
 }

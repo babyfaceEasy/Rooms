@@ -24,7 +24,26 @@ type Server struct {
 }
 
 // NewServer builds a configured Fiber server and wires all routes.
-func NewServer(cfg config.Config, logger *slog.Logger, itemHandler *handler.ItemHandler, userHandler *handler.UserHandler, authHandler *handler.AuthHandler, roomHandler *handler.RoomHandler, postHandler *handler.PostHandler, commentHandler *handler.CommentHandler, reportHandler *handler.ReportHandler, deviceHandler *handler.DeviceHandler, patchActivityHandler *handler.PatchActivityHandler, authService service.AuthService) *Server {
+func NewServer(
+	cfg config.Config,
+	logger *slog.Logger,
+	itemHandler *handler.ItemHandler,
+	userHandler *handler.UserHandler,
+	authHandler *handler.AuthHandler,
+	roomHandler *handler.RoomHandler,
+	postHandler *handler.PostHandler,
+	commentHandler *handler.CommentHandler,
+	reportHandler *handler.ReportHandler,
+	deviceHandler *handler.DeviceHandler,
+	patchActivityHandler *handler.PatchActivityHandler,
+	authService service.AuthService,
+	adminAuthService service.AdminAuthService,
+	adminAuthHandler *handler.AdminAuthHandler,
+	adminUserHandler *handler.AdminUserHandler,
+	adminCustomerHandler *handler.AdminCustomerHandler,
+	adminAnalyticsHandler *handler.AdminAnalyticsHandler,
+	adminLogsHandler *handler.AdminLogsHandler,
+) *Server {
 	app := fiber.New(fiber.Config{
 		AppName:      cfg.App.Name,
 		ErrorHandler: middleware.NewErrorHandler(logger, cfg.App.Env == "development"),
@@ -48,6 +67,7 @@ func NewServer(cfg config.Config, logger *slog.Logger, itemHandler *handler.Item
 	}
 	emailRateLimiter := middleware.NewEmailRateLimiter(cfg, logger)
 	s.registerRoutes(itemHandler, userHandler, authHandler, roomHandler, postHandler, commentHandler, reportHandler, deviceHandler, patchActivityHandler, authService, emailRateLimiter)
+	s.registerAdminRoutes(adminAuthService, adminAuthHandler, adminUserHandler, adminCustomerHandler, adminAnalyticsHandler, adminLogsHandler)
 	return s
 }
 

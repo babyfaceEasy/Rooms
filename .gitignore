@@ -46,3 +46,7 @@ report_options.jpeg
 main
 
 
+# Docker
+docker-compose.yml
+docker-compose.yaml
+.dockerignore
