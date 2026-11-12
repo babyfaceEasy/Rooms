@@ -132,6 +132,7 @@ func (s *Server) registerAdminRoutes(
 	adminProtected := s.app.Group("/api/v1/admin", middleware.AdminAuthMiddleware(authService))
 
 	// Admin auth routes (protected)
+	adminProtected.Get("/profile", adminAuthHandler.GetAdminProfile)
 	adminProtected.Post("/auth/logout", adminAuthHandler.Logout)
 
 	// Admin management routes (super_admin only)

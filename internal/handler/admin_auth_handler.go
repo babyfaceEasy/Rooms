@@ -230,3 +230,42 @@ func (h *AdminAuthHandler) Logout(c *fiber.Ctx) error {
 		"message": "Logged out successfully",
 	})
 }
+
+// GetAdminProfile retrieves the currently logged-in admin's profile
+// GET /api/v1/admin/profile
+func (h *AdminAuthHandler) GetAdminProfile(c *fiber.Ctx) error {
+	adminID := c.Locals("admin_id")
+	if adminID == nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "admin not authenticated",
+		})
+	}
+
+	adminIDObj, ok := adminID.(primitive.ObjectID)
+	if !ok {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "invalid admin id format",
+		})
+	}
+
+	admin, err := h.userService.GetAdmin(c.Context(), adminIDObj)
+	if err != nil {
+		appErr, ok := err.(*domain.AppError)
+		if ok {
+			return c.Status(appErr.HTTPStatus).JSON(fiber.Map{
+				"error": appErr.Message,
+				"code":  appErr.Code,
+			})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to retrieve admin profile",
+		})
+	}
+
+	// Remove sensitive fields
+	admin.PasswordHash = ""
+	admin.SetupToken = ""
+	admin.PasswordResetToken = ""
+
+	return c.JSON(admin)
+}

@@ -141,6 +141,56 @@ Response (200 OK):
 
 ---
 
+### Get Admin Profile
+Retrieves the profile of the currently logged-in admin. Returns the complete admin information including role, permissions, and metadata.
+
+```
+GET /api/v1/admin/profile
+Authorization: Bearer <access_token>
+
+Response (200 OK):
+{
+  "id": "507f1f77bcf86cd799439011",
+  "email": "admin@example.com",
+  "name": "John Admin",
+  "role": "super_admin",
+  "permissions": [
+    "manage_admins",
+    "manage_users",
+    "suspend_users",
+    "delete_users",
+    "view_user_analytics",
+    "manage_posts",
+    "delete_posts",
+    "view_post_analytics",
+    "manage_patches",
+    "delete_patches",
+    "view_patch_analytics",
+    "view_logs",
+    "view_analytics"
+  ],
+  "is_active": true,
+  "last_login": "2024-11-08T15:30:00Z",
+  "failed_login_attempts": 0,
+  "created_at": "2024-10-01T08:00:00Z",
+  "updated_at": "2024-11-08T15:30:00Z"
+}
+```
+
+**Error Response** (401 Unauthorized):
+```json
+{
+  "error": "admin not authenticated"
+}
+```
+
+**Error Response** (500 Internal Server Error):
+```json
+{
+  "error": "failed to retrieve admin profile"
+}
+```
+
 ## Admin Management Endpoints
 
 ### View Admin
