@@ -790,3 +790,48 @@ async function suspendUser(userId, reason) {
 }
 ```
 
+
+---
+
+## Password Hash Reference
+
+When creating admin users directly in MongoDB, use bcrypt-hashed passwords.
+
+### Common Test Passwords (for development only)
+
+| Password | Bcrypt Hash (cost=10) |
+|---|---|
+| `password123` | `$2a$10$l7jPnFGq0ZUTTdsKAPgvv.Nn9n9aP3p.w8T41egx/H1SkWLNKRshW` |
+
+### Generating Password Hashes
+
+Use this Go code to generate bcrypt hashes:
+
+```go
+package main
+import ("fmt"; "golang.org/x/crypto/bcrypt")
+func main() {
+    hash, _ := bcrypt.GenerateFromPassword([]byte("your_password"), bcrypt.DefaultCost)
+    fmt.Println(string(hash))
+}
+```
+
+### Creating Admin Users in MongoDB
+
+```javascript
+db.admins.insertOne({
+  email: "newadmin@example.com",
+  password_hash: "$2a$10$l7jPnFGq0ZUTTdsKAPgvv.Nn9n9aP3p.w8T41egx/H1SkWLNKRshW",
+  name: "New Admin",
+  role: "admin",
+  permissions: ["view_analytics", "view_logs"],
+  is_active: true,
+  failed_login_attempts: 0,
+  created_at: new Date(),
+  updated_at: new Date(),
+  locked_until: null
+})
+```
+
+**Note**: The hash shown corresponds to password "password123". For production, always use strong, unique passwords and secure hash generation methods.
+

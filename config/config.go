@@ -21,6 +21,7 @@ type Config struct {
 		ConnectTimeout time.Duration
 	}
 	S3 struct {
+		Enabled         bool
 		EndpointURL     string
 		Region          string
 		Bucket          string
@@ -93,6 +94,7 @@ func Load() (Config, error) {
 	cfg.Mongo.Database = getEnv("MONGO_DATABASE", "temp_backend")
 	cfg.Mongo.ConnectTimeout = parseDuration(getEnv("MONGO_CONNECT_TIMEOUT", "10s"))
 
+	cfg.S3.Enabled = parseBool(getEnv("S3_ENABLED", "true"))
 	cfg.S3.EndpointURL = getEnv("S3_ENDPOINT_URL", "http://localhost:9000")
 	cfg.S3.Region = getEnv("S3_REGION", "us-east-1")
 	cfg.S3.Bucket = getEnv("S3_BUCKET", "temp-bucket")
@@ -144,11 +146,13 @@ func Load() (Config, error) {
 	if cfg.Mongo.URI == "" {
 		return cfg, fmt.Errorf("MONGO_URI is required")
 	}
-	if cfg.S3.EndpointURL == "" {
-		return cfg, fmt.Errorf("S3_ENDPOINT_URL is required")
-	}
-	if cfg.S3.Bucket == "" {
-		return cfg, fmt.Errorf("S3_BUCKET is required")
+	if cfg.S3.Enabled {
+		if cfg.S3.EndpointURL == "" {
+			return cfg, fmt.Errorf("S3_ENDPOINT_URL is required when S3_ENABLED is true")
+		}
+		if cfg.S3.Bucket == "" {
+			return cfg, fmt.Errorf("S3_BUCKET is required when S3_ENABLED is true")
+		}
 	}
 	if cfg.JWT.Secret == "" {
 		return cfg, fmt.Errorf("JWT_SECRET is required")

@@ -50,26 +50,34 @@ func main() {
 		_ = mongoClient.Disconnect(disconnectCtx)
 	}()
 
-	s3Client, err := pks3.InitS3Config(
-		ctx,
-		cfg.S3.EndpointURL,
-		cfg.S3.Region,
-		cfg.S3.AccessKey,
-		cfg.S3.SecretKey,
-	)
-	if err != nil {
-		logger.Error("s3 client creation failed", slog.Any("error", err))
-		os.Exit(1)
-	}
+	var storageRepo repository.ObjectStorage
+	if cfg.S3.Enabled {
+		s3Client, err := pks3.InitS3Config(
+			ctx,
+			cfg.S3.EndpointURL,
+			cfg.S3.Region,
+			cfg.S3.AccessKey,
+			cfg.S3.SecretKey,
+		)
+		if err != nil {
+			logger.Error("s3 client creation failed", slog.Any("error", err))
+			os.Exit(1)
+		}
 
-	if err := ensureBucket(ctx, s3Client, cfg); err != nil {
-		logger.Error("s3 bucket check failed", slog.Any("error", err))
-		os.Exit(1)
+		if err := ensureBucket(ctx, s3Client, cfg); err != nil {
+			logger.Error("s3 bucket check failed", slog.Any("error", err))
+			os.Exit(1)
+		}
+
+		storageRepo = repository.NewS3Repository(s3Client, cfg.S3.Bucket, cfg.S3.PublicURL)
+		logger.Info("s3 storage enabled")
+	} else {
+		storageRepo = repository.NewNoOpStorage()
+		logger.Info("s3 storage disabled - using no-op storage")
 	}
 
 	// Item repositories and service
 	itemRepo := repository.NewMongoItemRepository(mongoClient.Database(cfg.Mongo.Database))
-	storageRepo := repository.NewS3Repository(s3Client, cfg.S3.Bucket, cfg.S3.PublicURL)
 	itemService := service.NewItemService(itemRepo, storageRepo)
 	itemHandler := handler.NewItemHandler(itemService)
 

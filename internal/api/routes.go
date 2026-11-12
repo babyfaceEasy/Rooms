@@ -9,7 +9,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
-func (s *Server) registerRoutes(itemHandler *handler.ItemHandler, userHandler *handler.UserHandler, authHandler *handler.AuthHandler, roomHandler *handler.RoomHandler, postHandler *handler.PostHandler, commentHandler *handler.CommentHandler, reportHandler *handler.ReportHandler, deviceHandler *handler.DeviceHandler, patchActivityHandler *handler.PatchActivityHandler, authService service.AuthService, emailRateLimiter fiber.Handler) {
+func (s *Server) registerRoutes(itemHandler *handler.ItemHandler, userHandler *handler.UserHandler, authHandler *handler.AuthHandler, roomHandler *handler.RoomHandler, postHandler *handler.PostHandler, commentHandler *handler.CommentHandler, reportHandler *handler.ReportHandler, deviceHandler *handler.DeviceHandler, patchActivityHandler *handler.PatchActivityHandler, authService service.AuthService, emailRateLimiter fiber.Handler, adminAuthHandler *handler.AdminAuthHandler) {
 	s.app.Get("/health", func(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusOK).JSON(fiber.Map{
 			"status": "ok",
@@ -44,6 +44,14 @@ func (s *Server) registerRoutes(itemHandler *handler.ItemHandler, userHandler *h
 	authGroup.Post("/forgot-password", emailRateLimiter, userHandler.ForgotPassword)
 	authGroup.Post("/resend-password-reset-email", emailRateLimiter, userHandler.ResendPasswordResetEmail)
 	authGroup.Post("/reset-password", emailRateLimiter, userHandler.ResetPassword)
+
+	// Public admin auth routes (must be registered before protected routes to avoid middleware conflicts)
+	adminAuthGroup := s.app.Group("/api/v1/admin/auth")
+	adminAuthGroup.Post("/login", adminAuthHandler.Login)
+	adminAuthGroup.Post("/initial-setup", adminAuthHandler.InitialSetup)
+	adminAuthGroup.Post("/forgot-password", adminAuthHandler.ForgotPassword)
+	adminAuthGroup.Post("/reset-password", adminAuthHandler.ResetPassword)
+	adminAuthGroup.Post("/refresh", adminAuthHandler.RefreshToken)
 
 	api := s.app.Group("/api/v1")
 
@@ -120,14 +128,7 @@ func (s *Server) registerAdminRoutes(
 	adminAnalyticsHandler *handler.AdminAnalyticsHandler,
 	adminLogsHandler *handler.AdminLogsHandler,
 ) {
-	// Public admin auth routes
-	adminAuthGroup := s.app.Group("/api/v1/admin/auth")
-	adminAuthGroup.Post("/login", adminAuthHandler.Login)
-	adminAuthGroup.Post("/initial-setup", adminAuthHandler.InitialSetup)
-	adminAuthGroup.Post("/forgot-password", adminAuthHandler.ForgotPassword)
-	adminAuthGroup.Post("/reset-password", adminAuthHandler.ResetPassword)
-	adminAuthGroup.Post("/refresh", adminAuthHandler.RefreshToken)
-
+	// Public admin auth routes are already registered in registerRoutes()
 	// Protected admin routes
 	adminProtected := s.app.Group("/api/v1/admin", middleware.AdminAuthMiddleware(authService))
 

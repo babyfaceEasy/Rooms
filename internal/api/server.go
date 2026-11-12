@@ -66,7 +66,7 @@ func NewServer(
 		logger: logger,
 	}
 	emailRateLimiter := middleware.NewEmailRateLimiter(cfg, logger)
-	s.registerRoutes(itemHandler, userHandler, authHandler, roomHandler, postHandler, commentHandler, reportHandler, deviceHandler, patchActivityHandler, authService, emailRateLimiter)
+	s.registerRoutes(itemHandler, userHandler, authHandler, roomHandler, postHandler, commentHandler, reportHandler, deviceHandler, patchActivityHandler, authService, emailRateLimiter, adminAuthHandler)
 	s.registerAdminRoutes(adminAuthService, adminAuthHandler, adminUserHandler, adminCustomerHandler, adminAnalyticsHandler, adminLogsHandler)
 	return s
 }
