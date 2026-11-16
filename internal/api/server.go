@@ -11,6 +11,7 @@ import (
 	"temp_backend/internal/service"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cors"
 	flogger "github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/gofiber/fiber/v2/middleware/requestid"
@@ -57,6 +58,12 @@ func NewServer(
 	app.Use(requestid.New())
 	app.Use(flogger.New(flogger.Config{
 		Format: "[${time}] ${status} ${method} ${path} (${latency}) ${ip}\n",
+	}))
+	app.Use(cors.New(cors.Config{
+		AllowOrigins: "http://localhost:3000, http://localhost:3001, http://localhost:5173, http://127.0.0.1:3000, http://127.0.0.1:3001, http://127.0.0.1:5173",
+		AllowMethods: "GET,POST,HEAD,PUT,DELETE,PATCH,OPTIONS",
+		AllowHeaders: "Content-Type,Authorization",
+		MaxAge:       600,
 	}))
 	app.Use(middleware.NewGlobalRateLimiter(cfg, logger))
 
