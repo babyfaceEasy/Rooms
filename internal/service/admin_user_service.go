@@ -17,8 +17,8 @@ type AdminUserService interface {
 	// GetAdmin retrieves an admin by ID
 	GetAdmin(ctx context.Context, adminID primitive.ObjectID) (*domain.Admin, error)
 
-	// ListAdmins retrieves all admins (paginated)
-	ListAdmins(ctx context.Context, limit int, offset int) ([]*domain.Admin, error)
+	// ListAdmins retrieves all admins (paginated) with total count
+	ListAdmins(ctx context.Context, limit int, offset int) (*domain.PaginatedResponse[*domain.Admin], error)
 
 	// CreateAdmin creates a new admin with setup token for initial password setup
 	CreateAdmin(ctx context.Context, email, name string, role domain.AdminRole) (*domain.Admin, string, error)
@@ -57,9 +57,19 @@ func (s *adminUserService) GetAdmin(ctx context.Context, adminID primitive.Objec
 	return s.adminRepo.GetByID(ctx, adminID)
 }
 
-// ListAdmins retrieves all admins (paginated)
-func (s *adminUserService) ListAdmins(ctx context.Context, limit int, offset int) ([]*domain.Admin, error) {
-	return s.adminRepo.List(ctx, limit, offset)
+// ListAdmins retrieves all admins (paginated) with total count
+func (s *adminUserService) ListAdmins(ctx context.Context, limit int, offset int) (*domain.PaginatedResponse[*domain.Admin], error) {
+	admins, err := s.adminRepo.List(ctx, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+
+	total, err := s.adminRepo.CountAll(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return domain.NewPaginatedResponse(admins, total, limit, offset), nil
 }
 
 // CreateAdmin creates a new admin with setup token

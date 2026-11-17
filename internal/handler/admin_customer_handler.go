@@ -81,15 +81,11 @@ func (h *AdminCustomerHandler) ListUsers(c *fiber.Ctx) error {
 	}
 
 	// Remove sensitive fields
-	for _, user := range users {
+	for _, user := range users.Data {
 		user.PasswordHash = ""
 	}
 
-	return c.JSON(fiber.Map{
-		"data":   users,
-		"limit":  limit,
-		"offset": offset,
-	})
+	return c.JSON(users)
 }
 
 // SuspendUser suspends a customer

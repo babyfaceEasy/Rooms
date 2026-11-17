@@ -46,11 +46,7 @@ func (h *AdminLogsHandler) GetLogs(c *fiber.Ctx) error {
 		})
 	}
 
-	return c.JSON(fiber.Map{
-		"data":   logs,
-		"limit":  limit,
-		"offset": offset,
-	})
+	return c.JSON(logs)
 }
 
 // GetAdminLogs retrieves logs for a specific admin
@@ -86,9 +82,5 @@ func (h *AdminLogsHandler) GetAdminLogs(c *fiber.Ctx) error {
 		})
 	}
 
-	return c.JSON(fiber.Map{
-		"data":   logs,
-		"limit":  limit,
-		"offset": offset,
-	})
+	return c.JSON(logs)
 }

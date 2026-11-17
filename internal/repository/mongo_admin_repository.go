@@ -466,3 +466,17 @@ func (r *MongoAdminRepository) CountSuperAdmins(ctx context.Context) (int, error
 
 	return int(count), nil
 }
+
+// CountAll counts the total number of active admins
+func (r *MongoAdminRepository) CountAll(ctx context.Context) (int, error) {
+	filter := bson.M{
+		"deleted_at": nil,
+	}
+
+	count, err := r.collection.CountDocuments(ctx, filter)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count admins: %w", err)
+	}
+
+	return int(count), nil
+}

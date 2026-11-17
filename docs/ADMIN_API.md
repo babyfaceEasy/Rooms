@@ -229,10 +229,17 @@ Response (200 OK):
       ...
     }
   ],
+  "total": 42,
   "limit": 10,
   "offset": 0
 }
 ```
+
+**Response Fields**:
+- `data`: Array of admin objects
+- `total`: Total number of admins (integer) - use this to calculate total pages: `Math.ceil(total / limit)`
+- `limit`: Number of records per page (matches query parameter)
+- `offset`: Starting position (matches query parameter)
 
 ### Create New Admin
 **Requires Permission**: `manage_admins` (super_admin only)
@@ -343,10 +350,17 @@ Response (200 OK):
       ...
     }
   ],
+  "total": 1250,
   "limit": 20,
   "offset": 0
 }
 ```
+
+**Response Fields**:
+- `data`: Array of customer user objects
+- `total`: Total number of customers (integer) - use this to calculate total pages: `Math.ceil(total / limit)`
+- `limit`: Number of records per page (matches query parameter)
+- `offset`: Starting position (matches query parameter)
 
 ### Suspend Customer
 **Requires Permission**: `suspend_users`
@@ -623,10 +637,17 @@ Response (200 OK):
       "created_at": "2024-10-31T10:30:00Z"
     }
   ],
+  "total": 15847,
   "limit": 50,
   "offset": 0
 }
 ```
+
+**Response Fields**:
+- `data`: Array of audit log entries
+- `total`: Total number of logs (integer) - use this to calculate total pages: `Math.ceil(total / limit)`
+- `limit`: Number of records per page (matches query parameter)
+- `offset`: Starting position (matches query parameter)
 
 ### Get Admin's Logs
 **Requires Permission**: `view_logs`
@@ -637,11 +658,34 @@ Authorization: Bearer <access_token>
 
 Response (200 OK):
 {
-  "data": [...],
+  "data": [
+    {
+      "id": "507f191e810c19729de860fa",
+      "admin_id": "507f191e810c19729de860fb",
+      "admin_email": "admin@example.com",
+      "action": "USER_SUSPEND",
+      "resource_type": "USER",
+      "resource_id": "507f191e810c19729de860fc",
+      "changes": {
+        "reason": "Violated community guidelines"
+      },
+      "status": "SUCCESS",
+      "ip_address": "192.168.1.1",
+      "user_agent": "Mozilla/5.0...",
+      "created_at": "2024-10-31T10:30:00Z"
+    }
+  ],
+  "total": 342,
   "limit": 50,
   "offset": 0
 }
 ```
+
+**Response Fields**:
+- `data`: Array of audit log entries for the specific admin
+- `total`: Total number of logs for this admin (integer) - use this to calculate total pages: `Math.ceil(total / limit)`
+- `limit`: Number of records per page (matches query parameter)
+- `offset`: Starting position (matches query parameter)
 
 ---
 

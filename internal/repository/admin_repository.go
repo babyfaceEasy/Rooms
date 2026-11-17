@@ -60,6 +60,9 @@ type AdminRepository interface {
 
 	// CountSuperAdmins counts the number of active super admin accounts
 	CountSuperAdmins(ctx context.Context) (int, error)
+
+	// CountAll counts the total number of active admins
+	CountAll(ctx context.Context) (int, error)
 }
 
 // AdminLogRepository defines operations for admin log persistence
@@ -81,4 +84,10 @@ type AdminLogRepository interface {
 
 	// ListWithFilters retrieves logs with multiple filters (paginated)
 	ListWithFilters(ctx context.Context, filters map[string]interface{}, limit int, offset int) ([]*domain.AdminLog, error)
+
+	// Count returns total number of admin logs
+	Count(ctx context.Context) (int, error)
+
+	// CountByAdmin returns total number of logs for a specific admin
+	CountByAdmin(ctx context.Context, adminID primitive.ObjectID) (int, error)
 }

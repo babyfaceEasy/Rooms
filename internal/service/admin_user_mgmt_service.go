@@ -15,8 +15,8 @@ type AdminUserManagementService interface {
 	// GetUser retrieves a user by ID
 	GetUser(ctx context.Context, userID primitive.ObjectID) (*domain.User, error)
 
-	// ListAllUsers retrieves all users (paginated)
-	ListAllUsers(ctx context.Context, limit int, offset int) ([]*domain.User, error)
+	// ListAllUsers retrieves all users (paginated) with total count
+	ListAllUsers(ctx context.Context, limit int, offset int) (*domain.PaginatedResponse[*domain.User], error)
 
 	// SuspendUser suspends a user
 	SuspendUser(ctx context.Context, userID primitive.ObjectID, reason string, adminID primitive.ObjectID) error
@@ -55,9 +55,19 @@ func (s *adminUserManagementService) GetUser(ctx context.Context, userID primiti
 	return s.userRepo.GetByID(ctx, userID)
 }
 
-// ListAllUsers retrieves all users (paginated)
-func (s *adminUserManagementService) ListAllUsers(ctx context.Context, limit int, offset int) ([]*domain.User, error) {
-	return s.userRepo.ListAllUsers(ctx, limit, offset)
+// ListAllUsers retrieves all users (paginated) with total count
+func (s *adminUserManagementService) ListAllUsers(ctx context.Context, limit int, offset int) (*domain.PaginatedResponse[*domain.User], error) {
+	users, err := s.userRepo.ListAllUsers(ctx, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+
+	total, err := s.userRepo.CountAllUsers(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return domain.NewPaginatedResponse(users, total, limit, offset), nil
 }
 
 // SuspendUser suspends a user

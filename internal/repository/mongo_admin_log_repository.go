@@ -246,3 +246,27 @@ func (r *MongoAdminLogRepository) ListWithFilters(ctx context.Context, filters m
 
 	return logs, nil
 }
+
+// Count returns total number of admin logs
+func (r *MongoAdminLogRepository) Count(ctx context.Context) (int, error) {
+	count, err := r.collection.CountDocuments(ctx, bson.M{})
+	if err != nil {
+		return 0, fmt.Errorf("failed to count admin logs: %w", err)
+	}
+
+	return int(count), nil
+}
+
+// CountByAdmin returns total number of logs for a specific admin
+func (r *MongoAdminLogRepository) CountByAdmin(ctx context.Context, adminID primitive.ObjectID) (int, error) {
+	filter := bson.M{
+		"admin_id": adminID,
+	}
+
+	count, err := r.collection.CountDocuments(ctx, filter)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count admin logs by admin: %w", err)
+	}
+
+	return int(count), nil
+}

@@ -81,17 +81,13 @@ func (h *AdminUserHandler) ListAdmins(c *fiber.Ctx) error {
 	}
 
 	// Remove sensitive fields
-	for _, admin := range admins {
+	for _, admin := range admins.Data {
 		admin.PasswordHash = ""
 		admin.SetupToken = ""
 		admin.PasswordResetToken = ""
 	}
 
-	return c.JSON(fiber.Map{
-		"data":   admins,
-		"limit":  limit,
-		"offset": offset,
-	})
+	return c.JSON(admins)
 }
 
 // CreateAdmin creates a new admin
