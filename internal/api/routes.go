@@ -141,6 +141,7 @@ func (s *Server) registerAdminRoutes(
 	adminMgmt.Use(middleware.AdminPermissionMiddleware([]domain.AdminPermission{domain.PermissionManageAdmins}))
 	adminMgmt.Get("/:id", adminUserHandler.GetAdmin)
 	adminMgmt.Get("", adminUserHandler.ListAdmins)
+	adminMgmt.Get("/search", adminUserHandler.SearchAdmins)
 	adminMgmt.Post("", adminUserHandler.CreateAdmin)
 	adminMgmt.Patch("/:id", adminUserHandler.UpdateAdmin)
 	adminMgmt.Delete("/:id", adminUserHandler.DeleteAdmin)
@@ -149,6 +150,7 @@ func (s *Server) registerAdminRoutes(
 	customerMgmt := adminProtected.Group("/customers")
 	customerMgmt.Get("/:id", adminCustomerHandler.GetUser)
 	customerMgmt.Get("", adminCustomerHandler.ListUsers)
+	customerMgmt.Get("/search", adminCustomerHandler.SearchUsers)
 	customerMgmt.Post("/:id/suspend", 
 		middleware.AdminPermissionMiddleware([]domain.AdminPermission{domain.PermissionSuspendUsers}),
 		adminCustomerHandler.SuspendUser)
@@ -170,5 +172,6 @@ func (s *Server) registerAdminRoutes(
 	logs := adminProtected.Group("/logs",
 		middleware.AdminPermissionMiddleware([]domain.AdminPermission{domain.PermissionViewLogs}))
 	logs.Get("", adminLogsHandler.GetLogs)
+	logs.Get("/search", adminLogsHandler.SearchLogs)
 	logs.Get("/admin/:admin_id", adminLogsHandler.GetAdminLogs)
 }

@@ -480,3 +480,54 @@ func (r *MongoAdminRepository) CountAll(ctx context.Context) (int, error) {
 
 	return int(count), nil
 }
+
+// SearchAdmins searches admins by email or name using regex (case-insensitive)
+func (r *MongoAdminRepository) SearchAdmins(ctx context.Context, query string, limit int, offset int) ([]*domain.Admin, error) {
+	filter := bson.M{
+		"deleted_at": nil,
+		"$or": bson.A{
+			bson.M{"email": bson.M{"$regex": query, "$options": "i"}},
+			bson.M{"name": bson.M{"$regex": query, "$options": "i"}},
+		},
+	}
+
+	opts := options.Find().
+		SetSkip(int64(offset)).
+		SetLimit(int64(limit)).
+		SetSort(bson.M{"created_at": -1})
+
+	cursor, err := r.collection.Find(ctx, filter, opts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to search admins: %w", err)
+	}
+	defer cursor.Close(ctx)
+
+	var admins []*domain.Admin
+	if err := cursor.All(ctx, &admins); err != nil {
+		return nil, fmt.Errorf("failed to decode search results: %w", err)
+	}
+
+	if admins == nil {
+		admins = make([]*domain.Admin, 0)
+	}
+
+	return admins, nil
+}
+
+// CountSearchAdmins counts admins matching the search query
+func (r *MongoAdminRepository) CountSearchAdmins(ctx context.Context, query string) (int, error) {
+	filter := bson.M{
+		"deleted_at": nil,
+		"$or": bson.A{
+			bson.M{"email": bson.M{"$regex": query, "$options": "i"}},
+			bson.M{"name": bson.M{"$regex": query, "$options": "i"}},
+		},
+	}
+
+	count, err := r.collection.CountDocuments(ctx, filter)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count search results: %w", err)
+	}
+
+	return int(count), nil
+}

@@ -63,6 +63,12 @@ type AdminRepository interface {
 
 	// CountAll counts the total number of active admins
 	CountAll(ctx context.Context) (int, error)
+
+	// SearchAdmins searches admins by email or name (case-insensitive, fuzzy match)
+	SearchAdmins(ctx context.Context, query string, limit int, offset int) ([]*domain.Admin, error)
+
+	// CountSearchAdmins counts total admins matching the search query
+	CountSearchAdmins(ctx context.Context, query string) (int, error)
 }
 
 // AdminLogRepository defines operations for admin log persistence
@@ -90,4 +96,10 @@ type AdminLogRepository interface {
 
 	// CountByAdmin returns total number of logs for a specific admin
 	CountByAdmin(ctx context.Context, adminID primitive.ObjectID) (int, error)
+
+	// SearchLogs searches logs by admin email or action
+	SearchLogs(ctx context.Context, query string, limit int, offset int) ([]*domain.AdminLog, error)
+
+	// CountSearchLogs counts total logs matching the search query
+	CountSearchLogs(ctx context.Context, query string) (int, error)
 }

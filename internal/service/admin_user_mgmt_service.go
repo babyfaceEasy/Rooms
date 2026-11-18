@@ -18,6 +18,9 @@ type AdminUserManagementService interface {
 	// ListAllUsers retrieves all users (paginated) with total count
 	ListAllUsers(ctx context.Context, limit int, offset int) (*domain.PaginatedResponse[*domain.User], error)
 
+	// SearchUsers searches users by email or name (paginated) with total count
+	SearchUsers(ctx context.Context, query string, limit int, offset int) (*domain.PaginatedResponse[*domain.User], error)
+
 	// SuspendUser suspends a user
 	SuspendUser(ctx context.Context, userID primitive.ObjectID, reason string, adminID primitive.ObjectID) error
 
@@ -63,6 +66,21 @@ func (s *adminUserManagementService) ListAllUsers(ctx context.Context, limit int
 	}
 
 	total, err := s.userRepo.CountAllUsers(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return domain.NewPaginatedResponse(users, total, limit, offset), nil
+}
+
+// SearchUsers searches users by email or name (paginated) with total count
+func (s *adminUserManagementService) SearchUsers(ctx context.Context, query string, limit int, offset int) (*domain.PaginatedResponse[*domain.User], error) {
+	users, err := s.userRepo.SearchUsers(ctx, query, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+
+	total, err := s.userRepo.CountSearchUsers(ctx, query)
 	if err != nil {
 		return nil, err
 	}

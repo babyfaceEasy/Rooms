@@ -389,3 +389,54 @@ func (r *MongoUserRepository) ListAllUsers(ctx context.Context, limit int, offse
 
 	return users, nil
 }
+
+// SearchUsers searches users by email or name using regex (case-insensitive)
+func (r *MongoUserRepository) SearchUsers(ctx context.Context, query string, limit int, offset int) ([]*domain.User, error) {
+	filter := bson.M{
+		"deleted_at": nil,
+		"$or": bson.A{
+			bson.M{"email": bson.M{"$regex": query, "$options": "i"}},
+			bson.M{"name": bson.M{"$regex": query, "$options": "i"}},
+		},
+	}
+
+	opts := options.Find().
+		SetSkip(int64(offset)).
+		SetLimit(int64(limit)).
+		SetSort(bson.M{"created_at": -1})
+
+	cursor, err := r.collection.Find(ctx, filter, opts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to search users: %w", err)
+	}
+	defer cursor.Close(ctx)
+
+	var users []*domain.User
+	if err := cursor.All(ctx, &users); err != nil {
+		return nil, fmt.Errorf("failed to decode search results: %w", err)
+	}
+
+	if users == nil {
+		users = make([]*domain.User, 0)
+	}
+
+	return users, nil
+}
+
+// CountSearchUsers counts users matching the search query
+func (r *MongoUserRepository) CountSearchUsers(ctx context.Context, query string) (int, error) {
+	filter := bson.M{
+		"deleted_at": nil,
+		"$or": bson.A{
+			bson.M{"email": bson.M{"$regex": query, "$options": "i"}},
+			bson.M{"name": bson.M{"$regex": query, "$options": "i"}},
+		},
+	}
+
+	count, err := r.collection.CountDocuments(ctx, filter)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count search results: %w", err)
+	}
+
+	return int(count), nil
+}

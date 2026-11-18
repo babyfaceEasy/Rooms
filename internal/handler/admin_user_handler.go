@@ -90,6 +90,48 @@ func (h *AdminUserHandler) ListAdmins(c *fiber.Ctx) error {
 	return c.JSON(admins)
 }
 
+// SearchAdmins searches admins by email or name
+// GET /api/v1/admin/admins/search?search=query&limit=10&offset=0
+func (h *AdminUserHandler) SearchAdmins(c *fiber.Ctx) error {
+	query := c.Query("search", "")
+	if query == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "search query parameter is required",
+		})
+	}
+
+	limit := 10
+	offset := 0
+
+	if l := c.Query("limit"); l != "" {
+		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 {
+			limit = parsed
+		}
+	}
+
+	if o := c.Query("offset"); o != "" {
+		if parsed, err := strconv.Atoi(o); err == nil && parsed >= 0 {
+			offset = parsed
+		}
+	}
+
+	admins, err := h.adminService.SearchAdmins(c.Context(), query, limit, offset)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to search admins",
+		})
+	}
+
+	// Remove sensitive fields
+	for _, admin := range admins.Data {
+		admin.PasswordHash = ""
+		admin.SetupToken = ""
+		admin.PasswordResetToken = ""
+	}
+
+	return c.JSON(admins)
+}
+
 // CreateAdmin creates a new admin
 // POST /api/v1/admin/admins
 func (h *AdminUserHandler) CreateAdmin(c *fiber.Ctx) error {

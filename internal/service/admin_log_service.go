@@ -20,6 +20,9 @@ type AdminLogService interface {
 	// GetAdminLogs retrieves logs for a specific admin (paginated) with total count
 	GetAdminLogs(ctx context.Context, adminID primitive.ObjectID, limit int, offset int) (*domain.PaginatedResponse[*domain.AdminLog], error)
 
+	// SearchLogs searches logs by admin email or action (paginated) with total count
+	SearchLogs(ctx context.Context, query string, limit int, offset int) (*domain.PaginatedResponse[*domain.AdminLog], error)
+
 	// GetResourceLogs retrieves logs for a specific resource
 	GetResourceLogs(ctx context.Context, resourceType domain.AdminLogResourceType, resourceID primitive.ObjectID, limit int, offset int) ([]*domain.AdminLog, error)
 }
@@ -75,6 +78,21 @@ func (s *adminLogService) GetAdminLogs(ctx context.Context, adminID primitive.Ob
 	}
 
 	total, err := s.logRepo.CountByAdmin(ctx, adminID)
+	if err != nil {
+		return nil, err
+	}
+
+	return domain.NewPaginatedResponse(logs, total, limit, offset), nil
+}
+
+// SearchLogs searches logs by admin email or action (paginated) with total count
+func (s *adminLogService) SearchLogs(ctx context.Context, query string, limit int, offset int) (*domain.PaginatedResponse[*domain.AdminLog], error) {
+	logs, err := s.logRepo.SearchLogs(ctx, query, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+
+	total, err := s.logRepo.CountSearchLogs(ctx, query)
 	if err != nil {
 		return nil, err
 	}

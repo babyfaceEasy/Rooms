@@ -241,6 +241,52 @@ Response (200 OK):
 - `limit`: Number of records per page (matches query parameter)
 - `offset`: Starting position (matches query parameter)
 
+### Search Admins
+**Requires Permission**: `manage_admins` (super_admin only)
+
+Searches admins by email or name using fuzzy matching (case-insensitive).
+
+```
+GET /api/v1/admin/admins/search?search=john&limit=10&offset=0
+Authorization: Bearer <access_token>
+
+Response (200 OK):
+{
+  "data": [
+    {
+      "id": "507f1f77bcf86cd799439011",
+      "email": "john.admin@example.com",
+      "name": "John Admin",
+      "role": "admin",
+      "is_active": true,
+      ...
+    },
+    {
+      "id": "507f1f77bcf86cd799439013",
+      "email": "admin@example.com",
+      "name": "Johnny Smith",
+      "role": "admin",
+      "is_active": true,
+      ...
+    }
+  ],
+  "total": 2,
+  "limit": 10,
+  "offset": 0
+}
+```
+
+**Query Parameters**:
+- `search` (required): Search term for email or name (fuzzy, case-insensitive)
+- `limit` (optional): Number of results per page (default: 10)
+- `offset` (optional): Starting position (default: 0)
+
+**Response Fields**:
+- `data`: Array of matching admin objects
+- `total`: Total number of matches (use for pagination)
+- `limit`: Number of records per page
+- `offset`: Starting position
+
 ### Create New Admin
 **Requires Permission**: `manage_admins` (super_admin only)
 
@@ -361,6 +407,46 @@ Response (200 OK):
 - `total`: Total number of customers (integer) - use this to calculate total pages: `Math.ceil(total / limit)`
 - `limit`: Number of records per page (matches query parameter)
 - `offset`: Starting position (matches query parameter)
+
+### Search Customers
+Searches customers by email or name using fuzzy matching (case-insensitive).
+
+```
+GET /api/v1/admin/customers/search?search=john&limit=20&offset=0
+Authorization: Bearer <access_token>
+
+Response (200 OK):
+{
+  "data": [
+    {
+      "id": "507f191e810c19729de860ea",
+      "email": "john@example.com",
+      "name": "John Doe",
+      ...
+    },
+    {
+      "id": "507f191e810c19729de860eb",
+      "email": "johnny.smith@example.com",
+      "name": "Johnny Smith",
+      ...
+    }
+  ],
+  "total": 2,
+  "limit": 20,
+  "offset": 0
+}
+```
+
+**Query Parameters**:
+- `search` (required): Search term for email or name (fuzzy, case-insensitive)
+- `limit` (optional): Number of results per page (default: 10)
+- `offset` (optional): Starting position (default: 0)
+
+**Response Fields**:
+- `data`: Array of matching customer objects
+- `total`: Total number of matches (use for pagination)
+- `limit`: Number of records per page
+- `offset`: Starting position
 
 ### Suspend Customer
 **Requires Permission**: `suspend_users`
@@ -648,6 +734,73 @@ Response (200 OK):
 - `total`: Total number of logs (integer) - use this to calculate total pages: `Math.ceil(total / limit)`
 - `limit`: Number of records per page (matches query parameter)
 - `offset`: Starting position (matches query parameter)
+
+### Search Logs
+**Requires Permission**: `view_logs`
+
+Searches logs by admin email or action using fuzzy matching (case-insensitive).
+
+```
+GET /api/v1/admin/logs/search?search=USER_SUSPEND&limit=50&offset=0
+Authorization: Bearer <access_token>
+
+Response (200 OK):
+{
+  "data": [
+    {
+      "id": "507f191e810c19729de860fa",
+      "admin_id": "507f191e810c19729de860fb",
+      "admin_email": "admin@example.com",
+      "action": "USER_SUSPEND",
+      "resource_type": "USER",
+      "resource_id": "507f191e810c19729de860fc",
+      "changes": {
+        "reason": "Violated community guidelines"
+      },
+      "status": "SUCCESS",
+      "ip_address": "192.168.1.1",
+      "user_agent": "Mozilla/5.0...",
+      "created_at": "2024-10-31T10:30:00Z"
+    },
+    {
+      "id": "507f191e810c19729de860fd",
+      "admin_id": "507f191e810c19729de860fe",
+      "admin_email": "moderator@example.com",
+      "action": "USER_SUSPEND",
+      "resource_type": "USER",
+      "resource_id": "507f191e810c19729de860ff",
+      "changes": {
+        "reason": "Spam activity"
+      },
+      "status": "SUCCESS",
+      "ip_address": "192.168.1.2",
+      "user_agent": "Mozilla/5.0...",
+      "created_at": "2024-10-31T09:45:00Z"
+    }
+  ],
+  "total": 342,
+  "limit": 50,
+  "offset": 0
+}
+```
+
+**Query Parameters**:
+- `search` (required): Search term for admin email or action (fuzzy, case-insensitive)
+- `limit` (optional): Number of results per page (default: 50, max: 100)
+- `offset` (optional): Starting position (default: 0)
+
+**Response Fields**:
+- `data`: Array of matching log entries
+- `total`: Total number of matches (use for pagination)
+- `limit`: Number of records per page
+- `offset`: Starting position
+
+**Common Search Terms**:
+- `USER_SUSPEND` - Find all user suspension actions
+- `USER_DELETE` - Find all user deletion actions
+- `ADMIN_CREATE` - Find all admin creation actions
+- `admin@example.com` - Find all actions by a specific admin
+- `POST_DELETE` - Find all post deletion actions
 
 ### Get Admin's Logs
 **Requires Permission**: `view_logs`

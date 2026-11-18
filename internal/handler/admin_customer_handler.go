@@ -88,6 +88,46 @@ func (h *AdminCustomerHandler) ListUsers(c *fiber.Ctx) error {
 	return c.JSON(users)
 }
 
+// SearchUsers searches customers by email or name
+// GET /api/v1/admin/customers/search?search=query&limit=10&offset=0
+func (h *AdminCustomerHandler) SearchUsers(c *fiber.Ctx) error {
+	query := c.Query("search", "")
+	if query == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "search query parameter is required",
+		})
+	}
+
+	limit := 10
+	offset := 0
+
+	if l := c.Query("limit"); l != "" {
+		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 {
+			limit = parsed
+		}
+	}
+
+	if o := c.Query("offset"); o != "" {
+		if parsed, err := strconv.Atoi(o); err == nil && parsed >= 0 {
+			offset = parsed
+		}
+	}
+
+	users, err := h.userMgmtService.SearchUsers(c.Context(), query, limit, offset)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to search users",
+		})
+	}
+
+	// Remove sensitive fields
+	for _, user := range users.Data {
+		user.PasswordHash = ""
+	}
+
+	return c.JSON(users)
+}
+
 // SuspendUser suspends a customer
 // POST /api/v1/admin/customers/:id/suspend
 func (h *AdminCustomerHandler) SuspendUser(c *fiber.Ctx) error {

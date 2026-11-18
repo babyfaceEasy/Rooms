@@ -20,6 +20,9 @@ type AdminUserService interface {
 	// ListAdmins retrieves all admins (paginated) with total count
 	ListAdmins(ctx context.Context, limit int, offset int) (*domain.PaginatedResponse[*domain.Admin], error)
 
+	// SearchAdmins searches admins by email or name (paginated) with total count
+	SearchAdmins(ctx context.Context, query string, limit int, offset int) (*domain.PaginatedResponse[*domain.Admin], error)
+
 	// CreateAdmin creates a new admin with setup token for initial password setup
 	CreateAdmin(ctx context.Context, email, name string, role domain.AdminRole) (*domain.Admin, string, error)
 
@@ -65,6 +68,21 @@ func (s *adminUserService) ListAdmins(ctx context.Context, limit int, offset int
 	}
 
 	total, err := s.adminRepo.CountAll(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return domain.NewPaginatedResponse(admins, total, limit, offset), nil
+}
+
+// SearchAdmins searches admins by email or name (paginated) with total count
+func (s *adminUserService) SearchAdmins(ctx context.Context, query string, limit int, offset int) (*domain.PaginatedResponse[*domain.Admin], error) {
+	admins, err := s.adminRepo.SearchAdmins(ctx, query, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+
+	total, err := s.adminRepo.CountSearchAdmins(ctx, query)
 	if err != nil {
 		return nil, err
 	}

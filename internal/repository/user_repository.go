@@ -29,5 +29,11 @@ type UserRepository interface {
 	CountSuspendedUsers(ctx context.Context) (int, error)
 	CountVerifiedUsers(ctx context.Context) (int, error)
 	ListAllUsers(ctx context.Context, limit int, offset int) ([]*domain.User, error)
+
+	// SearchUsers searches users by email or name (case-insensitive, fuzzy match)
+	SearchUsers(ctx context.Context, query string, limit int, offset int) ([]*domain.User, error)
+
+	// CountSearchUsers counts total users matching the search query
+	CountSearchUsers(ctx context.Context, query string) (int, error)
 }
 

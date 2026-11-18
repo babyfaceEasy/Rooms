@@ -49,6 +49,41 @@ func (h *AdminLogsHandler) GetLogs(c *fiber.Ctx) error {
 	return c.JSON(logs)
 }
 
+// SearchLogs searches admin logs by admin email or action
+// GET /api/v1/admin/logs/search?search=query&limit=50&offset=0
+func (h *AdminLogsHandler) SearchLogs(c *fiber.Ctx) error {
+	query := c.Query("search", "")
+	if query == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "search query parameter is required",
+		})
+	}
+
+	limit := 50
+	offset := 0
+
+	if l := c.Query("limit"); l != "" {
+		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 && parsed <= 100 {
+			limit = parsed
+		}
+	}
+
+	if o := c.Query("offset"); o != "" {
+		if parsed, err := strconv.Atoi(o); err == nil && parsed >= 0 {
+			offset = parsed
+		}
+	}
+
+	logs, err := h.logService.SearchLogs(c.Context(), query, limit, offset)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to search logs",
+		})
+	}
+
+	return c.JSON(logs)
+}
+
 // GetAdminLogs retrieves logs for a specific admin
 // GET /api/v1/admin/logs/admin/:admin_id?limit=50&offset=0
 func (h *AdminLogsHandler) GetAdminLogs(c *fiber.Ctx) error {
